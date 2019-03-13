@@ -6,7 +6,7 @@ import os
 from typing import List
 
 
-def pad(data: bytes, block_size_bytes: int) -> bytes:
+def rsrpad(data: bytes, block_size_bytes: int) -> bytes:
     """Return data padded to match the specified block_size_bytes.
 
     Arguments:
