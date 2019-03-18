@@ -4,10 +4,11 @@
 Refer to class SteamMetadata for further detail/definitions.
 """
 
-import os
+from pathlib import Path
 from hashlib import sha1
 from collections import abc
 from enum import Enum
+from typing import Dict, Any, Iterator, Tuple, Mapping, Optional, Union
 
 from rsrtools.utils import double_quote
 
@@ -30,7 +31,7 @@ class SteamMetadataKey(Enum):
 class SteamMetadataError(Exception):
     """Base class for Steam metadata handling errors."""
 
-    def __init__(self, message=None):
+    def __init__(self, message: str = None) -> None:
         """Minimal constructor.
 
         Keyword Arguments:
@@ -84,6 +85,9 @@ class SteamMetadata:
                 "platformstosync2"		"-1"
             }
 
+    Warning: The class does not validate the steam cloud files and does not validate
+    the file locations. These are caller responsibilities.
+
     Implementation notes for the Steam metadata dictionary (self._steam_metadata):
         - This is a dictionary with one entry:
             key = Steam app_id
@@ -95,7 +99,13 @@ class SteamMetadata:
 
     """
 
-    def _read_steam_metadata(self):
+    # lazy annotation here.
+    # Path to Steam metadata file.
+    _metadata_path: Path
+    # Instance version of the steam metadata
+    _steam_metadata: Dict[str, Any]
+
+    def _read_steam_metadata(self) -> None:
         """Read Steam metadata file and load metadata dictionary."""
         self._steam_metadata = dict()
 
@@ -103,7 +113,7 @@ class SteamMetadata:
         node = self._steam_metadata
         section_label = ""
         branches = list()
-        with open(self._file_path, "rt") as fh:
+        with self._metadata_path.open("rt") as fh:
             for line in fh:
                 key = line.strip()
                 try:
@@ -129,7 +139,9 @@ class SteamMetadata:
             )
 
     @staticmethod
-    def _update_metadata_key_value(metadata_set: dict, key: SteamMetadataKey, value):
+    def _update_metadata_key_value(
+        metadata_set: Dict, key: SteamMetadataKey, value: Any
+    ) -> None:
         """Update value for the specified key in the Steam cloud file metadata set.
 
         Arguments:
@@ -167,26 +179,29 @@ class SteamMetadata:
                 "Steam metadata entry does not exist for key {0}.".format(key.name)
             )
 
-    def _cloud_file_metadata_set(self, app_id: str, file_path):
+    def _cloud_file_metadata_set(self, app_id: str, file_path: Path) -> Dict:
         """Return the Steam cloud file metadata set for the app_id/file_path pair.
 
         Arguments:
             app_id {str} -- Steam app id for the Steam cloud file.
-            file_path {str | path like} -- Path to the Steam cloud file.
+            file_path {pathlib.Path} -- Path to the Steam cloud file. Warning: this
+                method extracts the filename from the path and ignores all other path
+                information. It is the caller responsibility to ensure the path points
+                to the correct steam cloud file.
 
         Raises:
             KeyError -- Raised if the Steam metadata does not contain an entry for the
                 app_id/file_path parameters.
 
         Returns:
-            [dict] -- Steam cloud file metadata set for the app_id/file_path pair.
+            dict -- Steam cloud file metadata set for the app_id/file_path pair.
 
         Note: This method returns the metadata dictionary for a single Steam cloud
         file. It does **not** return self._steam_metadata (see Class help for
         definition).
 
         """
-        ret_val = None
+        file_metadata = None
         # This will throw a key error if the metadata dictionary doesn't contain
         # entries for app_id. Otherwiser returns a dictionary of dicts containing
         # metadata for *ALL* of the steam cloud files associated with the app_id. Need
@@ -196,26 +211,29 @@ class SteamMetadata:
         # As I've seen weird case stuff for file names in remotecache.vdf, assume we
         # need to do a case insensitive check for the filename. Should be OK for
         # windows, may break on OSX/Linux
-        find_file = double_quote(os.path.basename(file_path).upper())
+        find_name = double_quote(file_path.name.upper())
         for check_name in file_dict.keys():
-            if check_name.upper() == find_file:
+            if check_name.upper() == find_name:
                 file_metadata = file_dict[check_name]
                 break
 
-        if ret_val is None:
+        if file_metadata is None:
             raise KeyError(
                 "No Steam metadata entry  for file {0} in "
-                "app {1}".format(find_file, app_id)
+                "app {1}".format(find_name, app_id)
             )
 
         return file_metadata
 
-    def metadata_exists(self, app_id: str, file_path):
+    def metadata_exists(self, app_id: str, file_path: Path) -> bool:
         """Return True if a metadata set exists for a Steam cloud file.
 
         Arguments:
             app_id {str} --  Steam app id for the Steam cloud file.
-            file_path {str | path like} -- Path to the Steam cloud file.
+            file_path {pathlib.Path} -- Path to the Steam cloud file. Warning: this
+                method extracts the filename from the path and ignores all other path
+                information. It is the caller responsibility to ensure the path points
+                to the correct steam cloud file.
 
         """
         ret_val = True
@@ -227,12 +245,19 @@ class SteamMetadata:
 
         return ret_val
 
-    def update_metadata_set(self, app_id: str, file_path, data=None):
+    def update_metadata_set(
+        self, app_id: str, file_path: Path, data: bytes = None
+    ) -> None:
         """Update all writeable metadata for a Steam cloud file.
 
         Arguments:
             app_id {str} --  Steam app id for the Steam cloud file.
-            file_path {[type]} -- Path to the Steam cloud file.
+            file_path {pathlib.Path} -- Path to the Steam cloud file. Warning: this
+                method extracts the filename from the path to identify the metadata set
+                and updates metadata based on the file properties. It is the caller
+                responsibility to ensure the path points to the correct steam cloud
+                file (i.e. this method does not validate that the file is valid 
+                steam cloud file in a valid location). 
 
         Keyword Arguments:
             data {bytes} -- Binary Steam cloud file held in memory
@@ -255,13 +280,14 @@ class SteamMetadata:
 
         hasher = sha1()
         if data is None:
-            with open(file_path, "rb") as fh:
+            with file_path.open("rb") as fh:
                 buffer = fh.read(BLOCK_SIZE)
                 while buffer:
                     hasher.update(buffer)
                     buffer = fh.read(BLOCK_SIZE)
 
-            file_size = os.path.getsize(file_path)
+            # st_size works on windows
+            file_size = file_path.stat().st_size
         else:
             hasher.update(data)
             file_size = len(data)
@@ -274,21 +300,19 @@ class SteamMetadata:
             cache_dict, SteamMetadataKey.SHA, hasher.hexdigest().lower()
         )
 
-        # getmtime appears gives the right (UTC since jan 1 1970) values on Windows,
+        # st_mtime appears gives the right (UTC since jan 1 1970) values on Windows,
         # probably also OK on OSX, Linux?
         self._update_metadata_key_value(
-            cache_dict,
-            SteamMetadataKey.LOCALTIME,
-            str(int(os.path.getmtime(file_path))),
+            cache_dict, SteamMetadataKey.LOCALTIME, str(int(file_path.stat().st_mtime))
         )
         self._update_metadata_key_value(
-            cache_dict, SteamMetadataKey.TIME, str(int(os.path.getmtime(file_path)))
+            cache_dict, SteamMetadataKey.TIME, str(int(file_path.stat().st_mtime))
         )
 
         # instance contents out of sync with metadata file.
         self._is_dirty = True
 
-    def _iter_tree(self, tree):
+    def _iter_tree(self, tree: Mapping[Any, Any]) -> Iterator[Tuple[Any, Any]]:
         """Iterate (walk) the Steam metadata tree.
 
         Arguments:
@@ -306,11 +330,12 @@ class SteamMetadata:
             else:
                 yield key, value
 
-    def write_metadata_file(self, save_dir):
+    def write_metadata_file(self, save_dir: Optional[Path]) -> None:
         """Write Steam metadata file if instance data differs from the original file.
 
         Arguments:
-            save_dir {str | PathLike} -- Save directory for the steam metadata file.
+            save_dir {Optional[pathlib.Path]} -- Save directory for the steam metadata
+                file or None.
 
         If save_dir is specified as None, the original steam metadata file will be
         overwritten.
@@ -338,48 +363,49 @@ class SteamMetadata:
                     file_lines.append("".join([indent, key, SEPARATOR, value, "\n"]))
 
             if save_dir is None:
-                with open(self._file_path, "wt") as fh:
+                with self._metadata_path.open("wt") as fh:
                     fh.writelines(file_lines)
                 # original source file and instance now in sync
                 self._is_dirty = False
 
             else:
-                save_path = os.path.join(save_dir, os.path.basename(self._file_path))
-                with open(save_path, "xt") as fh:
+                save_path = save_dir.joinpath(self._metadata_path.name)
+
+                with save_path.open("xt") as fh:
                     fh.writelines(file_lines)
 
-    def __init__(self, search_dir):
+    def __init__(self, search_dir: Path) -> None:
         """Locate Steam metadata file in search_dir and load it.
 
         Arguments:
-            search_dir {str | PathLike} -- Search directory for metadata file.
+            search_dir {pathlib.Path} -- Search directory for metadata file.
 
         Raises:
             FileNotFoundError -- Metadata file not found.
 
         """
         # see if we can find a path to remotecache.vdf.
-        self._file_path = None
         self._is_dirty = False
 
-        file_path = os.path.abspath(os.path.join(search_dir, REMOTE_CACHE_NAME))
-        if os.path.isfile(file_path):
-            self._file_path = file_path
+        target_path = search_dir.joinpath(REMOTE_CACHE_NAME)
+        
+        if target_path.is_file():
+            self._metadata_path = target_path
         else:
             raise FileNotFoundError(
                 "Steam metadata file {0} expected but not found in:\n   {1}".format(
-                    REMOTE_CACHE_NAME, search_dir
+                    REMOTE_CACHE_NAME, str(search_dir)
                 )
             )
 
         self._read_steam_metadata()
 
     @property
-    def file_path(self):
+    def file_path(self) -> Path:
         """Return the path to the underlying Steam metadata file.
 
         Returns:
-            [str] -- Path to metadata file.
+            pathlib.Path -- Path to metadata file.
 
         """
-        return self._file_path
+        return self._metadata_path

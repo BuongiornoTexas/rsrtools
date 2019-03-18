@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Provides utilities for rsrtools."""
 
-import winreg
-import os
-from typing import List
+# Not even trying to get stubs for winreg
+import winreg  # type: ignore
+from pathlib import Path
+from typing import List, Optional, Dict, Tuple, Union, Any
 
 
 def rsrpad(data: bytes, block_size_bytes: int) -> bytes:
@@ -41,16 +42,18 @@ def double_quote(raw_string: str) -> str:
 
 # utilities for extracting steam parameters from the windows registry.
 # OSX will need to modify these.
-def steam_path() -> str:
+def steam_path() -> Optional[Path]:
     """Return steam installation path as a string. Return None if not found."""
     ret_val = None
     try:
         with winreg.OpenKey(
             winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam"
         ) as steam_key:
-            ret_val, _ = winreg.QueryValueEx(steam_key, "SteamPath")
+            str_path, _ = winreg.QueryValueEx(steam_key, "SteamPath")
     except OSError:
         pass
+
+    ret_val = Path(str_path)
 
     return ret_val
 
@@ -93,7 +96,7 @@ def steam_registry_users() -> List[str]:
     return ret_val
 
 
-def steam_user_data_dirs() -> dict:
+def steam_user_data_dirs() -> Dict[str, Path]:
     """Return a dictionary of all userdata directories found in the steam directory.
 
     Dictionary keys are local steam user ids as strings, values are the directory paths
@@ -105,22 +108,27 @@ def steam_user_data_dirs() -> dict:
     users_dir = steam_path()
     if users_dir is not None:
         # noinspection SpellCheckingInspection
-        users_dir = os.path.join(os.path.abspath(users_dir), "userdata")
+        users_dir = users_dir.joinpath("userdata")
 
-        if os.path.isdir(users_dir):
-            with os.scandir(users_dir) as it:
-                for entry in it:
-                    if entry.is_dir():
-                        ret_val[entry.name] = entry.path
+        if users_dir.is_dir():
+            for child in users_dir.iterdir():
+                if child.is_dir():
+                    ret_val[child.name] = child
 
     return ret_val
 
 
-def choose(options, header=None, allow_multi=False, no_action=None, help_text=None):
+def choose(
+    options: Union[List[str], List[Tuple[str, Any]]],
+    header: Optional[str] = None,
+    allow_multi: bool = False,
+    no_action: Optional[Any] = None,
+    help_text: Optional[str] = None,
+) -> Optional[Union[Any, List[Any]]]:
     """Return user selection or multi-selection from a list of options.
 
     Arguments:
-        options {list[str] | list[(str, Any)]} -- Either:
+        options {Union[List[str], List[Tuple[str, Any]]]} -- Either:
             * a list containing options, where the selected option(s) are returned
             * a list containing tuples of (option_description, return_value), where
               choose returns the return_value(s) corresponding to the selected
@@ -135,8 +143,8 @@ def choose(options, header=None, allow_multi=False, no_action=None, help_text=No
         help_text {str} -- Detailed help text. (default: {None})
 
     Returns:
-        Any | list[Any] -- Return value/list of return values, per options and
-            no_action keyword.
+        Optional[Union[Any, List[Any]]] -- Return value/list of return values, per
+            options and no_action keyword.
 
     """
     opt_tuple_list = list()
@@ -159,7 +167,7 @@ def choose(options, header=None, allow_multi=False, no_action=None, help_text=No
         if help_text is not None:
             print("  h) Help.")
 
-        values = ""
+        values: Any = ""
         try:
             # splits on commas, strips white space from values, converts to int
             print()
@@ -196,7 +204,7 @@ def choose(options, header=None, allow_multi=False, no_action=None, help_text=No
                 print("Invalid input, please try again")
 
 
-def yes_no_dialog(prompt):
+def yes_no_dialog(prompt: str) -> bool:
     """Return true/false based on prompt string and Y/y or N/n response."""
     while True:
         print()
