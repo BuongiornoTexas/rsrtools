@@ -27,8 +27,9 @@ for testing (I wouldn't run this on any files in the steam folder though ...)
 
 import struct
 import zlib
-import os
 import argparse
+from pathlib import Path
+from typing import Optional, Tuple, Dict, Any
 
 import simplejson
 
@@ -36,17 +37,17 @@ import simplejson
 # noinspection PyPackageRequirements
 from Crypto.Cipher import AES
 
-from rsrtools.files.exceptions import RsrError, RSFileFormatError
+from rsrtools.files.exceptions import RSFileFormatError
 from rsrtools.utils import rsrpad
 
 # Encryption key for Rocksmith save files
-SAVE_FILE_KEY = bytes.fromhex(
+SAVE_FILE_KEY: bytes = bytes.fromhex(
     "728B369E24ED0134768511021812AFC0A3C25D02065F166B4BCC58CD2644F29E"
 )
 
 HEADER_BYTES = 16
 PAYLOAD_SIZE_BYTES = 4
-FIRST_PAYLOAD_BYTE = HEADER_BYTES + PAYLOAD_SIZE_BYTES
+FIRST_PAYLOAD_BYTE: int = HEADER_BYTES + PAYLOAD_SIZE_BYTES
 ECB_BLOCK_SIZE = 16
 
 
@@ -78,11 +79,27 @@ class RSSaveFile:
     Rocksmith and may corrupt the installation.
     """
 
-    def __init__(self, file_name, json_debug_file=None, debug=False):
+    _debug: bool
+    _json_debug_path: Optional[Path]
+    _file_path: Path
+    _check_padding: bytes
+    _original_file_data: bytes
+    _header: bytes
+    # too hard to figure out how factory annotation works today.
+    # for now make _cipher explictly dynamic with an Any type
+    # TODO: more reading another time.
+    _cipher: Any
+    _debug_z_payload: bytes  # compressed payload
+    _debug_payload: bytes  # null terminated payload
+    json_tree: Dict
+
+    def __init__(
+        self, rs_file_path: Path, json_debug_file: str = None, debug: bool = False
+    ) -> None:
         """Read a file, perform reconstructability test, and expose file data as self.json_tree.
 
         Arguments:
-            file_name {string} -- The name/path of the Rocksmith file to load.
+            rs_file_path {pathlib.Path} -- The name/path of the Rocksmith file to load.
 
         Keyword Arguments:
             json_debug_file {str} -- If supplied, the constructor will write the
@@ -104,18 +121,18 @@ class RSSaveFile:
         """
         self._debug = debug
         if json_debug_file is None:
-            self.json_debug_file = None
+            self._json_debug_path = None
         else:
-            self.json_debug_file = os.path.abspath(json_debug_file)
+            self._json_debug_path = Path(json_debug_file)
 
-        self._file_path = os.path.abspath(file_name)
+        self._file_path = rs_file_path
 
         self._read_save_file()
 
         # run self check on file reconstructability, discard return
         self._generate_file_data(self_check=True)
 
-    def _generate_json_string(self):
+    def _generate_json_string(self) -> str:
         """Generate json string and and apply Ubisoft specific formatting.
 
         Returns:
@@ -154,7 +171,7 @@ class RSSaveFile:
 
         return payload
 
-    def _compress_payload(self):
+    def _compress_payload(self) -> Tuple[bytes, int]:
         """Generate and return compressed payload and uncompressed payload size.
 
         Returns:
@@ -164,23 +181,28 @@ class RSSaveFile:
         Includes self checking on reconstructability if required.
 
         """
-        payload = self._generate_json_string()
+        payload_str = self._generate_json_string()
 
+        # convert str payload to terminated bytes
         # RS expects null terminated payload
-        payload = b"".join([payload.encode(), b"\x00"])
+        payload = b"".join([payload_str.encode(), b"\x00"])
 
         z_payload = zlib.compress(payload, zlib.Z_BEST_COMPRESSION)
 
         if self._debug:
             if payload != self._debug_payload:
-                if self.json_debug_file is not None:
-                    self.save_json_file(self.json_debug_file + ".reconstruct")
+                if self._json_debug_path:
+                    self.save_json_file(
+                        self._json_debug_path.with_suffix(
+                            self._json_debug_path.suffix + ".reconstruct"
+                        )
+                    )
 
                 raise RSFileFormatError(
                     "Mismatch between original payload and self check reconstructed "
                     "payload in: \n\n    {0}\n\nRun with _debug=True and "
                     "json_debug_file specified to gather "
-                    "diagnostics.".format(self._file_path)
+                    "diagnostics.".format(str(self._file_path))
                 )
 
             if z_payload != self._debug_z_payload[: len(z_payload)]:
@@ -190,12 +212,12 @@ class RSSaveFile:
                 # editing will work!). So we compare without padding.
                 raise RSFileFormatError(
                     "Mismatch between original compressed payload and self check "
-                    "reconstruction in:\n\n    {0}\n".format(self._file_path)
+                    "reconstruction in:\n\n    {0}\n".format(str(self._file_path))
                 )
 
         return z_payload, len(payload)
 
-    def _generate_file_data(self, self_check: bool):
+    def _generate_file_data(self, self_check: bool) -> bytes:
         """Convert simplejson data into save file as bytes object.
 
         Arguments:
@@ -230,7 +252,7 @@ class RSSaveFile:
             if file_data != self._original_file_data:
                 raise RSFileFormatError(
                     "Mismatch between original file and self check reconstruction in: "
-                    "\n\n    {0}\n".format(self._file_path)
+                    "\n\n    {0}\n".format(str(self._file_path))
                 )
             elif not self._debug:
                 # discard self check vars. If we didn't have the problem of random
@@ -238,12 +260,12 @@ class RSSaveFile:
                 # original file data to check if the file had changed before writing.
                 # But we do, so we don't. Could keep the z_payload if this was a really
                 # useful check?
-                self._original_file_data = None
-                self._check_padding = None
+                self._original_file_data = b""
+                self._check_padding = b""
 
         return file_data
 
-    def generate_save_file(self):
+    def generate_save_file(self) -> bytes:
         """Return a bytes object containing the save file corresponding the current json tree.
 
         Returns:
@@ -255,42 +277,37 @@ class RSSaveFile:
         """
         return self._generate_file_data(self_check=False)
 
-    def write_save_file(self, save_file_name=None, overwrite_original: bool = False):
-        """Write save file based on data in simplejson object self.json_tree.
+    def _write_save_file(self, save_path: Path, mode: str) -> None:
+        """Save instance data to file.
 
         Keyword Arguments:
-            save_file_name {str} -- Save file name/path. (default: {None})
-            overwrite_original {bool} -- Overwrite original file if True.
-                (default: {False})
-
-        Raises:
-            RsrError -- If the called with default values for save_file_name and
-                overwrite_original.
-
-        If a save file name is provided and the file doesn't exist, write to the named
-        file and **ignore** overwrite_original. Otherwise if overwrite_original is True,
-        overwrite the original source file. Does not make a backup either way.
+            save_path {pathlib.Path} -- Save file name/path.
+            mode {str} -- File open mode. Must be a valid binary write mode. Should be
+                either "wb" or "xb".
 
         """
         file_data = self._generate_file_data(self_check=False)
 
-        if save_file_name is not None:
-            fh = open(os.path.abspath(save_file_name), "xb")
+        with save_path.open(mode) as fh:
+            fh.write(file_data)
 
-        elif not overwrite_original:
-            raise RsrError(
-                "RSSaveFile: write_save_file must be called with either a save file "
-                "name or with the over_write_original flag set to True. No file saved."
-            )
-        else:
-            fh = open(self._file_path, "wb")
+    def overwrite_original(self) -> None:
+        """Overwrite original save file with instance data."""
+        self._write_save_file(self._file_path, "wb")
 
-        fh.write(file_data)
-        fh.close()
+    def save_to_new_file(self, save_path: Path) -> None:
+        """Save instance data to a new save file.
 
-    def _load_file(self):
+        Keyword Arguments:
+            save_path {pathlib.Path} -- Save file name/path.
+
+        The method will not overwrite existing files.
+        """
+        self._write_save_file(save_path, "xb")
+
+    def _load_file(self) -> None:
         """Load save file into memory and perform preliminary integrity checks."""
-        with open(self._file_path, "rb") as f:
+        with self._file_path.open("rb") as f:
             # discard self._original_file_data after validation at end of __init__
             self._original_file_data = f.read()
 
@@ -303,11 +320,11 @@ class RSSaveFile:
                 "Unexpected value in in file: \n\n    {0}"
                 "\n\nExpected '{1}' as first four bytes (magic number), "
                 "found '{2}'.".format(
-                    self._file_path, expect_magic.decode(), found_magic.decode()
+                    str(self._file_path), expect_magic.decode(), found_magic.decode()
                 )
             )
 
-    def _decompress_payload(self, z_payload: bytes):
+    def _decompress_payload(self, z_payload: bytes) -> bytes:
         """Decompress compressed payload, and return decompressed payload.
 
         Arguments:
@@ -344,13 +361,13 @@ class RSSaveFile:
                 "Unexpected decompressed payload size in file: \n\n    {0}"
                 "\n\nExpected {1} bytes, found "
                 "{2} bytes.".format(
-                    self._file_path, str(expect_payload_size), str(len(payload))
+                    str(self._file_path), str(expect_payload_size), str(len(payload))
                 )
             )
 
         return payload
 
-    def _read_save_file(self):
+    def _read_save_file(self) -> None:
         """Read save file into memory.
 
         Reading file takes the following steps:
@@ -376,7 +393,9 @@ class RSSaveFile:
                 "Unexpected encrypted payload in file: \n\n    {0}"
                 "\n\nPayload should be multiple of {1} bytes, found {2} unexpected "
                 "bytes.".format(
-                    self._file_path, ECB_BLOCK_SIZE, len(z_payload) % ECB_BLOCK_SIZE
+                    str(self._file_path),
+                    ECB_BLOCK_SIZE,
+                    len(z_payload) % ECB_BLOCK_SIZE,
                 )
             )
 
@@ -392,28 +411,30 @@ class RSSaveFile:
         # remove trailing null from payload
         payload = payload[:-1]
 
-        if self.json_debug_file is not None:
-            with open(self.json_debug_file, "xt") as fh:
+        if self._json_debug_path:
+            # Note: this is the raw json as loaded, not reconstructed.
+            # See save_json_file for reconstructed json file
+            with self._json_debug_path.open("xt") as fh:
                 fh.write(payload.decode())
 
         # we use simplejson because it understands decimals and will preserve number
         # formats in the file (required for reconstructability checks).
         self.json_tree = simplejson.loads(payload.decode(), use_decimal=True)
 
-    def save_json_file(self, filename):
+    def save_json_file(self, file_path: Path) -> None:
         """Generate json string including Ubisoft formatting and save to a file.
 
         Arguments:
-            filename {str} -- File/path for saving json data.
+            file_path {pathlib.Path} -- File/path for saving json data.
 
         Useful for debugging and working out changes in file formats.
         """
         payload = self._generate_json_string()
-        with open(os.path.abspath(filename), "xt") as fh:
+        with file_path.open("xt") as fh:
             fh.write(payload)
 
 
-def self_test():
+def self_test() -> None:
     """Limited self test for RSSaveFile.
 
     Run with:
@@ -435,47 +456,41 @@ def self_test():
     )
     test_dir = parser.parse_args().test_directory
 
-    keep_path = ""
     keep_save_file = None
-    with os.scandir(test_dir) as it:
-        for entry in it:
-            if entry.is_file():
-                try:
-                    save_file = RSSaveFile(entry.path)
-                    print(
-                        'Successfully loaded and validated save file "{0}".'.format(
-                            entry.path
-                        )
+    for child in Path(test_dir).iterdir():
+        if child.is_file():
+            try:
+                keep_save_file = RSSaveFile(child)
+                print(
+                    'Successfully loaded and validated save file "{0}".'.format(
+                        str(child)
                     )
-                    keep_save_file = save_file
-                    keep_path = entry.path
-                except Exception as exc:
-                    # probably not a save file. Provide a message and move on.
-                    print(
-                        "Failed to load and validate file \"{0}\".\nIf this file is a "
-                        "Rocksmith save file, there may be a problem with with the "
-                        "RSSaveFile class. Error details follow.".format(
-                            entry.path
-                        )
-                    )
-                    print(exc)
+                )
+            except Exception as exc:
+                # probably not a save file. Provide a message and move on.
+                print(
+                    "Failed to load and validate file \"{0}\".\nIf this file is a "
+                    "Rocksmith save file, there may be a problem with with the "
+                    "RSSaveFile class. Error details follow.".format(str(child))
+                )
+                print(exc)
 
     if keep_save_file is not None:
-        keep_path = os.path.join(
-            os.path.dirname(keep_path), os.path.basename(keep_path) + "test.tmp"
-        )
-        if os.path.exists(keep_path):
+        test_path = keep_save_file._file_path
+        test_path = test_path.with_suffix(test_path.suffix + "test.tmp")
+
+        if test_path.exists():
             print(
                 'File "{0}" exists. Save and reload test not run (rename/delete '
-                "existing file for test).".format(keep_path)
+                "existing file for test).".format(str(test_path))
             )
         else:
             try:
-                keep_save_file.write_save_file(save_file_name=keep_path)
-                print('Saved test file "{0}".'.format(keep_path))
+                keep_save_file.save_to_new_file(test_path)
+                print('Saved test file "{0}".'.format(str(test_path)))
 
                 try:
-                    keep_save_file = RSSaveFile(keep_path)
+                    keep_save_file = RSSaveFile(test_path)
                     print("  Reloaded and validated test file.")
                 except Exception as exc:
                     print(
@@ -484,15 +499,14 @@ def self_test():
                     )
                     print(exc)
 
-                os.remove(keep_path)
+                # clean up
+                test_path.unlink()
 
             except Exception as exc:
                 print(
                     'Failed to save test file "{0}".\nThere '
                     "may be a problem with with the RSSaveFile class. Error details "
-                    "follow.".format(
-                        keep_path
-                    )
+                    "follow.".format(str(test_path))
                 )
                 print(exc)
 

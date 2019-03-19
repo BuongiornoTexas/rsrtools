@@ -8,7 +8,7 @@ from pathlib import Path
 from hashlib import sha1
 from collections import abc
 from enum import Enum
-from typing import Dict, Any, Iterator, Tuple, Mapping, Optional, Union
+from typing import Dict, Any, Iterator, Tuple, Mapping, Optional
 
 from rsrtools.utils import double_quote
 
@@ -104,6 +104,7 @@ class SteamMetadata:
     _metadata_path: Path
     # Instance version of the steam metadata
     _steam_metadata: Dict[str, Any]
+    _is_dirty: bool
 
     def _read_steam_metadata(self) -> None:
         """Read Steam metadata file and load metadata dictionary."""
@@ -256,8 +257,8 @@ class SteamMetadata:
                 method extracts the filename from the path to identify the metadata set
                 and updates metadata based on the file properties. It is the caller
                 responsibility to ensure the path points to the correct steam cloud
-                file (i.e. this method does not validate that the file is valid 
-                steam cloud file in a valid location). 
+                file (i.e. this method does not validate that the file is valid
+                steam cloud file in a valid location).
 
         Keyword Arguments:
             data {bytes} -- Binary Steam cloud file held in memory
@@ -388,7 +389,7 @@ class SteamMetadata:
         self._is_dirty = False
 
         target_path = search_dir.joinpath(REMOTE_CACHE_NAME)
-        
+
         if target_path.is_file():
             self._metadata_path = target_path
         else:
