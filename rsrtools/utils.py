@@ -4,7 +4,7 @@
 # Not even trying to get stubs for winreg
 import winreg  # type: ignore
 from pathlib import Path
-from typing import List, Optional, Dict, Tuple, Union, Any
+from typing import List, Optional, Dict, Tuple, Union, Any, Sequence
 
 
 def rsrpad(data: bytes, block_size_bytes: int) -> bytes:
@@ -119,32 +119,34 @@ def steam_user_data_dirs() -> Dict[str, Path]:
 
 
 def choose(
-    options: Union[List[str], List[Tuple[str, Any]]],
+    options: Sequence[Union[str, Tuple[str, Any]]],
     header: Optional[str] = None,
     allow_multi: bool = False,
-    no_action: Optional[Any] = None,
+    no_action: Optional[str] = None,
     help_text: Optional[str] = None,
 ) -> Optional[Union[Any, List[Any]]]:
     """Return user selection or multi-selection from a list of options.
 
     Arguments:
-        options {Union[List[str], List[Tuple[str, Any]]]} -- Either:
-            * a list containing options, where the selected option(s) are returned
-            * a list containing tuples of (option_description, return_value), where
-              choose returns the return_value(s) corresponding to the selected
-              option(s)
+        options {Sequence[Union[str, Tuple[str, Any]]]} -- A list of options, where
+            each may be either:
+            * a string, where string is returned if the option is selected; or
+            * a of tuple (option_description, return_value), where the return_value
+              is returned if the option is selected.
 
     Keyword Arguments:
         header {str} -- Header/description text for the selection (default: {None})
         allow_multi {bool} -- Allow multi-selection if True (default: {False})
-        no_action {Any} -- Return value for no selection. If this argument is not
+        no_action {str} -- Description value for no selection. If this argument is not
             set or is None, the user must select from the options list.
             (default: {None})
         help_text {str} -- Detailed help text. (default: {None})
 
     Returns:
         Optional[Union[Any, List[Any]]] -- Return value/list of return values, per
-            options and no_action keyword.
+            options, or if the user has selected no_action, None.
+
+    To select multiple options, enter a comma separated list of values.
 
     """
     opt_tuple_list = list()

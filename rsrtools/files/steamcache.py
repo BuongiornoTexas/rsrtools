@@ -103,7 +103,7 @@ class SteamMetadata:
     # Path to Steam metadata file.
     _metadata_path: Path
     # Instance version of the steam metadata
-    _steam_metadata: Dict[str, Any]
+    _steam_metadata: Dict[str, Dict[str, Dict[str, str]]]
     _is_dirty: bool
 
     def _read_steam_metadata(self) -> None:
@@ -111,7 +111,8 @@ class SteamMetadata:
         self._steam_metadata = dict()
 
         # ugly custom parser, cos Steam doesn't do standard file formats
-        node = self._steam_metadata
+        # node needs a type to stop mypy collapsing during the walk
+        node: dict = self._steam_metadata
         section_label = ""
         branches = list()
         with self._metadata_path.open("rt") as fh:
@@ -141,7 +142,7 @@ class SteamMetadata:
 
     @staticmethod
     def _update_metadata_key_value(
-        metadata_set: Dict, key: SteamMetadataKey, value: Any
+        metadata_set: Dict, key: SteamMetadataKey, value: str
     ) -> None:
         """Update value for the specified key in the Steam cloud file metadata set.
 
@@ -151,7 +152,7 @@ class SteamMetadata:
             key {SteamMetadataKey} -- Key to update in the metadata set. Must be a
                 member of SteamMetadataKey enum. The key must already exist in the
                 metatdata dict (no creating new keys).
-            value {Per key type} -- New value to be assigned to the key. The caller is
+            value {str} -- New value to be assigned to the key. The caller is
                 responsible for value formatting per Steam standards.
 
         Raises:

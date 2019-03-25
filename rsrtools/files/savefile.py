@@ -29,7 +29,8 @@ import struct
 import zlib
 import argparse
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, Union, List
+from decimal import Decimal
 
 import simplejson
 
@@ -39,6 +40,11 @@ from Crypto.Cipher import AES
 
 from rsrtools.files.exceptions import RSFileFormatError
 from rsrtools.utils import rsrpad
+
+# aliases for first level of Rocksmith json tree types.
+# mypy doesn't do recursion at the moment, and may never,
+# casting to any makes life a whole lot easier in handling the json structure.
+RSJsonRoot = Dict[str, Any]
 
 # Encryption key for Rocksmith save files
 SAVE_FILE_KEY: bytes = bytes.fromhex(
@@ -91,7 +97,7 @@ class RSSaveFile:
     _cipher: Any
     _debug_z_payload: bytes  # compressed payload
     _debug_payload: bytes  # null terminated payload
-    json_tree: Dict
+    json_tree: RSJsonRoot
 
     def __init__(
         self, rs_file_path: Path, json_debug_file: str = None, debug: bool = False
@@ -191,7 +197,7 @@ class RSSaveFile:
 
         if self._debug:
             if payload != self._debug_payload:
-                if self._json_debug_path:
+                if self._json_debug_path is not None:
                     self.save_json_file(
                         self._json_debug_path.with_suffix(
                             self._json_debug_path.suffix + ".reconstruct"
@@ -411,7 +417,7 @@ class RSSaveFile:
         # remove trailing null from payload
         payload = payload[:-1]
 
-        if self._json_debug_path:
+        if self._json_debug_path is not None:
             # Note: this is the raw json as loaded, not reconstructed.
             # See save_json_file for reconstructed json file
             with self._json_debug_path.open("xt") as fh:
