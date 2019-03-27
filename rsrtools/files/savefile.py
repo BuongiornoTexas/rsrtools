@@ -22,12 +22,13 @@ run from the command line by:
     py -m rsrtools.files.savefile <test_dir>
 
 Where test_dir is the name of a directory containing one or more files that can be used
-for testing (I wouldn't run this on any files in the steam folder though ...)
+for testing (I wouldn't run this on any files in the steam directory though ...)
 """
 
 import struct
 import zlib
 import argparse
+from os import fsdecode
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any, Union, List
 from decimal import Decimal
@@ -75,6 +76,9 @@ class RSSaveFile:
         save_json_file: Save json file to text. Includes any Ubisoft formatting.
         generate_save_file: Returns a byte object containing the save file
             corresponding the current json tree.
+
+    The object exposes json_tree, which is the JSON data dictionary loaded from the
+    Rocksmith profile.
 
     The Constructor performs limited self checks when loading a file. These checks try
     to reconstruct the original source file from the simplejson tree. If the self check
@@ -208,7 +212,7 @@ class RSSaveFile:
                     "Mismatch between original payload and self check reconstructed "
                     "payload in: \n\n    {0}\n\nRun with _debug=True and "
                     "json_debug_file specified to gather "
-                    "diagnostics.".format(str(self._file_path))
+                    "diagnostics.".format(fsdecode(self._file_path))
                 )
 
             if z_payload != self._debug_z_payload[: len(z_payload)]:
@@ -218,7 +222,7 @@ class RSSaveFile:
                 # editing will work!). So we compare without padding.
                 raise RSFileFormatError(
                     "Mismatch between original compressed payload and self check "
-                    "reconstruction in:\n\n    {0}\n".format(str(self._file_path))
+                    "reconstruction in:\n\n    {0}\n".format(fsdecode(self._file_path))
                 )
 
         return z_payload, len(payload)
@@ -258,7 +262,7 @@ class RSSaveFile:
             if file_data != self._original_file_data:
                 raise RSFileFormatError(
                     "Mismatch between original file and self check reconstruction in: "
-                    "\n\n    {0}\n".format(str(self._file_path))
+                    "\n\n    {0}\n".format(fsdecode(self._file_path))
                 )
             elif not self._debug:
                 # discard self check vars. If we didn't have the problem of random
@@ -326,7 +330,9 @@ class RSSaveFile:
                 "Unexpected value in in file: \n\n    {0}"
                 "\n\nExpected '{1}' as first four bytes (magic number), "
                 "found '{2}'.".format(
-                    str(self._file_path), expect_magic.decode(), found_magic.decode()
+                    fsdecode(self._file_path),
+                    expect_magic.decode(),
+                    found_magic.decode(),
                 )
             )
 
@@ -367,7 +373,9 @@ class RSSaveFile:
                 "Unexpected decompressed payload size in file: \n\n    {0}"
                 "\n\nExpected {1} bytes, found "
                 "{2} bytes.".format(
-                    str(self._file_path), str(expect_payload_size), str(len(payload))
+                    fsdecode(self._file_path),
+                    str(expect_payload_size),
+                    str(len(payload)),
                 )
             )
 
@@ -399,7 +407,7 @@ class RSSaveFile:
                 "Unexpected encrypted payload in file: \n\n    {0}"
                 "\n\nPayload should be multiple of {1} bytes, found {2} unexpected "
                 "bytes.".format(
-                    str(self._file_path),
+                    fsdecode(self._file_path),
                     ECB_BLOCK_SIZE,
                     len(z_payload) % ECB_BLOCK_SIZE,
                 )
@@ -450,7 +458,7 @@ def self_test() -> None:
     LocalProfiles.json, *_PRFLDB).
 
     I'd strongly recommend you **do not** run this script on any of your steam
-    folders.
+    directories.
     """
     parser = argparse.ArgumentParser(
         description="Runs a self test of RSSaveFile on a specified directory."
@@ -469,15 +477,15 @@ def self_test() -> None:
                 keep_save_file = RSSaveFile(child)
                 print(
                     'Successfully loaded and validated save file "{0}".'.format(
-                        str(child)
+                        fsdecode(child)
                     )
                 )
             except Exception as exc:
                 # probably not a save file. Provide a message and move on.
                 print(
-                    "Failed to load and validate file \"{0}\".\nIf this file is a "
+                    'Failed to load and validate file "{0}".\nIf this file is a '
                     "Rocksmith save file, there may be a problem with with the "
-                    "RSSaveFile class. Error details follow.".format(str(child))
+                    "RSSaveFile class. Error details follow.".format(fsdecode(child))
                 )
                 print(exc)
 
@@ -488,12 +496,12 @@ def self_test() -> None:
         if test_path.exists():
             print(
                 'File "{0}" exists. Save and reload test not run (rename/delete '
-                "existing file for test).".format(str(test_path))
+                "existing file for test).".format(fsdecode(test_path))
             )
         else:
             try:
                 keep_save_file.save_to_new_file(test_path)
-                print('Saved test file "{0}".'.format(str(test_path)))
+                print('Saved test file "{0}".'.format(fsdecode(test_path)))
 
                 try:
                     keep_save_file = RSSaveFile(test_path)
@@ -512,7 +520,7 @@ def self_test() -> None:
                 print(
                     'Failed to save test file "{0}".\nThere '
                     "may be a problem with with the RSSaveFile class. Error details "
-                    "follow.".format(str(test_path))
+                    "follow.".format(fsdecode(test_path))
                 )
                 print(exc)
 

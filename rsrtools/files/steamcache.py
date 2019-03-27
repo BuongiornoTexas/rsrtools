@@ -4,6 +4,7 @@
 Refer to class SteamMetadata for further detail/definitions.
 """
 
+from os import fsdecode
 from pathlib import Path
 from hashlib import sha1
 from collections import abc
@@ -67,8 +68,8 @@ class SteamMetadata:
             single Steam cloud file, such as modification time, hashes, etc.
         Steam metadata file: A file containing metadata about Steam cloud files for a
             game or Steam application. Typically named remotecache.vdf and found in the
-            same directory as the remote folder. This file contains a set of metadata
-            for each Steam cloud file in the remote folder.
+            same directory as the remote directory. This file contains a set of metadata
+            for each Steam cloud file in the remote directory.
 
         The following extract from a Steam remotecache.vdf for a Rocksmith
         LocalProfiles.json file shows the typical metadata for a Steam cloud file.
@@ -396,7 +397,7 @@ class SteamMetadata:
         else:
             raise FileNotFoundError(
                 "Steam metadata file {0} expected but not found in:\n   {1}".format(
-                    REMOTE_CACHE_NAME, str(search_dir)
+                    REMOTE_CACHE_NAME, fsdecode(search_dir)
                 )
             )
 

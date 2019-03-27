@@ -100,7 +100,7 @@ def steam_user_data_dirs() -> Dict[str, Path]:
     """Return a dictionary of all userdata directories found in the steam directory.
 
     Dictionary keys are local steam user ids as strings, values are the directory paths
-    Returns an empty dict if no userdata folders are found.
+    Returns an empty dict if no userdata directories are found.
 
     """
     ret_val = dict()

@@ -8,9 +8,6 @@ For command line options (database setup, reporting), run:
     'python -m rsrtools.files.profile_manager -h'
 """
 
-# TODO remove os import
-import os
-
 import argparse
 import time
 import copy
@@ -19,7 +16,9 @@ import shutil
 from decimal import Decimal
 from zipfile import ZipFile
 from typing import Dict, Sequence, Union, Tuple, Optional, Any, Iterator, Set, List
+from typing import cast
 from pathlib import Path
+from os import fsdecode
 
 from rsrtools.files.savefile import RSSaveFile, RSJsonRoot
 from rsrtools.files.steamcache import SteamMetadata, SteamMetadataError
@@ -33,6 +32,10 @@ RS_BACKUP_DIR = "RS_backup"
 RS_UPDATE_DIR = "RS_update"
 PROFILE_DB_STR = "_PRFLDB"
 RS_APP_ID = "221680"
+MINUS_ONE = "-1"
+
+# type alias
+JSON_path_type = Sequence[Union[int, str]]
 
 
 class RSFileSetError(Exception):
@@ -104,8 +107,8 @@ class RSSaveWrapper:
     RSSaveWrapper is implemented as wrapper, rather than a sub class, of RSSaveFile to
     support lazy loading of save files.
 
-    This class and sub-classes use a json path to navigate save data elements in the
-    json dict. A json path is a list or tuple of the elements used to locate a specific
+    This class and sub-classes use a JSON path to navigate save data elements in the
+    json dict. A JSON path is a list or tuple of the elements used to locate a specific
     value or subtree in the save data. E.g. the json_path to song list 2 is:
 
         ('SongListsRoot', 'SongLists', 1)
@@ -259,10 +262,8 @@ class RSSaveWrapper:
         """
         self._is_dirty = True
 
-    def _json_node(
-        self, json_path: Sequence[Union[int, str]]
-    ) -> Tuple[Any, Union[str, int]]:
-        """Return container and key/index pair for json path.
+    def _json_node(self, json_path: JSON_path_type) -> Tuple[Any, Union[str, int]]:
+        """Return container and key/index pair for JSON path.
 
         Arguments:
             json_path {Sequence[Union[int, str]]} -- Path to json sub container or data
@@ -274,13 +275,14 @@ class RSSaveWrapper:
 
         Returns:
             Tuple[Any, Union[str, int]] -- Returns a tuple consisting of:
-                - A container for the last element in the json path (a dict or
-                  list - not that this is NOT the last element in the json path); and
+                - A container for the last element in the JSON path (a dict or
+                  list - not that this is NOT the last element in the JSON path); and
                 - The container key (str) or index (int) that can be used to get or
-                  the set the value or container referenced by json path (i.e. this is
-                  the last element of the json path).
+                  the set the value or container referenced by JSON path (i.e. this is
+                  the last element of the JSON path).
 
         Refer to get/set_json_subtree for usage.
+
         """
         node = self.json_tree
         prev_node = node
@@ -294,11 +296,11 @@ class RSSaveWrapper:
                         node = node[key]
                     except KeyError:
                         raise KeyError(
-                            "Invalid key {0} in json path {1}.".format(key, json_path)
+                            "Invalid key {0} in JSON path {1}.".format(key, json_path)
                         )
                 else:
                     raise KeyError(
-                        "Key {0} supplied in json path {1}, but JSON dict not found."
+                        "Key {0} supplied in JSON path {1}, but JSON dict not found."
                         "".format(key, json_path)
                     )
             elif isinstance(key, int):
@@ -307,24 +309,24 @@ class RSSaveWrapper:
                         node = node[key]
                     except IndexError:
                         raise IndexError(
-                            "Invalid index {0} in json path {1}."
+                            "Invalid index {0} in JSON path {1}."
                             "".format(key, json_path)
                         )
                 else:
                     raise IndexError(
-                        "Index {0} supplied in json path {1}, but JSON list not found."
+                        "Index {0} supplied in JSON path {1}, but JSON list not found."
                         "".format(key, json_path)
                     )
             else:
                 raise TypeError(
-                    "Invalid value {0} in json path {1}.\nJson path should "
+                    "Invalid value {0} in JSON path {1}.\nJson path should "
                     "be a tuple of string and integer values.".format(key, json_path)
                 )
 
         # actually want to return  final node (prev_node) rather than final value (node)
         return prev_node, json_path[-1]
 
-    def get_json_subtree(self, json_path: Sequence[Union[int, str]]) -> Any:
+    def get_json_subtree(self, json_path: JSON_path_type) -> Any:
         """Return a json subtree or value based on the json_path sequence.
 
         Arguments:
@@ -334,13 +336,14 @@ class RSSaveWrapper:
         Returns:
             Any -- A json subtree (list, dict), or a json value (str, bool, Decimal)
                 found at the end of the json_path.
+
         """
         parent_dict, key = self._json_node(json_path)
 
         return parent_dict[key]
 
     def set_json_subtree(
-        self, json_path: Sequence[Union[int, str]], subtree_or_value: Any
+        self, json_path: JSON_path_type, subtree_or_value: Any
     ) -> None:
         """Replace subtree or value at the end of json_path.
 
@@ -379,7 +382,7 @@ class RSLocalProfiles(RSSaveWrapper):
 
         Arguments:
             profile_dir {pathlib.Path} -- Path to directory containing target
-                LocalProfiles.json file. Typically a Rocksmith save folder.
+                LocalProfiles.json file. Typically a Rocksmith save directory.
         """
         file_path = profile_dir.joinpath(LOCAL_PROFILES)
         super().__init__(file_path)
@@ -400,6 +403,7 @@ class RSLocalProfiles(RSSaveWrapper):
         Note: This method returns Rocksmith metadata from LocalProfiles.json about a
         a specific Rocksmith profile with the specified unique_id. It is not steam
         cloud metadata.
+
         """
         ret_val = None
         for profile in self.get_json_subtree(("Profiles",)):
@@ -417,6 +421,7 @@ class RSLocalProfiles(RSSaveWrapper):
         Returns:
             str -- Returns the player name for Rocksmith profile unique_id if
                 it exists, returns empty string '' otherwise.
+
         """
         profile = self._profile_from_unique_id(unique_id)
         if profile is None:
@@ -502,6 +507,7 @@ class RSProfileDB(RSSaveWrapper):
         Player name is set to empty string ('') if:
             - local_profiles is None; or
             - the profile unique id is not found in local_profiles.
+
         """
         super().__init__(file_path)
 
@@ -524,7 +530,8 @@ class RSProfileDB(RSSaveWrapper):
     def unique_id(self) -> str:
         """Return the unique_id for the Rocksmith profile .
 
-        This is/should be the save file name excluding _PRFLDB suffix."""
+        This is/should be the save file name excluding _PRFLDB suffix.
+        """
         return self._unique_id
 
     @property
@@ -536,11 +543,12 @@ class RSProfileDB(RSSaveWrapper):
         return self._player_name
 
     def arrangement_ids(self) -> Iterator[str]:
-        """Iterator for all song arrangement ids that appear in the profile.
+        """Return iterator for all song arrangement ids that appear in the profile.
 
         Yields:
-            str -- song arrangment id."""
+            str -- song arrangment id.
 
+        """
         # can add/remove members as file changes in future. RS appears to fill data as
         # it it is created, so children are likely to be incomplete.
         arrangement_ids: Set[str] = set()
@@ -565,7 +573,7 @@ class RSProfileDB(RSSaveWrapper):
             yield a_id
 
     def replace_song_list(self, list_index: int, new_song_list: List[str]) -> None:
-        """Replaces song list[x] with a new song list.
+        """Replace indexed song list with a new song list.
 
         Arguments:
             list_index {int} -- The index of the song list to replace in the range 0-5.
@@ -604,13 +612,21 @@ class RSFileSet:
 
     Public methods:
         Constructor -- Creates and check the consistency of a Rocksmith file set based
-            on the files and folders in a target directory.
+            on the files and and sub-directories in a target directory.
         copy_file_set -- Copy a Rocksmith fileset to a new directory.
         delete_files -- Delete all files in the file set.
-        TODO
-        TODO
-        TODO
-        TODO
+        consistent -- Read only property. True if the file set has passed basic tests on
+            folder structure, existences of steam and Rocksmith files, and metadata
+            consistency. False otherwise.
+        steam_metadata -- Read only property, returns the steam metadata for the file
+            set.
+        local_profiles -- Read only property, returns the local_profiles instance for
+            the file set (RSLocalProfiles object).
+        profiles -- Read only property, returns a dictionary of the Rocksmith profiles
+            in the the file set (RSProfileDB objects).
+        m_time -- Read only property, returns the most recent modification date/time for
+            all of the profiles in the fileset (i.e. checks all profiles and returns the
+            date from the most recently modified of these).
 
     A consistent rocksmith save set consists of the following elements:
         - A remotecache.vdf file used for steam cloud syncing.
@@ -634,16 +650,16 @@ class RSFileSet:
     _m_time: str
 
     def __init__(self, remote_path: Path) -> None:
-        """Creates an RSFileSet based on remote_path.
+        """Create an RSFileSet instance based on remote_path.
 
         Arguments:
             remote_path {pathlib.Path} -- The path to a directory named 'remote'
                 containing Rocksmith profiles and a LocalFiles.json file.
 
         The Constructor will check that the files are in a directory named 'remote',
-        and expects to find the steam 'remotecache.vdf' file in the parent folder that
-        contains the 'remote' folder. See the RSProfileManager class description for
-        for more details on the expected folder and file structure.
+        and expects to find the steam 'remotecache.vdf' file in the parent directory
+        that contains the 'remote' directory. See the RSProfileManager class description
+        for more details on the expected file and directory structure.
 
         The Constructor also checks consistency of the file set and finds time of the
         most recent profile save.
@@ -657,9 +673,9 @@ class RSFileSet:
         parent_name = remote_path.parent.name
         if parent_name != STEAM_REMOTE_DIR:
             logging.warning(
-                f"Rocksmith profiles should be in a folder/dir named:"
+                f"Rocksmith profiles should be in a directory named:"
                 f"\n    {STEAM_REMOTE_DIR}\nRocksmith file set constructor (__init__) "
-                f"called on folder/dir named:\n    {parent_name}"
+                f"called on directory named:\n    {parent_name}"
             )
             self._valid_structure = False
 
@@ -685,7 +701,7 @@ class RSFileSet:
         self._check_consistency(remote_path)
 
     def _find_profiles(self, remote_path: Path) -> None:
-        """Finds all Rocksmith profile save files in directory remote_path.
+        """Find all Rocksmith profile save files in directory remote_path.
 
         Arguments:
             remote_path {pathlib.Path} -- The path to a directory named 'remote'
@@ -731,7 +747,7 @@ class RSFileSet:
             consistent = False
             logging.warning(
                 "Warning: No Rocksmith save files ({0}) found in:\n    {1}.".format(
-                    PROFILE_DB_STR, str(remote_path)
+                    PROFILE_DB_STR, fsdecode(remote_path)
                 )
             )
 
@@ -740,7 +756,7 @@ class RSFileSet:
                 consistent = False
                 logging.warning(
                     "Rocksmith save file has no player name:\n   {0}".format(
-                        str(rs_profile.file_path)
+                        fsdecode(rs_profile.file_path)
                     )
                 )
 
@@ -758,7 +774,7 @@ class RSFileSet:
                     consistent = False
                     logging.warning(
                         "Steam cache contains no data for file:\n   {0}".format(
-                            str(rs_save.file_path)
+                            fsdecode(rs_save.file_path)
                         )
                     )
 
@@ -770,15 +786,15 @@ class RSFileSet:
         """Copy all files in the files set to the target save directory.
 
         Arguments:
-            new_remote_path {pathlib.Path} -- The destination folder for the Rocksmith
-                save files.
+            new_remote_path {pathlib.Path} -- The destination directory for the
+                Rocksmith save files.
             require_consistent {bool} -- If true, the copy will raise an exception is
                 not consistent. See notes below. A False value for this parameter may
                 be useful when working with incomplete file sets.(default: True)
 
         The copy performs the following actions:
             - Raise an exception if require_consistent is true and the source file set
-              is inconsistent and the base name of the new_remote_path folder is not
+              is inconsistent and the base name of the new_remote_path directory is not
               'remote'.
             - If it exists, it will copy the Steam remotecache.vdf file into the parent
               directory of new_remote_path.
@@ -788,7 +804,7 @@ class RSFileSet:
         if not new_remote_path.is_dir():
             raise NotADirectoryError(
                 f"RSFileSet.copy_file_set requires a directory as a target.\n"
-                f"'{str(new_remote_path)}' is not a directory."
+                f"'{fsdecode(new_remote_path)}' is not a directory."
             )
 
         if require_consistent:
@@ -798,8 +814,8 @@ class RSFileSet:
                 )
             elif new_remote_path.name != STEAM_REMOTE_DIR:
                 raise RSFileSetError(
-                    f"RSFileSet.copy_file_set called with a target folder named "
-                    f"'{new_remote_path.name}'.\nThis folder should have the name "
+                    f"RSFileSet.copy_file_set called with a target directory named "
+                    f"'{new_remote_path.name}'.\nThis directory should have the name "
                     f"'{STEAM_REMOTE_DIR}'."
                 )
 
@@ -808,17 +824,17 @@ class RSFileSet:
             file_list.append(self._fs_local_profiles)
 
         for file in file_list:
-            shutil.copy2(str(file.file_path), str(new_remote_path))
+            shutil.copy2(fsdecode(file.file_path), fsdecode(new_remote_path))
 
         if self._fs_steam_metadata is not None:
             # steam cache is copied to the parent directory
             shutil.copy2(
-                str(self._fs_steam_metadata.file_path), str(new_remote_path.parent)
+                fsdecode(self._fs_steam_metadata.file_path),
+                fsdecode(new_remote_path.parent),
             )
 
     def delete_files(self) -> None:
         """Delete all files in the file set."""
-
         file_list: List[Union[RSSaveWrapper, SteamMetadata]] = list(
             self._fs_profiles.values()
         )
@@ -839,13 +855,70 @@ class RSFileSet:
         self._fs_local_profiles = None
         self._fs_steam_metadata = None
 
+    @property
+    def consistent(self) -> bool:
+        """Return True if the file set has passed basic consistency tests.
+
+        Returns:
+            bool -- True if the file set is consistent, false otherwise.
+
+        The tests address folder structure, existence of steam and Rocksmith files,
+        and metadata.
+
+        """
+        return self._consistent
+
+    @property
+    def steam_metadata(self) -> Optional[SteamMetadata]:
+        """Return the Steam metadata for the file set if it exists. Read only property.
+
+        Returns:
+            Optional[SteamMetadata] -- The file set steam metadata.
+
+        """
+        return self._fs_steam_metadata
+
+    @property
+    def local_profiles(self) -> Optional[RSLocalProfiles]:
+        """Return the RSLocalProfiles for the file set if it exists. Read only property.
+
+        Returns:
+            Optional[RSLocalProfiles] -- The local profiles instance for the file set.
+
+        """
+        return self._fs_local_profiles
+
+    @property
+    def profiles(self) -> Dict[str, RSProfileDB]:
+        """Return a dictionary of the RSProfileDB objects for the file set. Read only.
+
+        Returns:
+            Dict[str, RSProfileDB] -- The keys are the Rocksmith unique ids and profile
+                names associated with the Rocksmith profiles (i.e. each profile has up
+                two keys associated with it).
+
+        """
+        return self._fs_profiles
+
+    @property
+    def m_time(self) -> str:
+        """Return data/time of most recently modified Rocksmith profile. Read only.
+
+        Returns:
+            str -- Returns the most recent modification date/time for all of the
+            profiles in the fileset (i.e. checks all profiles and returns the date from
+            the most recently modified of these).
+
+        """
+        return self._m_time
+
 
 class RSProfileManager:
-    """Provides an integrated interface to Rocksmith save files owned by a steam user.
+    r"""Provides an integrated interface to Rocksmith save files owned by a steam user.
 
     Public members:
         Constructor -- Sets up the working directories, optionally copies a Rocksmith
-            file set from the steam user folder, and loads a working file set for use.
+            file set from the steam user directory, and loads a working file set.
 
         cl_choose_profile -- Command line utility for selecting a profile name from the
             profiles available in the profile manager.
@@ -863,7 +936,7 @@ class RSProfileManager:
             profile, and optionally writes updated files.
 
         move_updates_to_steam -- Moves files in the update directory to the steam user
-            folders for the specified steam user id.
+            directories for the specified steam user id.
 
         player_arrangement_ids -- Provides an iterator for all arrangement ids in the
             named profile.
@@ -881,16 +954,16 @@ class RSProfileManager:
 
     RSProfileManager works on a base directory with the following structure:
         base_dir
-            \\-- RS_working   - This directory contains the working copy of the
+            \-- RS_working   - This directory contains the working copy of the
                                 Rocksmith save directory. The object expects to find
                                 remotecache.vdf in this directory.
-                \\-- remote   - This directory should contain the Rocksmith game files
+                \-- remote   - This directory should contain the Rocksmith game files
                                 and the LocalProfiles.json file.
-            \\-- RS_backup    - Backups of RS_working will be made into this directory
+            \-- RS_backup    - Backups of RS_working will be made into this directory
                                 before creating the any updates.
-            \\-- RS_update    - Changed steam cache files will be saved in this
+            \-- RS_update    - Changed steam cache files will be saved in this
                                 directory.
-                \\--remote    - Changed Rocksmith files will be saved in this
+                \--remote    - Changed Rocksmith files will be saved in this
                                 directory.
 
     If this structure does not exist, the user will be asked for permission to create
@@ -898,101 +971,102 @@ class RSProfileManager:
     """
 
     # type hints
-    _local_profiles: RSLocalProfiles
+    # As we should be working on consistent fileset, none of these three
+    # should ever be None.
     _steam_metadata: SteamMetadata
+    _local_profiles: RSLocalProfiles
     _profiles: Dict[str, RSProfileDB]
+
     _source_steam_uid: str
 
     def __init__(
         self,
-        working_dir,
+        base_dir: Path,
         steam_user_id: Union[str, int] = None,
-        auto_setup=False,
-        flush_working_set=False,
+        auto_setup: bool = False,
+        flush_working_set: bool = False,
     ) -> None:
-        """[summary]
-        
+        """Initialise the directory structure, copy steam files and load working set.
+
         Arguments:
-            working_dir {[type]} -- [description]
-        
+            base_dir {pathlib.Path} -- The base directory for the profile manager. This
+                directory will house all working files and directories used or created
+                by the profile manager. This directory must exist.
+
         Keyword Arguments:
-            steam_user_id {Union[str, int]} -- Steam user id per steam user folders. (default: {None})
-            auto_setup {bool} -- [description] (default: {False})
-            flush_working_set {bool} -- [description] (default: {False})
-        
+            steam_user_id {Union[str, int]} -- Optional. Specifies the Rocksmith files
+                that will be managed by the profile manager. If specified, this must be
+                an integer or a string representation of an integer. (default: {None})
+                - If the value is a positive integer, it should correspond to a steam
+                  user id. In this case, the instance will manage this users Rocksmith
+                  saves.
+                - If the value is negative, the instance will manage the Rocksmith
+                  saves in the working directory.
+                - If no value is specified (default), the constructor will provide a
+                  command line interface for the user to select a steam user id or the
+                  saves in the working directory.
+            auto_setup {bool} -- If False, the user will be prompted to confirm
+                workspace setup actions. Otherwise the method performs the setup actions
+                without interaction. (default: {False})
+            flush_working_set {bool} -- If True, delete any Rocksmith file set or
+                partial file set in the working directory. If False, does nothing.
+                (default: {False})
+
         Raises:
-            NotADirectoryError -- [description]
-            RSFileSetError -- [description]
-            RSFileSetError -- [description]
-        
-        Returns:
-            None -- [description]
+            NotADirectoryError -- If base_dir is not a directory.
+            RSFileSetError -- If the selected/specified fileset is not valid.
 
-        Initialises/cleans up working directory structure, optionally copies in
-        files from steam, and loads working file set.
-
-        :param working_dir: Working directory. String path or path like object.
-
-        :param bool auto_setup:
-        :param bool flush_working_set:
-
-        Initialisation:
-            - Checks the directory structure under working_dir and offers to set up
-              missing folders.
+        The constructor performs the following actions:
+            - Checks the directory structure under base_dir and offers to set up any
+              missing directories.
 
             - Checks for Rocksmith files in the update directory, and offers to delete
               any files found.
-                - Initialisation raises an error if the user rejects offer of automatic
-                  setup (i.e. user must either allow automatic setup to complete or
-                  must setup folders manually for successful initialisation).
-
-            - if flush_working_set is True, checks the working directory for any file
-              set or partial file set and deletes these files.
+                - If the user rejects automatic setup, the constructor will raise an
+                  exception (i.e. user must either allow automatic setup to complete,
+                  or must setup directories manually for successful initialisation).
 
             - If no steam user id is specified (default):
-                - The working directory and all steam user folders are scanned for
-                  Rocksmith file sets.
+                - The working directory and all steam user directories are scanned for
+                  valid Rocksmith file sets.
                 - The user is asked to select a working file set from a menu of
                   available, consistent file sets.
-                    - An error is raised if the user rejects all available file sets.
-                - If a steam user's file set is selected, this file set is copied into
-                  the working directory, replacing any file set already in the working
-                  directory.
+                    - If the user rejects all available file sets, the constructor will
+                      raise an exception.
 
-            - If a steam user id is specified and is < 0:
-                - The file set in the working directory is selected.
-                - If the file set is not valid, an exception is raised
-                This function is provided for debugging/testing.
+            - If steam_user_id < 0 or the user interactively selected the file set in
+              the working directory, the instance will manage the file set in the
+              working directory. This functionality provides for debugging/testing.
 
-            - If a steam user id is specified:
-                  be copied into the working directory (replacing any file set already
-                  in the working directory).
-                - If the file set is not valid, an exception is raised
+            - If a steam user id is specified or selected interactively by the user,
+              this user's file set is copied into the working directory, replacing any
+              file set already in the working directory.
+
+            - If the specified/selected file set is not valid and consistent, an
+              exception is raised.
 
             - Finally, the file set in the working directory is loaded for use by the
               profile manager instance.
 
-            If auto_setup is False, the user will be prompted to confirm workspace
-            setup.
         """
-        if not os.path.isdir(working_dir):
+        if not base_dir.is_dir():
             raise NotADirectoryError(
                 "Profile manager constructor called on invalid base directory:\n    "
-                '"{0}"'.format(working_dir)
+                '"{0}"'.format(fsdecode(base_dir))
             )
 
-        self._setup_workspace(working_dir, auto_setup=auto_setup)
+        self._setup_workspace(base_dir, auto_setup=auto_setup)
 
         # source steam uid is the source uid for this profile manager.
         # string version of integer steam uid. Specifies the source of the file set in
         # the working dir
         #    - negative uid: using the file set found in the working directory at start
         #      of run (no copying from steam).
-        #    - positive uid: file set from the steam user data folders corresponding to
-        #      this uid will be copied into the working dir for us.
+        #    - positive uid: file set from the steam user data directories corresponding
+        #      to this uid will be copied into the working dir for us.
         # I.e. we always work on the files in the working dir, but this is a memo for
         # the source of the files.
-        # Also provides a target for copying altered files back into steam folders.
+        # Also provides a target for copying altered files back into steam directories.
         if steam_user_id is None:
             self._source_steam_uid = ""
         else:
@@ -1002,7 +1076,7 @@ class RSProfileManager:
         # Otherwise returns file sets for all uids.
         steam_file_sets = self._get_steam_file_sets()
 
-        # tidy up working set. 
+        # tidy up working set.
         if flush_working_set:
             logging.disable(logging.CRITICAL)
         working_file_set = RSFileSet(self._working_save_path)
@@ -1040,18 +1114,24 @@ class RSProfileManager:
             # re-read working directory to load updated file set.
             chosen_file_set = RSFileSet(self._working_save_path)
 
+        # as we *should* have a consistent fileset, cast away the
+        # None values.
         self._profiles = chosen_file_set.profiles
-        self._local_profiles = chosen_file_set.local_profiles
-        self._steam_metadata = chosen_file_set.steam_cache
+        self._local_profiles = cast(RSLocalProfiles, chosen_file_set.local_profiles)
+        self._steam_metadata = cast(SteamMetadata, chosen_file_set.steam_metadata)
 
     @property
-    def source_steam_uid(self):
-        """The source steam user id for the profile manager file set.
+    def source_steam_uid(self) -> str:
+        """Return the source steam user id for the profile manager file set.
 
-        This value is negative if the profile manager is handling files originally in
-        the working folder rather than copied in from a steam user folder. In this
-        instance, the user is responsible for tying the files to a steam user id (if
-        relevant).
+        Returns:
+            str -- The string representation of an integer steam user id.
+
+        This value is negative if the profile manager constructor loaded the file set
+        in the working directory. Otherwise, the steam user id corresponds to a steam
+        user id with a valid Rocksmith file set, where this file set has been copied
+        into the working directory.
+
         """
         return self._source_steam_uid
 
@@ -1059,13 +1139,24 @@ class RSProfileManager:
     def _choose_file_set(
         steam_file_sets: Dict[str, RSFileSet], working_file_set: RSFileSet
     ) -> Tuple[str, RSFileSet]:
-        """Provides a command line menu for the user to select a source for the
-        Rocksmith file set.
+        """Provide a command line menu for choosing a Rocksmith file set.
 
-        Returns steam uid and selected fileset. The steam uid is '-1' if the working
-        file set is selected.
+        Arguments:
+            steam_file_sets {Dict[str, RSFileSet]} -- A dictionary of all consistent
+                steam user id/Rocksmith file set pairs.
+            working_file_set {RSFileSet} -- The file set found in the working directory
+                by the profile manager constructor.
+
+        Raises:
+            RSFileSetError -- If there are no valid, consistent file sets to manage, or
+                if the user did not select a file set.
+
+        Returns:
+            Tuple[str, RSFileSet] -- A string representation of the steam user id
+                selected, and the corresponding file set object.  A user id of '-1' is
+                returned if the user selects the working file set.
+
         """
-
         header = (
             "Rocksmith profile/file set selection"
             "\n\nSelect a steam user id/Rocksmith file set from the following options. "
@@ -1093,7 +1184,7 @@ class RSProfileManager:
         if not steam_file_sets and not working_file_set.consistent:
             raise RSFileSetError(
                 "No valid Rocksmith file sets found in working directory or "
-                "steam user folders (fatal error)."
+                "steam user directories (fatal error)."
             )
 
         options = list()
@@ -1111,20 +1202,21 @@ class RSProfileManager:
                 "[Debugging/development] Keep and use the file set in the "
                 "working directory ({0}).".format(working_file_set.m_time)
             )
-            options.append((option_text, "-1"))
+            options.append((option_text, MINUS_ONE))
 
-        steam_uid = utils.choose(
+        choice = utils.choose(
             options,
             header=header,
             no_action="Do nothing and raise error.",
             help_text=help_text,
         )
-        if steam_uid is None:
+        if choice is None:
             raise RSFileSetError(
                 "User exit: User did not select a valid Rocksmith file set for use."
             )
 
-        if steam_uid == "-1":
+        steam_uid = cast(str, choice)
+        if steam_uid == MINUS_ONE:
             file_set = working_file_set
         else:
             file_set = steam_file_sets[steam_uid]
@@ -1132,32 +1224,46 @@ class RSProfileManager:
         return steam_uid, file_set
 
     @staticmethod
-    def _get_steam_rs_user_dirs(find_steam_user_id: str):
-        """Finds all Rocksmith save directories in steam user folders.
+    def _get_steam_rs_user_dirs(find_user_id: str) -> Dict[str, Path]:
+        """Return Rocksmith save directories for those steam users that have them.
 
-        If find_steam_user_id is specified, the file set is limited to this user.
-        Implemented as a static method, as it is specific to Rocksmith.
+        Arguments:
+            find_user_id {str} -- String representation of a steam uid or the empty
+                string.
+
+        Raises:
+            TypeError -- On find_user_id type error.
+
+        Returns:
+            Dict[str, Path] -- String steam user id/Path object for the steam users
+                Rocksmith save directory.
+
+        If find_user_id is empty, returns Rocksmith save directories for all users that
+        have one, otherwise returns only the Rocksmith save directory of the user id
+        specified in find_user_id. Returns an empty dictionary if no save directories
+        are found.
+
         """
-
         user_dirs = utils.steam_user_data_dirs()
 
-        if find_steam_user_id:
-            if not isinstance(find_steam_user_id, str):
+        if find_user_id:
+            if not isinstance(find_user_id, str):
                 raise TypeError(
-                    "Unexpected type for find_steam_user_id. This should be string "
+                    "Unexpected type for find_user_id. This should be string "
                     "version of steam integer uid - str(steam_uid)."
                 )
             # retain dir for specified id (if found), delete all other entries.
-            save_dir = user_dirs.get(find_steam_user_id, None)
+            save_dir = user_dirs.get(find_user_id, None)
             user_dirs.clear()
             if save_dir is not None:
-                user_dirs[find_steam_user_id] = save_dir
+                user_dirs[find_user_id] = save_dir
 
         for user_id in list(user_dirs.keys()):
-            save_dir = os.path.join(user_dirs[user_id], RS_APP_ID, STEAM_REMOTE_DIR)
+            # extend path to steam rocksmith remote folder.
+            save_dir = user_dirs[user_id].joinpath(RS_APP_ID, STEAM_REMOTE_DIR)
 
-            if os.path.isdir(save_dir):
-                # update path with Rocksmith save location.
+            if save_dir.is_dir():
+                # update user_dirs path with Rocksmith remote save location.
                 user_dirs[user_id] = save_dir
             else:
                 # user has no Rocksmith save directory, so delete from dictionary
@@ -1165,13 +1271,19 @@ class RSProfileManager:
 
         return user_dirs
 
-    def _get_steam_file_sets(self):
-        """Finds Rocksmith file sets in steam user folders.
+    def _get_steam_file_sets(self) -> Dict[str, RSFileSet]:
+        """Return a dictionary of the valid Rocksmith file sets for steam users.
 
-        If source steam user id is specified, file set is limited to this user."""
-        user_dirs = self._get_steam_rs_user_dirs(
-            find_steam_user_id=self.source_steam_uid
-        )
+        Returns:
+            Dict[str, RSFileSet] -- Dictionary of valid Rocksmith file sets, where the
+                keys are steam user ids as strings, and the values are the Rocksmith
+                file sets for each steam user.
+
+        If a target steam user id was set in the constructor, the dictionary will
+        contain only the file set for this user (if it exists).
+
+        """
+        user_dirs = self._get_steam_rs_user_dirs(find_user_id=self.source_steam_uid)
 
         steam_file_sets = dict()
         for user_id, save_path in user_dirs.items():
@@ -1188,7 +1300,13 @@ class RSProfileManager:
         return steam_file_sets
 
     @staticmethod
-    def _user_confirm_setup():
+    def _user_confirm_setup() -> bool:
+        """Prompt user to confirm setup of workspace for profile manager.
+
+        Raises:
+            RSProfileError: If the users rejects setup of the workspace.
+
+        """
         perform_setup = utils.choose(
             [
                 (
@@ -1211,25 +1329,35 @@ class RSProfileManager:
                 "\nEither perform this set up or allow the profile manager to do so."
             )
 
-        return perform_setup
+        return cast(bool, perform_setup)
 
-    def _setup_workspace(self, base_dir, auto_setup=False):
-        """Check working folder structure and state, optionally create/clean up working folders and files.
+    def _setup_workspace(self, base_dir: Path, auto_setup: bool = False) -> None:
+        """Check and create working directory structure and state.
 
-        If auto_setup is False, user will be prompted to confirm setup actions.
-        Otherwise the routine performs the setup actions without interaction."""
+        Arguments:
+            base_dir {pathlib.Path} -- The base directory for the profile manager
+                instance.
 
+        Keyword Arguments:
+            auto_setup {bool} -- If False, the user will be prompted to confirm setup
+                actions. Otherwise the method performs the setup actions without
+                interaction. (default: {False})
+
+        Raises:
+            NotADirectoryError -- If any of the workspace directory paths exist, but are
+                not directories.
+
+        Workspace set up consists of checking that workspace directories exist, creating
+        them if they don't, and deleting any old files from the update directory.
+
+        """
         perform_setup = auto_setup
 
-        working = os.path.abspath(os.path.join(base_dir, RS_WORKING_DIR))
-        self._working_save_path = os.path.abspath(
-            os.path.join(working, STEAM_REMOTE_DIR)
-        )
-        self._backup_path = os.path.abspath(os.path.join(base_dir, RS_BACKUP_DIR))
-        update_path = os.path.abspath(os.path.join(base_dir, RS_UPDATE_DIR))
-        self._update_save_path = os.path.abspath(
-            os.path.join(update_path, STEAM_REMOTE_DIR)
-        )
+        working = base_dir.joinpath(RS_WORKING_DIR)
+        self._working_save_path = working.joinpath(STEAM_REMOTE_DIR)
+        self._backup_path = base_dir.joinpath(RS_BACKUP_DIR)
+        update_path = base_dir.joinpath(RS_UPDATE_DIR)
+        self._update_save_path = update_path.joinpath(STEAM_REMOTE_DIR)
 
         for check_dir in (
             working,
@@ -1238,61 +1366,61 @@ class RSProfileManager:
             update_path,
             self._update_save_path,
         ):
-            if os.path.exists(check_dir):
-                if not os.path.isdir(check_dir):
+            if check_dir.exists():
+                if not check_dir.is_dir():
                     raise NotADirectoryError(
                         "Profile manager called on invalid working directory\n   "
-                        '"{0}"'.format(check_dir)
+                        '"{0}"'.format(fsdecode(check_dir))
                     )
             else:
                 if not perform_setup:
                     # raises an error if user does not confirm setup.
                     perform_setup = self._user_confirm_setup()
 
-                os.mkdir(check_dir)
+                check_dir.mkdir()
 
         # check and tidy update directory if needed. No need to log on this one as we
         # need to delete any full or partial file set.
         logging.disable(logging.CRITICAL)
         file_set = RSFileSet(self._update_save_path)
         logging.disable(logging.NOTSET)
+        # Note fileset.profiles is a dict - Returns True if it contains members
         if (
-            file_set.profiles is not None
+            file_set.profiles
             or file_set.local_profiles is not None
-            or file_set.steam_cache is not None
+            or file_set.steam_metadata is not None
         ):
 
             # at least one file exists, so clean up
             if not perform_setup:
                 # raises an error if user does not confirm setup.
-                self._user_confirm_setup()
+                perform_setup = self._user_confirm_setup()
 
             file_set.delete_files()
 
-    def write_files(self):
-        """Writes changed profiles, local profiles and steam cache as required.
+    def write_files(self) -> None:
+        """Write changed profiles, local profiles and steam metadata as required.
 
-        Updated files are written to update_path *AND* data is not marked as clean, as
-        data is not in sync with original source files referred to by objects (this is
-        only an issue if the user intent is to update original files later).
+        Updated files are written to self.update_path *AND* data is not marked as clean,
+        as the instance data is not in sync with original source files (this is only an
+        issue if the caller intent is to update original files later).
 
         Backs up *all* save files (including unchanged files), local profiles and steam
-        cache files into a zip file in backup_path before saving changes."""
-
+        cache files into a zip file in backup_path before saving changes.
+        """
         # create zip file and back up *all* files before writing any changes.
         # don't apply any compression as most objects are already compressed.
-        zipfile_name = "RS" + time.strftime("%Y%m%d%H%M%S", time.localtime()) + ".zip"
-        zipfile_name = os.path.join(self._backup_path, zipfile_name)
-        with ZipFile(zipfile_name, "x") as my_zip:
+        zip_path = self._backup_path.joinpath(
+            "RS" + time.strftime("%Y%m%d%H%M%S", time.localtime()) + ".zip"
+        )
+
+        with ZipFile(zip_path, "x") as my_zip:
             my_zip.write(
                 self._local_profiles.file_path,
-                "/".join(
-                    [STEAM_REMOTE_DIR, os.path.basename(self._local_profiles.file_path)]
-                ),
+                "/".join([STEAM_REMOTE_DIR, self._local_profiles.file_path.name]),
             )
             my_zip.write(
-                self._steam_metadata.file_path,
-                os.path.basename(self._steam_metadata.file_path),
+                self._steam_metadata.file_path, self._steam_metadata.file_path.name
             )
 
             for profile_key, profile in self._profiles.items():
@@ -1303,16 +1431,16 @@ class RSProfileManager:
                     # unique_id entry and skip the player_name entries.
                     my_zip.write(
                         profile.file_path,
-                        "/".join(
-                            [STEAM_REMOTE_DIR, os.path.basename(profile.file_path)]
-                        ),
+                        "/".join([STEAM_REMOTE_DIR, profile.file_path.name]),
                     )
 
+                    # as we have the profile, try writing it to the update save path
+                    # Save will only occur if the instance is dirty.
                     saved_file_path = profile.write_file(
-                        save_dir=self._update_save_path
+                        save_path=self._update_save_path
                     )
                     if saved_file_path is not None:
-                        # save occurred, so update local profiles, steam cache if
+                        # save occurred, so update local profiles, steam metadata if
                         # applicable
                         self._local_profiles.update_local_profiles(
                             profile.unique_id, saved_file_path
@@ -1321,53 +1449,83 @@ class RSProfileManager:
                             RS_APP_ID, saved_file_path
                         )
 
-            # Finally, save local profiles, update steam cache, and save steam cache if
-            # applicable
+            # Finally, save local profiles, update steam metadata, and save steam
+            # metadata if applicable.
+            # Again, this only happens if the instance is dirty.
             saved_file_path = self._local_profiles.write_file(
-                save_dir=self._update_save_path
+                save_path=self._update_save_path
             )
             if saved_file_path is not None:
+                # update steam metadata for local profiles.
                 self._steam_metadata.update_metadata_set(RS_APP_ID, saved_file_path)
+
+            # and save the steam metadata in to the parent directory!
             self._steam_metadata.write_metadata_file(
-                save_dir=os.path.dirname(self._update_save_path)
+                save_dir=self._update_save_path.parent
             )
 
-    def copy_profile(self, *, src_name, dst_name, write_files=False):
-        """Copies all data from src_name profile into dst_name profile, and optionally writes files. One shot for
-        creating test profiles.
+    def copy_profile(
+        self, *, src_name: str, dst_name: str, write_files: bool = False
+    ) -> None:
+        """Copy all data from one profile into another (destroys destination data).
 
-        This routines replaces *ALL* data in destination file. The routine wil work
-        with either player name or unique profile ids."""
+        Arguments:
+            src_name {str} -- The source profile name or unique id.
+            dst_name {str} -- The destination profile name or unique id.
 
+        Keyword Arguments:
+            write_files {bool} -- If True, the method will call self.write_files() after
+                copy the profile data. (default: {False})
+
+        This is a one shot utility for creating test profiles.
+
+        This method replaces *ALL* data in the destination profile (destructive copy).
+        The method wil work with either player name or unique profile ids.
+
+        """
         self._profiles[dst_name].json_tree = self._profiles[src_name].json_tree
         self._profiles[dst_name].mark_as_dirty()
 
         if write_files:
             self.write_files()
 
-    def move_updates_to_steam(self, target_steam_user_id):
-        """Moves the file set in the update folder to the save folder for the target steam id.
+    def move_updates_to_steam(self, target_steam_user_id: str) -> None:
+        """Move any updated files to a Steam user directory.
 
-        The file set must be consistent, and the steam user folder must exist. The
-        caller is responsible for ensuring the file set matches up with the steam user
-        id."""
+        Arguments:
+            target_steam_user_id {str} -- String representation of an integer steam
+                user id.
 
+        Raises:
+            RSProfileError -- If there is no Rocksmith save directory for the steam
+                user.
+            RSFileSetError -- If the file set in the update folder is not consistent.
+
+        The method moves all Rocksmith save and metadata files in the update directory
+        of the workspace to the target Steam user's Rocksmith save directory.
+
+        The file set must be consistent, and the steam user Rocksmith save directory
+        must exist. The caller is responsible for ensuring the file set matches up with
+        the steam user id.
+
+        """
         # steam dirs requires string version of steam user id.
         target_steam_user_id = str(target_steam_user_id)
 
-        steam_dirs = self._get_steam_rs_user_dirs(
-            find_steam_user_id=target_steam_user_id
-        )
+        steam_dirs = self._get_steam_rs_user_dirs(find_user_id=target_steam_user_id)
 
         if not steam_dirs:
             raise RSProfileError(
-                'Moving updates failed. Steam save folder for user id "{0}" does not '
-                "exist".format(target_steam_user_id)
+                "Moving updates failed. Steam Rocksmith save directory for user id "
+                '"{0}" does not exist'.format(target_steam_user_id)
             )
 
         steam_save_dir = steam_dirs[target_steam_user_id]
 
-        update_set = RSFileSet(rs_save_dir=self._update_save_path)
+        # Note: update set only contains files that have been changed.
+        # Metadata for unchanged files should still exist in the local profiles and
+        # steam metadata files, and should be unchanged as well!
+        update_set = RSFileSet(remote_path=self._update_save_path)
         if not update_set.consistent:
             raise RSFileSetError(
                 "Moving updates failed. Rocksmith update file set is not consistent"
@@ -1377,9 +1535,19 @@ class RSProfileManager:
         update_set.copy_file_set(steam_save_dir, True)
         update_set.delete_files()
 
-    def player_arrangement_ids(self, profile_name):
-        """Wrapper for arrangement id iterator in named profile."""
+    def player_arrangement_ids(self, profile_name: str) -> Iterator[str]:
+        """Return iterator for all song arrangement ids that appear in a profile.
 
+        Arguments:
+            profile_name {str} --  The target profile name or unique id.
+
+        Raises:
+            KeyError -- If the profile name does not exist.
+
+        Yields:
+            str -- song arrangment id.
+
+        """
         if profile_name in self._profiles:
             return self._profiles[profile_name].arrangement_ids()
         else:
@@ -1388,62 +1556,120 @@ class RSProfileManager:
                 "set".format(profile_name)
             )
 
-    def copy_player_json_value(self, profile_name, json_path):
-        """Returns a deep copy of the subtree/value found from the player profile json_path iterable."""
+    def copy_player_json_value(
+        self, profile_name: str, json_path: JSON_path_type
+    ) -> Any:
+        """Return a deep copy of part of the player profile data tree.
+
+        Arguments:
+            profile_name {str} -- The target profile name or unique id.
+            json_path {Sequence[Union[int, str]]} -- A JSON path to a subtree of the
+                player profile data. This is either a part of the profile JSON data
+                dictionary, or a leaf value in the data dictionary.
+
+        Returns:
+            Any -- A json subtree (list, dict), or a json value (str, bool, Decimal)
+                found at the end of the json_path.
+
+        """
         return copy.deepcopy(self._profiles[profile_name].get_json_subtree(json_path))
 
-    def replace_song_list(self, profile_name, list_index, new_song_list):
-        """Replaces song list[list_index (0-5)] in the named profile with the new song list."""
+    def replace_song_list(
+        self, profile_name: str, list_index: int, new_song_list: List[str]
+    ) -> None:
+        """Replace indexed song list in a profile with a new song list.
 
+        Arguments:
+            profile_name {str} -- The target profile name or unique id.
+            list_index {int} -- The index of the song list to replace in the range 0-5.
+            new_song_list {List[str]} -- The list of new songs to be inserted into the
+                song list. Refer rsrtools.songlists.arrangement_db for details on song
+                list generation and structure. In summary, this is a list of the short
+                form song names: e.g. ["BlitzkriegBop", "CallMe"].
+
+        Note: Rocksmith has 6 user specifiable song lists. Following python convention,
+        we index these from 0 to 5.
+        """
         self._profiles[profile_name].replace_song_list(list_index, new_song_list)
 
-    def set_arrangement_play_count(self, profile_name, arrangement_id, play_count):
+    def set_arrangement_play_count(
+        self, profile_name: str, arrangement_id: str, play_count: int
+    ) -> None:
+        """Set a profile's "Learn a Song" play count for an arrangement.
+
+        Arguments:
+            profile_name {str} -- The target profile name or unique id.
+            arrangment_id {str} -- The unique id for a Rocksmith arrangment.
+            play_count {int} -- The new play count value.
+
+        Note: This is a utility function that I find useful to reset some arrangement
+        play counts to zero (e.g. rythym arrangements I may have played once that I
+        don't want to appear in count based song lists).
+        """
         self._profiles[profile_name].set_arrangement_play_count(
             arrangement_id, play_count
         )
 
-    def profile_names(self):
-        """Returns a list of the profile names in the file set."""
-        ret_val = list()
+    def profile_names(self) -> List[str]:
+        """Return a list of the profile names in the file set.
+
+        Returns:
+            List[str] -- The list of profile names in the working Rocksmith file set.
+
+        """
+        ret_val: List[str] = list()
         for profile in self._profiles.values():
             name = profile.player_name
-            if name is not None and name not in ret_val:
+            if name and name not in ret_val:
                 ret_val.append(name)
 
         return ret_val
 
-    def cl_choose_profile(self, header_text, no_action_text):
-        """Provides a command line menu for selection of one of the profiles in the profile manager.
+    def cl_choose_profile(self, header_text: str, no_action_text: str) -> str:
+        """Provide a command line menu for selecting a Rocksmith profile name.
 
-        Returns the name of the selected profile."""
+        Arguments:
+            header_text {str} -- Menu description text.
+            no_action_text {str} -- Description of no action selection.
+
+        Returns:
+            str -- The name of the selected profile, or empty string if none selected.
+
+        The menu will list all profile names in the working Rocksmith file set.
+
+        """
         choice = utils.choose(
             options=self.profile_names(), header=header_text, no_action=no_action_text
         )
-        return choice
 
-    def cl_clone_profile(self):
-        """Command line interface for profile cloning."""
+        if choice is None:
+            choice = ""
+
+        return cast(str, choice)
+
+    def cl_clone_profile(self) -> None:
+        """Provide a command line interface for profile cloning."""
         while True:
             src = self.cl_choose_profile(
                 no_action_text="Exit without cloning.",
                 header_text=(
                     "Choose the source profile for cloning (data will be "
-                    "copied from this profile).",
+                    "copied from this profile)."
                 ),
             )
 
-            if src is None:
+            if not src:
                 return
 
             dst = self.cl_choose_profile(
                 no_action_text="Exit without cloning.",
                 header_text=(
                     "Choose the target profile for cloning (all data in "
-                    "this profile will be replaced).",
+                    "this profile will be replaced)."
                 ),
             )
 
-            if dst is None:
+            if not dst:
                 return
 
             if src == dst:
@@ -1456,12 +1682,16 @@ class RSProfileManager:
                 break
 
         if int(self.source_steam_uid) > 0:
-            dlg = f",\nand will write the updated profile back to steam user {self.source_steam_uid}."
+            dlg = (
+                f",\nand will write the updated profile back to steam "
+                f"user {self.source_steam_uid}."
+            )
         else:
             dlg = "."
 
         dlg = (
-            f"Please confirm that you want to copy player data from profile '{src}' into profile '{dst}'."
+            f"Please confirm that you want to copy player data from profile '{src}' "
+            f"into profile '{dst}'."
             f"\nThis will replace all existing data in profile '{dst}'{dlg}"
         )
 
@@ -1470,47 +1700,61 @@ class RSProfileManager:
             if int(self.source_steam_uid) > 0:
                 self.move_updates_to_steam(self.source_steam_uid)
 
-    def cl_set_play_counts(self, play_count_file_path):
-        """Primitive routine to set play counts for a profile. Mostly intended for tidying up arrangements that have
-        been played once only, and need resetting to zero.
+    def cl_set_play_counts(self, play_count_file_path: Path) -> None:
+        """Set some arrangment play counts for a profile (very primitive).
 
-        This function expects the path to a file containing <arrangement id>,
-        <play count> on each line. It has no error management, but only writes after
-        processing the entire file."""
+        Arguments:
+            play_count_file_path {Path} -- Path to test file containing arrangement ids
+                and play counts.
 
+        Mostly intended for tidying up arrangements that have been played once only,
+        and need resetting to zero. The method will use a command line menu to get
+        the user to select a target profile.
+
+        This method expects the path to a file containing:
+            <arrangement id>, <play count>
+        on each line. It has no error management, but only writes after processing the
+        entire file.
+        """
         target = self.cl_choose_profile(
             no_action_text="Exit.",
             header_text="Which profile do you want to apply play count changes to?.",
         )
 
-        if target is None:
+        if not target:
             return
 
         if int(self.source_steam_uid) > 0:
-            dlg = f",\nand write the updated profile back to steam user {self.source_steam_uid}."
+            dlg = (
+                f",\nand write the updated profile back to steam "
+                f"user {self.source_steam_uid}."
+            )
         else:
             dlg = "\nand write these changes to the update directory."
 
         dlg = (
-            f"Please confirm that you want to apply arrangement count changes to profile '{target}'"
-            f"{dlg}"
+            f"Please confirm that you want to apply arrangement count changes to "
+            f"profile '{target}'{dlg}"
         )
 
         if utils.yes_no_dialog(dlg):
-            with open(play_count_file_path, "rt") as fp:
+            with play_count_file_path.open("rt") as fp:
                 for arr_line in fp:
                     arr_id, count = arr_line.split(",")
                     arr_id = arr_id.strip()
                     count = count.strip()
                     print(arr_id, count)
-                    self.set_arrangement_play_count(target, arr_id, count)
+                    self.set_arrangement_play_count(
+                        target, arr_id, int(cast(int, count))
+                    )
 
             self.write_files()
             if int(self.source_steam_uid) > 0:
                 self.move_updates_to_steam(self.source_steam_uid)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Provide basic command line main."""
     # TODO Maybe in future add functionality to delete arrangement data. Need more
     #       confidence on what is/isn't useful data (target player arrangement data
     #       where the is no corresponding song arrangement data - but need to eliminate
@@ -1535,16 +1779,21 @@ if __name__ == "__main__":
     group.add_argument(
         "--set-play-counts",
         help="Sets play counts for arrangements as specified in the play count "
-        "file. Each line in this file should consist of <ArrangementID>, <NewPlayCount>.",
+        "file. Each line in this file should consist of: "
+        "<ArrangementID>, <NewPlayCount>.",
         metavar="play_count_file_path",
     )
 
     args = parser.parse_args()
 
+    pm = RSProfileManager(Path(args.working_dir))
+
     if args.clone_profile:
-        pm = RSProfileManager(args.working_dir)
         pm.cl_clone_profile()
 
     if args.set_play_counts:
-        pm = RSProfileManager(args.working_dir)
-        pm.cl_set_play_counts(args.set_play_counts)
+        pm.cl_set_play_counts(Path(args.set_play_counts))
+
+
+if __name__ == "__main__":
+    main()
