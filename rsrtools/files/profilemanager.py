@@ -670,12 +670,12 @@ class RSFileSet:
         This method deliberately excludes crd files.
         """
         self._valid_structure = True
-        parent_name = remote_path.parent.name
-        if parent_name != STEAM_REMOTE_DIR:
+        dir_name = remote_path.name
+        if dir_name != STEAM_REMOTE_DIR:
             logging.warning(
                 f"Rocksmith profiles should be in a directory named:"
                 f"\n    {STEAM_REMOTE_DIR}\nRocksmith file set constructor (__init__) "
-                f"called on directory named:\n    {parent_name}"
+                f"called on directory named:\n    {dir_name}"
             )
             self._valid_structure = False
 
@@ -819,11 +819,13 @@ class RSFileSet:
                     f"'{STEAM_REMOTE_DIR}'."
                 )
 
-        file_list: List[RSSaveWrapper] = list(self._fs_profiles.values())
+        # only need the unique save instances - _fs_profiles carrys
+        # index by name and unique_id
+        file_set: Set[RSSaveWrapper] = set(self._fs_profiles.values())
         if self._fs_local_profiles is not None:
-            file_list.append(self._fs_local_profiles)
+            file_set.add(self._fs_local_profiles)
 
-        for file in file_list:
+        for file in file_set:
             shutil.copy2(fsdecode(file.file_path), fsdecode(new_remote_path))
 
         if self._fs_steam_metadata is not None:
@@ -835,17 +837,17 @@ class RSFileSet:
 
     def delete_files(self) -> None:
         """Delete all files in the file set."""
-        file_list: List[Union[RSSaveWrapper, SteamMetadata]] = list(
+        file_set: Set[Union[RSSaveWrapper, SteamMetadata]] = set(
             self._fs_profiles.values()
         )
 
         if self._fs_local_profiles is not None:
-            file_list.append(self._fs_local_profiles)
+            file_set.add(self._fs_local_profiles)
 
         if self._fs_steam_metadata is not None:
-            file_list.append(self._fs_steam_metadata)
+            file_set.add(self._fs_steam_metadata)
 
-        for file in file_list:
+        for file in file_set:
             if file.file_path.exists():
                 file.file_path.unlink()
 
