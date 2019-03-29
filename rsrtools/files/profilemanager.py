@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Provides classes for managing a group of Rocksmith save files owned by a steam user.
 
-The primary public class is RSProfileManager, with the other classes being helpers that
-support the operation of the profile manager class.
+The primary public class is RSProfileManager. The other classes are helpers that support
+the operation of the profile manager class.
 
 For command line options (database setup, reporting), run:
     'python -m rsrtools.files.profile_manager -h'
@@ -236,10 +236,13 @@ class RSSaveWrapper:
         responsible for marking the save file as dirty if it modifies any of the tree
         elements.
 
-        The setter replaces the instance data with new_data. The setter is responsible
-        for ensuring the format of the tree is consistent with the Rocksmith save file
-        format. Using the setter to replace the tree will automatically mark the save
-        file as dirty.
+        The setter replaces the instance data with new_data.  Using the setter to
+        replace the tree will automatically mark the save file as dirty.
+
+        The caller is responsible for ensuring that any changes to the tree are
+        consistent with the Rocksmith save file structure and format. That is, the class
+        does not validate data changes. (It should be possible to implement a json
+        schema to address this, but it's not worth the effort for now.)
         """
         return self._rs_file.json_tree
 
@@ -788,9 +791,10 @@ class RSFileSet:
         Arguments:
             new_remote_path {pathlib.Path} -- The destination directory for the
                 Rocksmith save files.
-            require_consistent {bool} -- If true, the copy will raise an exception is
-                not consistent. See notes below. A False value for this parameter may
-                be useful when working with incomplete file sets.(default: True)
+            require_consistent {bool} -- If true, the copy will raise an exception if
+                the fileset is not not consistent. See notes below. A False value for
+                this parameter may be useful when working with incomplete file sets.
+                (default: True)
 
         The copy performs the following actions:
             - Raise an exception if require_consistent is true and the source file set
@@ -957,16 +961,16 @@ class RSProfileManager:
     RSProfileManager works on a base directory with the following structure:
         base_dir
             \-- RS_working   - This directory contains the working copy of the
-                                Rocksmith save directory. The object expects to find
-                                remotecache.vdf in this directory.
+                               Rocksmith save directory. The object expects to find
+                               remotecache.vdf in this directory.
                 \-- remote   - This directory should contain the Rocksmith game files
-                                and the LocalProfiles.json file.
+                               and the LocalProfiles.json file.
             \-- RS_backup    - Backups of RS_working will be made into this directory
-                                before creating the any updates.
+                               before creating any updates.
             \-- RS_update    - Changed steam cache files will be saved in this
-                                directory.
+                               directory.
                 \--remote    - Changed Rocksmith files will be saved in this
-                                directory.
+                               directory.
 
     If this structure does not exist, the user will be asked for permission to create
     it, and the class initialisation will fail if refused.
@@ -1403,12 +1407,12 @@ class RSProfileManager:
     def write_files(self) -> None:
         """Write changed profiles, local profiles and steam metadata as required.
 
-        Updated files are written to self.update_path *AND* data is not marked as clean,
-        as the instance data is not in sync with original source files (this is only an
-        issue if the caller intent is to update original files later).
+        Updated files are written to self._update_path *AND* data is not marked as
+        clean, as the instance data is not in sync with original source files (this is
+        only an issue if the caller intent is to update original files later).
 
         Backs up *all* save files (including unchanged files), local profiles and steam
-        cache files into a zip file in backup_path before saving changes.
+        cache files into a zip file in self._backup_path before saving changes.
         """
         # create zip file and back up *all* files before writing any changes.
         # don't apply any compression as most objects are already compressed.
@@ -1479,7 +1483,7 @@ class RSProfileManager:
             write_files {bool} -- If True, the method will call self.write_files() after
                 copy the profile data. (default: {False})
 
-        This is a one shot utility for creating test profiles.
+        This is a one shot utility for filling test profiles with data.
 
         This method replaces *ALL* data in the destination profile (destructive copy).
         The method wil work with either player name or unique profile ids.
