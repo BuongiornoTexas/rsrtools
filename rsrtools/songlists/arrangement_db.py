@@ -12,12 +12,14 @@ TODO: fix/check this. For command line options (database setup, reporting), run
 
 import sqlite3
 import argparse
-import os
 
 import xml.etree.ElementTree as eTree
 
 from enum import Enum
+from pathlib import Path
+from typing import Optional, TextIO
 
+import rsrtools.songlists.sldefs as SLDEF
 from rsrtools.utils import choose
 from rsrtools.files.profilemanager import RSProfileManager
 
@@ -124,31 +126,31 @@ class FieldTypes(Enum):
 # bucket of field types that will be processed as string list filters.
 LIST_FILTERS = (
     FieldTypes.TUNING,
-                FieldTypes.ARRANGEMENT_NAME,
-                FieldTypes.ARRANGEMENT_ID,
-                FieldTypes.TITLE,
-                FieldTypes.ARTIST,
+    FieldTypes.ARRANGEMENT_NAME,
+    FieldTypes.ARRANGEMENT_ID,
+    FieldTypes.TITLE,
+    FieldTypes.ARTIST,
     FieldTypes.ALBUM,
 )
 
 # bucket of field types that will be processed as positive range filters.
 POSITIVE_RANGE_FILTERS = (
     FieldTypes.PITCH,
-                          FieldTypes.TEMPO,
-                          FieldTypes.NOTE_COUNT,
-                          FieldTypes.YEAR,
-                          FieldTypes.PLAYED_COUNT,
-                          FieldTypes.MASTERY_PEAK,
-                          FieldTypes.SA_EASY_COUNT,
-                          FieldTypes.SA_MEDIUM_COUNT,
-                          FieldTypes.SA_HARD_COUNT,
-                          FieldTypes.SA_MASTER_COUNT,
-                          FieldTypes.SA_PLAYED_COUNT,
-                          FieldTypes.SA_EASY_BADGES,
-                          FieldTypes.SA_MEDIUM_BADGES,
-                          FieldTypes.SA_HARD_BADGES,
+    FieldTypes.TEMPO,
+    FieldTypes.NOTE_COUNT,
+    FieldTypes.YEAR,
+    FieldTypes.PLAYED_COUNT,
+    FieldTypes.MASTERY_PEAK,
+    FieldTypes.SA_EASY_COUNT,
+    FieldTypes.SA_MEDIUM_COUNT,
+    FieldTypes.SA_HARD_COUNT,
+    FieldTypes.SA_MASTER_COUNT,
+    FieldTypes.SA_PLAYED_COUNT,
+    FieldTypes.SA_EASY_BADGES,
+    FieldTypes.SA_MEDIUM_BADGES,
+    FieldTypes.SA_HARD_BADGES,
     FieldTypes.SA_MASTER_BADGES,
-                          )
+)
 
 
 class RSFilterError(Exception):
@@ -174,6 +176,7 @@ class SongListSQLGenerator:
     """
 
     _next_table_index: int
+    _filter_names: SLDEF.FilterSet
 
     def _next_table_name(self) -> str:
         """Return the next temporary table name.
@@ -185,8 +188,15 @@ class SongListSQLGenerator:
         self._next_table_index = self._next_table_index + 1
         return table_name
 
-    def _table_setup(self, filter_name, where_clause, where_values):
-        """Constructs SQL for a temporary table based on where_clause, where_values and the base filter for
+    def _table_setup(self, filter_name: str, where_clause, where_values):
+        """Construct an SQL query for creating a song list filter temporary table.
+        
+        Arguments:
+            filter_name {str} -- [description]
+            where_clause {str} -- [description]
+            where_values {[type]} -- [description]
+        
+        based on where_clause, where_values and the base filter for
         filter_name.
         """
 
@@ -195,14 +205,12 @@ class SongListSQLGenerator:
         base_table = self._table_map[self._base_filter(filter_name)]
 
         # set up the start of the SQL query for the table
-        self.tmp_table_sql.append(('DROP TABLE IF EXISTS {0};'.format(new_table), ()))
-        query = 'CREATE TEMP TABLE {0} AS SELECT * FROM {1}'.format(new_table, base_table)
-        query = ''.join((query, '\n', where_clause, ';'))
+        self.tmp_table_sql.append((f"DROP TABLE IF EXISTS {new_table};", ()))
+        query = f"CREATE TEMP TABLE {new_table} AS SELECT * FROM {base_table}"
+        query = "".join((query, "\n", where_clause, ";"))
         self.tmp_table_sql.append((query, where_values))
 
-    def __init__(
-        self, filter_set: list, filter_definitions: dict, list_validators: dict
-    ):
+    def __init__(self, filter_set: SLDEF.FilterSet, filter_definition, list_validators):
         """Generates song list sql queries for the filter set based on the filter definitions and list list_validators.
 
         :param filter_set: List of filter names for sql query generation.
@@ -216,7 +224,7 @@ class SongListSQLGenerator:
         self.list_validators = list_validators
         if len(filter_set) > 6:
             # Rocksmith supports up to 6 song lists. Discard any beyond this.
-            self._filter_names = filter_set[: 6 - len(filter_set)]
+            self._filter_names = filter_set[0:5]
         else:
             self._filter_names = filter_set[:]
 
@@ -230,15 +238,15 @@ class SongListSQLGenerator:
         # map name to itself. Might be a problem if someone cleverly names their base table to match the root table.
         self._table_map[self._root_table] = self._root_table
         # note that we exclude vocals here
-        self.tmp_table_sql.append(
-            ("DROP TABLE IF EXISTS {0};".format(self._root_table), ())
+        self.tmp_table_sql.append((f"DROP TABLE IF EXISTS {self._root_table};", ()))
+
+        query = (
+            f"CREATE TEMP TABLE {self._root_table} AS SELECT * "
+            f"\n    FROM Arrangements LEFT JOIN PlayerProfile ON "
+            f"\n    Arrangements.ArrangementId == PlayerProfile.ArrangementId"
+            f'\n    WHERE ArrangementName != "Vocals";'
         )
-        query = """
-CREATE TEMP TABLE {0} AS SELECT * 
-    FROM Arrangements LEFT JOIN PlayerProfile ON Arrangements.ArrangementId == PlayerProfile.ArrangementId
-    WHERE ArrangementName != "Vocals";""".format(
-            self._root_table
-        )
+
         self.tmp_table_sql.append((query, ()))
 
         # create the rest of the tables
@@ -256,21 +264,19 @@ CREATE TEMP TABLE {0} AS SELECT *
         pending_tables = list()
 
         for filter_name in self._filter_names:
-            if filter_name is None:
+            if not filter_name:
                 # nothing needed for empty filter set.
                 continue
 
             if filter_name not in self.filter_definitions:
-                raise KeyError("No definition for filter {0}.".format(filter_name))
+                raise KeyError(f"No definition for filter {filter_name}.")
 
             # only generating sql for temp tables, not for target song lists.
             this_filter = self._base_filter(filter_name)
             while True:
                 if this_filter not in self._table_map:
                     if this_filter not in self.filter_definitions:
-                        raise KeyError(
-                            "No definition for filter {0}.".format(this_filter)
-                        )
+                        raise KeyError(f"No definition for filter {this_filter}.")
 
                     # table needs to be defined for this filter.
                     # but, before we can do this, need to the same check on the base filter
@@ -280,10 +286,8 @@ CREATE TEMP TABLE {0} AS SELECT *
                         # do a quick check on circular filters and then push this filter onto the queue for later
                         if this_filter in pending_tables:
                             raise RSFilterError(
-                                "Filter {0} is recursive - it appears in as a parent filter to itself."
-                                " Recursive filter list follows.\n   {1}".format(
-                                    this_filter, pending_tables
-                                )
+                                f"Filter {this_filter} is recursive - it appears in as a parent filter to itself."
+                                f" Recursive filter list follows.\n   {pending_tables}"
                             )
                         pending_tables.append(this_filter)
                         # go down the base_filter rabbit hole
@@ -307,18 +311,20 @@ CREATE TEMP TABLE {0} AS SELECT *
         # temporary tables have already been created and consistency tests run previously,
         # so the code for the song list sql is a lot cleaner than that for table generation.
         for filter_name in self._filter_names:
-            if filter_name is None:
+            if not filter_name:
                 # empty song list
                 self.song_list_sql.append((None, None))
             else:
                 base_table = self._table_map[self._base_filter(filter_name)]
                 where_clause, where_values = self._where_clause(filter_name)
-                query = """
-    SELECT 
-        RSSongId, ArrangementId, ArrangementName, Artist, 
-        Title, Album, Year, Tuning, Pitch, PlayedCount FROM {0}""".format(
-                    base_table
+
+                query = (
+                    f"SELECT "
+                    f"\n    RSSongId, ArrangementId, ArrangementName, Artist,"
+                    f"\n    Title, Album, Year, Tuning, Pitch, PlayedCount"
+                    f"\n    FROM {base_table}"
                 )
+
                 query = "".join((query, "\n", where_clause, ";"))
                 self.song_list_sql.append((query, where_values))
 
@@ -328,7 +334,7 @@ CREATE TEMP TABLE {0} AS SELECT *
         where_values = list()
 
         if "QueryFields" not in self.filter_definitions[filter_name]:
-            raise KeyError("Missing QueryFields in filter {0}".format(filter_name))
+            raise KeyError(f"Missing QueryFields in filter {filter_name}")
 
         for idx, field_dict in enumerate(
             self.filter_definitions[filter_name]["QueryFields"]
@@ -338,40 +344,35 @@ CREATE TEMP TABLE {0} AS SELECT *
             field_type = field_dict.get("Field", None)
             if field_type is None:
                 raise KeyError(
-                    "Missing Field type definition in QueryFields[{0}] for filter {1}".format(
-                        idx, filter_name
-                    )
+                    f"Missing Field type definition in QueryFields[{idx}] for "
+                    f"filter {filter_name}."
                 )
             try:
                 field_type = FieldTypes[field_type]
             except KeyError:
                 raise AttributeError(
-                    "Invalid field type {0} in QueryFields[{1}] of filter {2}.".format(
-                        field_type, idx, filter_name
-                    )
+                    f"Invalid field type {field_type} in QueryFields[{idx}] of "
+                    f"filter {filter_name}."
                 )
 
             include = field_dict.get("Include", None)
             if include is None:
                 raise KeyError(
-                    "Missing Include field definition in QueryFields[{0}] for filter {1}".format(
-                        idx, filter_name
-                    )
+                    f"Missing Include field definition in QueryFields[{idx}] for "
+                    f"filter {filter_name}."
                 )
             if not isinstance(include, bool):
                 raise KeyError(
-                    "Include field definition in QueryFields[{0}] of filter {1} is not a valid boolean".format(
-                        idx, filter_name
-                    )
+                    f"Include field definition in QueryFields[{idx}] of filter "
+                    f"{filter_name} is not a valid boolean."
                 )
 
             if field_type in self.list_validators:
                 values = field_dict.get("Values", None)
                 if values is None or not values:
                     raise KeyError(
-                        "Missing or empty Values field definition in QueryFields[{0}] for filter {1}".format(
-                            idx, filter_name
-                        )
+                        f"Missing or empty Values field definition in "
+                        f"QueryFields[{idx}] for filter {filter_name}."
                     )
                 sql_text = self._list_clause(field_type, include, values)
                 sql_values = values
@@ -380,9 +381,8 @@ CREATE TEMP TABLE {0} AS SELECT *
                 values = field_dict.get("Ranges", None)
                 if values is None or not values:
                     raise KeyError(
-                        "Missing or empty Ranges field definition in QueryFields[{0}] for filter {1}".format(
-                            idx, filter_name
-                        )
+                        f"Missing or empty Ranges field definition in "
+                        f"QueryFields[{idx}] for filter {filter_name}."
                     )
                 sql_text, sql_values = self._positive_range_clause(
                     field_type, include, values
@@ -390,9 +390,7 @@ CREATE TEMP TABLE {0} AS SELECT *
 
             else:
                 raise RSFilterError(
-                    "Clause generator not implemented for field type {0}".format(
-                        field_type.name
-                    )
+                    f"Clause generator not implemented for field type {field_type.name}"
                 )
 
             where_text.append(sql_text)
@@ -411,9 +409,7 @@ CREATE TEMP TABLE {0} AS SELECT *
         for value in values:
             if value not in val_list:
                 raise RSFilterError(
-                    "Invalid value ({0}) for field type {1}".format(
-                        value, field_type.value
-                    )
+                    f"Invalid value ({value}) for field type {field_type.value}"
                 )
 
         if include:
@@ -426,7 +422,7 @@ CREATE TEMP TABLE {0} AS SELECT *
         else:
             q_marks = ""
 
-        sql_text = "{0} {1}IN ({2}?)".format(field_type.value, not_text, q_marks)
+        sql_text = f"{field_type.value} {not_text}IN ({q_marks}?)"
 
         return sql_text
 
@@ -444,18 +440,16 @@ CREATE TEMP TABLE {0} AS SELECT *
         for value_pair in values:
             if len(value_pair) != 2:
                 raise IndexError(
-                    "Range field type {0} expected high/low pair, got {1}.".format(
-                        field_type, value_pair
-                    )
+                    f"Range field type {field_type} expected high/low pair, got "
+                    f"{value_pair}."
                 )
 
             if not isinstance(value_pair[0], (int, float)) or not isinstance(
                 value_pair[1], (int, float)
             ):
                 raise RSFilterError(
-                    "Range field type {0} expects numeric pairs of values to define range. Got {1}".format(
-                        field_type, value_pair
-                    )
+                    f"Range field type {field_type} expects numeric pairs of values to "
+                    f"define range. Got {value_pair}."
                 )
 
             # silent tidy.
@@ -470,7 +464,7 @@ CREATE TEMP TABLE {0} AS SELECT *
 
             # and finally the SQL
             text_list.append(
-                "{0} {1}BETWEEN ? AND ?".format(field_type.value, not_text)
+                f"{field_type.value} {not_text}BETWEEN ? AND ?"
             )
             ret_values.append(low_val)
             ret_values.append(high_val)
@@ -529,28 +523,39 @@ class ArrangementDB:
         method:: list_validators()
             Returns a dictionary of all of the unique list field values in the database (e.g. unique tunings, artists,
             album names).
-        """
+    """
 
-    def __init__(self, db_path=None):
+    # Type declarations
+    _db_file_path: Path
+
+    def __init__(self, db_path: Path = None) -> None:
+        """Initialise instance path to database.
+        
+        Keyword Arguments:
+            db_path {Path} -- Path to directory containing SQLite3 database file.
+                (default: {None})
+        """
         if db_path is None:
-            self._db_file = DB_NAME
+            self._db_file_path = Path(DB_NAME)
         else:
-            self._db_file = os.path.join(db_path, DB_NAME)
+            self._db_file_path = db_path.joinpath(DB_NAME)
+
+        self._db_file_path = self._db_file_path.resolve()
 
     def open_db(self):
-        """Utility for opening database."""
-        return sqlite3.connect(self._db_file)
+        """Utility for opening/connecting to database."""
+        return sqlite3.connect(self._db_file_path)
 
     def _refresh_arrangements(self):
         """Deletes song specific arrangements table and creates a new one."""
         conn = self.open_db()
         conn.executescript(
-            """
-            DROP TABLE IF EXISTS Arrangements;
-            CREATE TABLE Arrangements
-                (ArrangementId text PRIMARY KEY, RSSongId text, ArrangementName text, Artist text, Title text, 
-                Album text, Year integer, Tempo integer, Tuning text, Pitch real, NoteCount integer);  
-            """
+            "DROP TABLE IF EXISTS Arrangements;"
+            "\nCREATE TABLE Arrangements"
+            "\n    (ArrangementId text PRIMARY KEY, RSSongId text, "
+            "\n    ArrangementName text, Artist text, Title text, "
+            "\n    Album text, Year integer, Tempo integer, Tuning text, Pitch real, "
+            "\n    NoteCount integer);"
         )
         conn.commit()
         conn.close()
@@ -558,12 +563,12 @@ class ArrangementDB:
     def _table_has_data(self, name):
         """Returns boolean indicating if the named table is empty, or has one or more records."""
         if name not in ("Arrangements", "PlayerProfile"):
-            raise ValueError("Invalid table name {0}".format(name))
+            raise ValueError(f"Invalid table name {name}")
 
         conn = self.open_db()
         ret_val = True
         try:
-            count = conn.execute("select count(*) from {0}".format(name)).fetchone()
+            count = conn.execute(f"select count(*) from {name}").fetchone()
         except sqlite3.OperationalError:
             ret_val = False
         else:
@@ -591,21 +596,29 @@ class ArrangementDB:
         if value_dict["ArrangementId"] is not None:
             # may need to modify this test in the future? Let calling routine decide if row should be recorded or not?
             conn.execute(
-                """
-                INSERT INTO Arrangements
-                (ArrangementId, RSSongId, ArrangementName, Artist, Title, 
-                Album, Year, Tempo, Tuning, Pitch, NoteCount)
-                VALUES
-                (:ArrangementId,:RSSongId,:ArrangementName,:Artist,:Title,
-                    :Album, :Year, :Tempo, :Tuning, :Pitch, :NoteCount);
-            """,
+                "INSERT INTO Arrangements"
+                "\n    (ArrangementId, RSSongId, ArrangementName, Artist, Title, "
+                "\n    Album, Year, Tempo, Tuning, Pitch, NoteCount)"
+                "\n    VALUES"
+                "\n    (:ArrangementId,:RSSongId,:ArrangementName,:Artist,:Title, "
+                "\n    :Album, :Year, :Tempo, :Tuning, :Pitch, :NoteCount);",
                 value_dict,
             )
 
-    def load_cfsm_arrangements(self, cfsm_xml_file):
-        """Reads CFSM arrangement file into arrangements table. Replaces any existing table."""
+    def load_cfsm_arrangements(self, cfsm_xml_file: Path) -> None:
+        """Reads CFSM arrangement file into arrangements table. 
+        
+        Arguments:
+            cfsm_xml_file {pathlib.Path} -- Path to the CFSM ArrangmentsGrid.xml file.
+        
+        Replaces any existing table.
+        """
         self._refresh_arrangements()
-        tree = eTree.parse(cfsm_xml_file)
+        # create file object from path to keep mypy happy
+        # (etree seems to grok pathlikes, but annotations don't reflect this)
+        with cfsm_xml_file.open("rt") as fp:
+            tree = eTree.parse(fp)
+
         root = tree.getroot()
 
         conn = self.open_db()
@@ -638,18 +651,18 @@ class ArrangementDB:
         """Deletes Player Profile table and creates a new one."""
         conn = self.open_db()
         conn.executescript(
-            """
-            DROP TABLE IF EXISTS PlayerProfile;
-            CREATE TABLE PlayerProfile
-                (ArrangementId text PRIMARY KEY, PlayedCount integer, MasteryPeak real, SAPlayedCount integer, 
-                    SAEasyCount integer, SAMediumCount integer, SAHardCount integer, SAMasterCount integer,
-                    SAEasyBadges integer, SAMediumBadges integer, SAHardBadges integer, SAMasterBadges integer);  
-            """
+            "DROP TABLE IF EXISTS PlayerProfile;"
+            "\nCREATE TABLE PlayerProfile"
+            "\n    (ArrangementId text PRIMARY KEY, PlayedCount integer, "
+            "\n    MasteryPeak real, SAPlayedCount integer, SAEasyCount integer, "
+            "\n    SAMediumCount integer, SAHardCount integer, SAMasterCount integer, "
+            "\n    SAEasyBadges integer, SAMediumBadges integer, SAHardBadges integer, "
+            "\n    SAMasterBadges integer);"
         )
         conn.commit()
         conn.close()
 
-    def load_player_profile(self, profile_manager, profile_name):
+    def load_player_profile(self, profile_manager, profile_name: str):
         """Loads data from profile name into player profile table.  Replaces any existing table."""
 
         self.flush_player_profile()
@@ -660,14 +673,14 @@ class ArrangementDB:
             value_dict = dict()
             value_dict["ArrangementId"] = a_id
 
-            for key, item in PLAYER_PROFILE_MAP.items(): 
+            for key, item in PLAYER_PROFILE_MAP.items():
                 json_path = list(item[0])
-                
+
                 for i in range(
                     len(json_path)
                 ):  # pylint: disable=consider-using-enumerate
                     if json_path[i] == ":a_id":
-                        json_path[i] = a_id 
+                        json_path[i] = a_id
 
                 try:
                     value = profile_manager.copy_player_json_value(
@@ -697,16 +710,15 @@ class ArrangementDB:
 
             # Database update
             conn.execute(
-                """
-                INSERT INTO PlayerProfile
-                (ArrangementId, PlayedCount, MasteryPeak, SAPlayedCount,
-                    SAEasyCount, SAMediumCount, SAHardCount, SAMasterCount,
-                    SAEasyBadges, SAMediumBadges, SAHardBadges, SAMasterBadges)
-                VALUES
-                (:ArrangementId, :PlayedCount, :MasteryPeak, :SAPlayedCount,
-                    :SAEasyCount, :SAMediumCount, :SAHardCount, :SAMasterCount,
-                    :SAEasyBadges, :SAMediumBadges, :SAHardBadges, :SAMasterBadges);
-            """,
+                "INSERT INTO PlayerProfile"
+                "\n    (ArrangementId, PlayedCount, MasteryPeak, SAPlayedCount,"
+                "\n    SAEasyCount, SAMediumCount, SAHardCount, SAMasterCount,"
+                "\n    SAEasyBadges, SAMediumBadges, SAHardBadges, SAMasterBadges)"
+                "\n    VALUES"
+                "\n    (:ArrangementId, :PlayedCount, :MasteryPeak, :SAPlayedCount,"
+                "\n    :SAEasyCount, :SAMediumCount, :SAHardCount, :SAMasterCount,"
+                "\n    :SAEasyBadges, :SAMediumBadges, :SAHardBadges,"
+                "\n    :SAMasterBadges);",
                 value_dict,
             )
 
@@ -720,13 +732,14 @@ class ArrangementDB:
         conn = self.open_db()
 
         # Automatically exclude vocal data. There should never be any player data for vocals anyway.
-        query = """
-            SELECT ArrangementId, ArrangementName, Artist, Title, Album FROM Arrangements
-            WHERE NOT EXISTS
-                (SELECT ArrangementId FROM PlayerProfile
-                    WHERE Arrangements.ArrangementId == PlayerProfile.ArrangementId)
-                AND (Arrangements.ArrangementName != "Vocals")
-        """
+        query = (
+            "SELECT ArrangementId, ArrangementName, Artist, Title, Album "
+            "\n    FROM Arrangements"
+            "\n    WHERE NOT EXISTS"
+            "\n    (SELECT ArrangementId FROM PlayerProfile"
+            "\n        WHERE Arrangements.ArrangementId == PlayerProfile.ArrangementId)"
+            '\n     AND (Arrangements.ArrangementName != "Vocals")'
+        )
 
         for row in conn.execute(query):
             print(row)
@@ -737,28 +750,32 @@ class ArrangementDB:
         """Quick and dirty report on song arrangement ids that appear in player profile but don't exist in song list."""
 
         print(
-            """
-WARNING. This is report is NOT useful in its current form (still under development). 
-
-This report summarises arrangements that appear in the player profile, but do not have any corresponding song 
-arrangement data (title, artist, album, tuning, etc.). Possible causes for this are:
-    - The arrangements are lesson/practice tracks without song names/details.
-    - DLC/Custom DLC has been removed from the library (and hence the song data is no longer present, while the player
-    history for the song arrangement is retained).
-As noted, this report is still under development. I do not recommend using output of this report.
-"""
+            "WARNING. This is report is NOT useful in its current form (still under "
+            "development)."
+            "\n"
+            "\nThis report summarises arrangements that appear in the player profile, "
+            "but do not have any corresponding song"
+            "\narrangement data (title, artist, album, tuning, etc.). Possible causes "
+            "for this are:"
+            "\n    - The arrangements are lesson/practice tracks without song "
+            "names/details."
+            "\n    - DLC/Custom DLC has been removed from the library (and hence the "
+            "song data is no longer present, while the player"
+            "\n      history for the song arrangement is retained)."
+            "\nAs noted, this report is still under development. I do not recommend "
+            "using output of this report."
         )
 
         input("Enter anything to run report ->")
 
         conn = self.open_db()
 
-        query = """
-            SELECT * FROM PlayerProfile
-            WHERE NOT EXISTS
-                (SELECT ArrangementId FROM Arrangements
-                    WHERE Arrangements.ArrangementId == PlayerProfile.ArrangementId);
-        """
+        query = (
+            "SELECT * FROM PlayerProfile"
+            "\n    WHERE NOT EXISTS"
+            "\n    (SELECT ArrangementId FROM Arrangements"
+            "\n     WHERE Arrangements.ArrangementId == PlayerProfile.ArrangementId);"
+        )
 
         for row in conn.execute(query):
             print(row)
@@ -780,12 +797,11 @@ As noted, this report is still under development. I do not recommend using outpu
 
         for f_type in validators:
             # Note that I assume we will never be interested in records relating to Vocals.
-            query = """
-                SELECT {0}, COUNT(*)
-                FROM Arrangements
-                WHERE ArrangementName != "Vocals"  
-                GROUP BY {0}""".format(
-                f_type.value
+            query = (
+                f"SELECT {f_type.value}, COUNT(*)"
+                f"\n    FROM Arrangements"
+                f'\n    WHERE ArrangementName != "Vocals"'
+                f"\n    GROUP BY {f_type.value}"
             )
 
             result = conn.execute(query).fetchall()
@@ -797,14 +813,17 @@ As noted, this report is still under development. I do not recommend using outpu
                 print("  " + str(len(result)) + " unique records for " + f_type.value)
                 print("    Unique item: Count")
                 for i in result:
-                    print("    {0}: {1}".format(i[0], i[1]))
+                    print(f"    {i[0]}: {i[1]}")
 
         conn.close()
 
         return ret_dict
 
     def generate_song_lists(
-        self, filter_set: list, filter_definitions: dict, debug_target=None
+        self,
+        filter_set: SLDEF.FilterSet,
+        filter_definitions,
+        debug_target: Optional[TextIO] = None,
     ):
         """Creates a list of up to six song lists from the filters named in filter set and the filter definitions.
 
@@ -833,7 +852,8 @@ As noted, this report is still under development. I do not recommend using outpu
                 # Run the queries for each song list, report out as needed.
                 results = conn.execute(query, values).fetchall()
 
-                # use a set comprehension to eliminate duplicate song ids thrown up by the query.
+                # use a set comprehension to eliminate duplicate song ids thrown up by
+                # the query.
                 songs = {record[0] for record in results}
                 song_lists.append(list(songs))
 
@@ -841,7 +861,7 @@ As noted, this report is still under development. I do not recommend using outpu
                     print("-" * 80, file=debug_target)
                     print(file=debug_target)
                     print(
-                        "{0} records for {1}".format(len(results), filter_set[idx]),
+                        f"{len(results)} records for {filter_set[idx]}",
                         file=debug_target,
                     )
                     print(file=debug_target)
@@ -884,7 +904,7 @@ As noted, this report is still under development. I do not recommend using outpu
 
             if choice is None:
                 return
-            
+
             if choice == 1:
                 self._no_player_data_report()
             elif choice == 2:
@@ -902,7 +922,7 @@ As noted, this report is still under development. I do not recommend using outpu
             no_action_text="Do not change database.",
         )
 
-        if profile_name:    
+        if profile_name:
             self.load_player_profile(p_manager, profile_name)
 
 
@@ -939,7 +959,7 @@ if __name__ == "__main__":
     db = ArrangementDB(args.db_directory)
 
     if args.CFSMxml:
-        db.load_cfsm_arrangements(args.CFSMxml)
+        db.load_cfsm_arrangements(Path(args.CFSMxml))
 
     if args.update_player_data:
         db.cl_update_player_data(args.db_directory)

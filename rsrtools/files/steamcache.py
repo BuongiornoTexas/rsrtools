@@ -169,7 +169,7 @@ class SteamMetadata:
         # pylint - may cause problems with enum?
         # if type(key) is not SteamMetadataKey:
         if not isinstance(key, SteamMetadataKey):
-            raise ValueError("Invalid Steam metadata key {0} specified".format(key))
+            raise ValueError(f"Invalid Steam metadata key {key} specified")
 
         # watch out for the need to use the key value twice, otherwise create a
         # new entry in dict.
@@ -178,9 +178,7 @@ class SteamMetadata:
         else:
             # this really, really shouldn't happen implies a corrupt Steam cache
             # file/file with missing keys.
-            raise KeyError(
-                "Steam metadata entry does not exist for key {0}.".format(key.name)
-            )
+            raise KeyError(f"Steam metadata entry does not exist for key {key.name}.")
 
     def _cloud_file_metadata_set(self, app_id: str, file_path: Path) -> Dict:
         """Return the Steam cloud file metadata set for the app_id/file_path pair.
@@ -222,8 +220,7 @@ class SteamMetadata:
 
         if file_metadata is None:
             raise KeyError(
-                "No Steam metadata entry  for file {0} in "
-                "app {1}".format(find_name, app_id)
+                f"No Steam metadata entry  for file {find_name} in app {app_id}"
             )
 
         return file_metadata
@@ -393,21 +390,20 @@ class SteamMetadata:
         target_path = search_dir.joinpath(REMOTE_CACHE_NAME)
 
         if target_path.is_file():
-            self._metadata_path = target_path
+            self._metadata_path = target_path.resolve()
         else:
             raise FileNotFoundError(
-                "Steam metadata file {0} expected but not found in:\n   {1}".format(
-                    REMOTE_CACHE_NAME, fsdecode(search_dir)
-                )
+                f"Steam metadata file {REMOTE_CACHE_NAME} expected but not found in:"
+                f"\n   {fsdecode(search_dir)}"
             )
 
         self._read_steam_metadata()
 
     @property
     def file_path(self) -> Path:
-        """Return the path to the underlying Steam metadata file.
+        """Gets the path to the underlying Steam metadata file.
 
-        Returns:
+        Gets:
             pathlib.Path -- Path to metadata file.
 
         """

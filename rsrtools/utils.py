@@ -53,7 +53,7 @@ def steam_path() -> Optional[Path]:
     except OSError:
         pass
 
-    ret_val = Path(str_path)
+    ret_val = Path(str_path).resolve()
 
     return ret_val
 
@@ -163,7 +163,7 @@ def choose(
             print()
 
         for i, (key, value) in enumerate(opt_tuple_list):
-            print("%3d) %s" % (i + 1, key))
+            print(f"{i +1:3d}) {key}")
         if no_action is not None:
             print("  0) " + no_action)
         if help_text is not None:

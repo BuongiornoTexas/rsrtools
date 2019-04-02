@@ -133,9 +133,9 @@ class RSSaveFile:
         if json_debug_file is None:
             self._json_debug_path = None
         else:
-            self._json_debug_path = Path(json_debug_file)
+            self._json_debug_path = Path(json_debug_file).resolve()
 
-        self._file_path = rs_file_path
+        self._file_path = rs_file_path.resolve()
 
         self._read_save_file()
 
@@ -209,10 +209,10 @@ class RSSaveFile:
                     )
 
                 raise RSFileFormatError(
-                    "Mismatch between original payload and self check reconstructed "
-                    "payload in: \n\n    {0}\n\nRun with _debug=True and "
-                    "json_debug_file specified to gather "
-                    "diagnostics.".format(fsdecode(self._file_path))
+                    f"Mismatch between original payload and self check reconstructed "
+                    f"payload in: \n\n    {fsdecode(self._file_path)}"
+                    f"\n\nRun with _debug=True and json_debug_file specified to gather "
+                    f"diagnostics."
                 )
 
             if z_payload != self._debug_z_payload[: len(z_payload)]:
@@ -221,8 +221,8 @@ class RSSaveFile:
                 # (I'm really hoping it isn't Rocksmith data - if it is, none of this
                 # editing will work!). So we compare without padding.
                 raise RSFileFormatError(
-                    "Mismatch between original compressed payload and self check "
-                    "reconstruction in:\n\n    {0}\n".format(fsdecode(self._file_path))
+                    f"Mismatch between original compressed payload and self check "
+                    f"reconstruction in:\n\n    {fsdecode(self._file_path)}\n"
                 )
 
         return z_payload, len(payload)
@@ -261,8 +261,8 @@ class RSSaveFile:
         if self_check:
             if file_data != self._original_file_data:
                 raise RSFileFormatError(
-                    "Mismatch between original file and self check reconstruction in: "
-                    "\n\n    {0}\n".format(fsdecode(self._file_path))
+                    f"Mismatch between original file and self check reconstruction in: "
+                    f"\n\n    {fsdecode(self._file_path)}\n"
                 )
             elif not self._debug:
                 # discard self check vars. If we didn't have the problem of random
@@ -327,13 +327,9 @@ class RSSaveFile:
         expect_magic = b"EVAS"
         if found_magic != expect_magic:
             raise RSFileFormatError(
-                "Unexpected value in in file: \n\n    {0}"
-                "\n\nExpected '{1}' as first four bytes (magic number), "
-                "found '{2}'.".format(
-                    fsdecode(self._file_path),
-                    expect_magic.decode(),
-                    found_magic.decode(),
-                )
+                f"Unexpected value in in file: \n\n    {fsdecode(self._file_path)}"
+                f"\n\nExpected '{expect_magic.decode()}' as first four bytes (magic "
+                f"number), found '{found_magic.decode()}'."
             )
 
     def _decompress_payload(self, z_payload: bytes) -> bytes:
@@ -370,13 +366,10 @@ class RSSaveFile:
 
         if len(payload) != expect_payload_size:
             raise RSFileFormatError(
-                "Unexpected decompressed payload size in file: \n\n    {0}"
-                "\n\nExpected {1} bytes, found "
-                "{2} bytes.".format(
-                    fsdecode(self._file_path),
-                    str(expect_payload_size),
-                    str(len(payload)),
-                )
+                f"Unexpected decompressed payload size in file: "
+                f"\n\n    {fsdecode(self._file_path)}"
+                f"\n\nExpected {str(expect_payload_size)} bytes, found "
+                f"{str(len(payload))} bytes."
             )
 
         return payload
@@ -404,13 +397,10 @@ class RSSaveFile:
 
         if (len(z_payload) % ECB_BLOCK_SIZE) != 0:
             raise RSFileFormatError(
-                "Unexpected encrypted payload in file: \n\n    {0}"
-                "\n\nPayload should be multiple of {1} bytes, found {2} unexpected "
-                "bytes.".format(
-                    fsdecode(self._file_path),
-                    ECB_BLOCK_SIZE,
-                    len(z_payload) % ECB_BLOCK_SIZE,
-                )
+                f"Unexpected encrypted payload in file: "
+                f"\n\n    {fsdecode(self._file_path)}"
+                f"\n\nPayload should be multiple of {ECB_BLOCK_SIZE} bytes, "
+                f"found {len(z_payload) % ECB_BLOCK_SIZE} unexpected bytes."
             )
 
         z_payload = self._cipher.decrypt(z_payload)
@@ -476,16 +466,15 @@ def self_test() -> None:
             try:
                 keep_save_file = RSSaveFile(child)
                 print(
-                    'Successfully loaded and validated save file "{0}".'.format(
-                        fsdecode(child)
-                    )
+                    f"Successfully loaded and validated save file '{fsdecode(child)}'."
                 )
             except Exception as exc:
                 # probably not a save file. Provide a message and move on.
                 print(
-                    'Failed to load and validate file "{0}".\nIf this file is a '
-                    "Rocksmith save file, there may be a problem with with the "
-                    "RSSaveFile class. Error details follow.".format(fsdecode(child))
+                    f"Failed to load and validate file '{fsdecode(child)}'."
+                    f"\nIf this file is a Rocksmith save file, there may be a problem "
+                    f"with the RSSaveFile class."
+                    f"\nError details follow."
                 )
                 print(exc)
 
@@ -495,13 +484,13 @@ def self_test() -> None:
 
         if test_path.exists():
             print(
-                'File "{0}" exists. Save and reload test not run (rename/delete '
-                "existing file for test).".format(fsdecode(test_path))
+                f"File '{fsdecode(test_path)}' exists. Save and reload test not run "
+                f"(rename/delete existing file for test)."
             )
         else:
             try:
                 keep_save_file.save_to_new_file(test_path)
-                print('Saved test file "{0}".'.format(fsdecode(test_path)))
+                print(f"Saved test file '{fsdecode(test_path)}'.")
 
                 try:
                     keep_save_file = RSSaveFile(test_path)
@@ -518,9 +507,9 @@ def self_test() -> None:
 
             except Exception as exc:
                 print(
-                    'Failed to save test file "{0}".\nThere '
-                    "may be a problem with with the RSSaveFile class. Error details "
-                    "follow.".format(fsdecode(test_path))
+                    f"Failed to save test file '{fsdecode(test_path)}'.\nThere "
+                    f"may be a problem with with the RSSaveFile class. Error details "
+                    f"follow."
                 )
                 print(exc)
 

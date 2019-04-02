@@ -152,15 +152,15 @@ class RSSaveWrapper:
         self.__cached_rs_file = None
 
         if file_path.is_file():
-            self._file_path = file_path
+            self._file_path = file_path.resolve()
         else:
-            raise FileNotFoundError("File {0} is missing.".format(file_path))
+            raise FileNotFoundError(f"File {file_path} is missing.")
 
     @property
     def file_path(self) -> Path:
-        """Return the original save file path.
+        """Gets the original save file path.
 
-        Returns:
+        Gets:
             pathlib.Path -- Original file save path used in __init__.
 
         """
@@ -209,13 +209,13 @@ class RSSaveWrapper:
 
     @property
     def _rs_file(self) -> RSSaveFile:
-        """Return a reference to the RSSaveFile instance for the save file.
+        """Gets a reference to the RSSaveFile instance for the save file.
 
         Create the instance if this is the first reference to it (lazy loading).
 
         Only meant for use by subclasses.
 
-        Returns:
+        Gets:
             RSSaveFile -- Rocksmith save file object.
 
         """
@@ -228,7 +228,7 @@ class RSSaveWrapper:
     def json_tree(self) -> RSJsonRoot:
         """Read/write property for instance save file data in mutable json tree format.
 
-        Returns/writes:
+        Gets/sets:
             {RSJsonRoot} -- Simplejson dictionary containing instance Rocksmith save
                 data.
 
@@ -299,12 +299,12 @@ class RSSaveWrapper:
                         node = node[key]
                     except KeyError:
                         raise KeyError(
-                            "Invalid key {0} in JSON path {1}.".format(key, json_path)
+                            f"Invalid key {key} in JSON path {json_path}."
                         )
                 else:
                     raise KeyError(
-                        "Key {0} supplied in JSON path {1}, but JSON dict not found."
-                        "".format(key, json_path)
+                        f"Key {key} supplied in JSON path {json_path}, but JSON dict "
+                        f"not found."                        
                     )
             elif isinstance(key, int):
                 if isinstance(node, list):
@@ -312,18 +312,17 @@ class RSSaveWrapper:
                         node = node[key]
                     except IndexError:
                         raise IndexError(
-                            "Invalid index {0} in JSON path {1}."
-                            "".format(key, json_path)
+                            f"Invalid index {key} in JSON path {json_path}."
                         )
                 else:
                     raise IndexError(
-                        "Index {0} supplied in JSON path {1}, but JSON list not found."
-                        "".format(key, json_path)
+                        f"Index {key} supplied in JSON path {json_path}, but JSON list "
+                        f"not found."
                     )
             else:
                 raise TypeError(
-                    "Invalid value {0} in JSON path {1}.\nJson path should "
-                    "be a tuple of string and integer values.".format(key, json_path)
+                    f"Invalid value {key} in JSON path {json_path}.\nJson path should "
+                    f"be a tuple of string and integer values."
                 )
 
         # actually want to return  final node (prev_node) rather than final value (node)
@@ -380,14 +379,14 @@ class RSLocalProfiles(RSSaveWrapper):
             save file/unique id pair.
     """
 
-    def __init__(self, profile_dir: Path) -> None:
+    def __init__(self, remote_dir: Path) -> None:
         """Read Rocksmith data from LocalProfiles.json.
 
         Arguments:
-            profile_dir {pathlib.Path} -- Path to directory containing target
+            remote_dir {pathlib.Path} -- Path to directory containing target
                 LocalProfiles.json file. Typically a Rocksmith save directory.
         """
-        file_path = profile_dir.joinpath(LOCAL_PROFILES)
+        file_path = remote_dir.joinpath(LOCAL_PROFILES).resolve()
         super().__init__(file_path)
 
     def _profile_from_unique_id(
@@ -435,7 +434,7 @@ class RSLocalProfiles(RSSaveWrapper):
             return ret_val
 
         raise TypeError(
-            "Expected string type for player name, got {0}" "".format(type(ret_val))
+            f"Expected string type for player name, got {type(ret_val)}."
         )
 
     def update_local_profiles(self, unique_id: str, file_path: Path) -> None:
@@ -512,14 +511,12 @@ class RSProfileDB(RSSaveWrapper):
             - the profile unique id is not found in local_profiles.
 
         """
-        super().__init__(file_path)
+        super().__init__(file_path.resolve())
 
         self._unique_id = file_path.name.upper()
         if not self._unique_id.endswith(PROFILE_DB_STR):
             raise RSProfileError(
-                "RSProfileDB objects require a file ending in {0}.".format(
-                    PROFILE_DB_STR
-                )
+                f"RSProfileDB objects require a file ending in {PROFILE_DB_STR}."
             )
         else:
             self._unique_id = self._unique_id[: -len(PROFILE_DB_STR)]
@@ -531,7 +528,7 @@ class RSProfileDB(RSSaveWrapper):
 
     @property
     def unique_id(self) -> str:
-        """Return the unique_id for the Rocksmith profile .
+        """Gets the unique_id {str} for the Rocksmith profile.
 
         This is/should be the save file name excluding _PRFLDB suffix.
         """
@@ -539,7 +536,7 @@ class RSProfileDB(RSSaveWrapper):
 
     @property
     def player_name(self) -> str:
-        """Return the Rocksmith player name associated with the profile.
+        """Gets the Rocksmith player name {str} associated with the profile.
 
         Return empty string ('') if there is no player name associated with the profile.
         """
@@ -673,7 +670,8 @@ class RSFileSet:
         This method deliberately excludes crd files.
         """
         self._valid_structure = True
-        dir_name = remote_path.name
+        resolved_path = remote_path.resolve()
+        dir_name = resolved_path.name
         if dir_name != STEAM_REMOTE_DIR:
             logging.warning(
                 f"Rocksmith profiles should be in a directory named:"
@@ -685,23 +683,22 @@ class RSFileSet:
         self._fs_steam_metadata = None
         try:
             # steam cache should be in parent of Rocksmith save dir
-            self._fs_steam_metadata = SteamMetadata(remote_path.parent)
+            self._fs_steam_metadata = SteamMetadata(resolved_path.parent)
         except (FileNotFoundError, SteamMetadataError) as exc:
             logging.warning(exc)
 
         self._fs_local_profiles = None
         try:
-            self._fs_local_profiles = RSLocalProfiles(remote_path)
+            self._fs_local_profiles = RSLocalProfiles(resolved_path)
         except FileNotFoundError as exc:
             logging.warning(
-                "Rocksmith local profiles file expected but not found:\n   {0}".format(
-                    str(exc)
-                )
+                f"Rocksmith local profiles file expected but not found:"
+                f"\n   {str(exc)}"
             )
 
-        self._find_profiles(remote_path)
+        self._find_profiles(resolved_path)
 
-        self._check_consistency(remote_path)
+        self._check_consistency(resolved_path)
 
     def _find_profiles(self, remote_path: Path) -> None:
         """Find all Rocksmith profile save files in directory remote_path.
@@ -749,18 +746,16 @@ class RSFileSet:
         if not self._fs_profiles:
             consistent = False
             logging.warning(
-                "Warning: No Rocksmith save files ({0}) found in:\n    {1}.".format(
-                    PROFILE_DB_STR, fsdecode(remote_path)
-                )
+                f"Warning: No Rocksmith save files ({PROFILE_DB_STR}) found in:"
+                f"\n    {fsdecode(remote_path)}."
             )
 
         for rs_profile in self._fs_profiles.values():
             if not rs_profile.player_name:
                 consistent = False
                 logging.warning(
-                    "Rocksmith save file has no player name:\n   {0}".format(
-                        fsdecode(rs_profile.file_path)
-                    )
+                    f"Rocksmith save file has no player name:"
+                    f"\n   {fsdecode(rs_profile.file_path)}"
                 )
 
         if self._fs_steam_metadata is None:
@@ -776,9 +771,8 @@ class RSFileSet:
                 ):
                     consistent = False
                     logging.warning(
-                        "Steam cache contains no data for file:\n   {0}".format(
-                            fsdecode(rs_save.file_path)
-                        )
+                        f"Steam cache contains no data for file:"
+                        f"\n   {fsdecode(rs_save.file_path)}"
                     )
 
         self._consistent = consistent
@@ -863,9 +857,9 @@ class RSFileSet:
 
     @property
     def consistent(self) -> bool:
-        """Return True if the file set has passed basic consistency tests.
+        """Read only property. True if the file set has passed basic consistency tests.
 
-        Returns:
+        Gets:
             bool -- True if the file set is consistent, false otherwise.
 
         The tests address folder structure, existence of steam and Rocksmith files,
@@ -876,9 +870,9 @@ class RSFileSet:
 
     @property
     def steam_metadata(self) -> Optional[SteamMetadata]:
-        """Return the Steam metadata for the file set if it exists. Read only property.
+        """Gets the Steam metadata for the file set if it exists. Read only property.
 
-        Returns:
+        Gets:
             Optional[SteamMetadata] -- The file set steam metadata.
 
         """
@@ -886,9 +880,9 @@ class RSFileSet:
 
     @property
     def local_profiles(self) -> Optional[RSLocalProfiles]:
-        """Return the RSLocalProfiles for the file set if it exists. Read only property.
+        """Gets the RSLocalProfiles for the file set if it exists. Read only property.
 
-        Returns:
+        Gets:
             Optional[RSLocalProfiles] -- The local profiles instance for the file set.
 
         """
@@ -896,9 +890,9 @@ class RSFileSet:
 
     @property
     def profiles(self) -> Dict[str, RSProfileDB]:
-        """Return a dictionary of the RSProfileDB objects for the file set. Read only.
+        """Gets a dictionary of the RSProfileDB objects for the file set. Read only.
 
-        Returns:
+        Gets:
             Dict[str, RSProfileDB] -- The keys are the Rocksmith unique ids and profile
                 names associated with the Rocksmith profiles (i.e. each profile has up
                 two keys associated with it).
@@ -908,9 +902,9 @@ class RSFileSet:
 
     @property
     def m_time(self) -> str:
-        """Return data/time of most recently modified Rocksmith profile. Read only.
+        """Gets data/time of most recently modified Rocksmith profile. Read only.
 
-        Returns:
+        Gets:
             str -- Returns the most recent modification date/time for all of the
             profiles in the fileset (i.e. checks all profiles and returns the date from
             the most recently modified of these).
@@ -984,6 +978,9 @@ class RSProfileManager:
     _profiles: Dict[str, RSProfileDB]
 
     _source_steam_uid: str
+    _working_save_path: Path
+    _backup_path: Path
+    _update_save_path: Path
 
     def __init__(
         self,
@@ -1057,11 +1054,11 @@ class RSProfileManager:
         """
         if not base_dir.is_dir():
             raise NotADirectoryError(
-                "Profile manager constructor called on invalid base directory:\n    "
-                '"{0}"'.format(fsdecode(base_dir))
+                f"Profile manager constructor called on invalid base directory:\n    "
+                f"'{fsdecode(base_dir)}'"
             )
 
-        self._setup_workspace(base_dir, auto_setup=auto_setup)
+        self._setup_workspace(base_dir.resolve(), auto_setup=auto_setup)
 
         # source steam uid is the source uid for this profile manager.
         # string version of integer steam uid. Specifies the source of the file set in
@@ -1109,8 +1106,8 @@ class RSProfileManager:
                 chosen_file_set = steam_file_sets[self._source_steam_uid]
             else:
                 raise RSFileSetError(
-                    "Rocksmith file set for steam user {0} is either missing or"
-                    "inconsistent.".format(self._source_steam_uid)
+                    f"Rocksmith file set for steam user {self._source_steam_uid} is "
+                    f"either missing or inconsistent."
                 )
 
         if chosen_file_set is not working_file_set:
@@ -1128,9 +1125,9 @@ class RSProfileManager:
 
     @property
     def source_steam_uid(self) -> str:
-        """Return the source steam user id for the profile manager file set.
+        """Gets the source steam user id for the profile manager file set.
 
-        Returns:
+        Gets:
             str -- The string representation of an integer steam user id.
 
         This value is negative if the profile manager constructor loaded the file set
@@ -1197,16 +1194,16 @@ class RSProfileManager:
 
         active_user = str(utils.steam_active_user())
         for steam_uid, file_set in steam_file_sets.items():
-            option_text = "Steam user '{0}'".format(steam_uid)
+            option_text = f"Steam user '{steam_uid}'"
             if steam_uid == active_user:
-                option_text = option_text + ". This is the user logged into steam now."
-            option_text = option_text + " ({0}).".format(file_set.m_time)
+                option_text = option_text + ". This is the user logged into steam now"
+            option_text = f"{option_text}. ({file_set.m_time})"
             options.append((option_text, steam_uid))
 
         if working_file_set.consistent:
             option_text = (
-                "[Debugging/development] Keep and use the file set in the "
-                "working directory ({0}).".format(working_file_set.m_time)
+                f"[Debugging/development] Keep and use the file set in the "
+                f"working directory. ({working_file_set.m_time})"
             )
             options.append((option_text, MINUS_ONE))
 
@@ -1298,9 +1295,9 @@ class RSProfileManager:
                 steam_file_sets[user_id] = file_set
             else:
                 logging.warning(
-                    "Rocksmith save file set for steam user {0} is not consistent and "
-                    "will be discarded.\nRefer to previous warnings for "
-                    "details .".format(user_id)
+                    f"Rocksmith save file set for steam user {user_id} is not "
+                    f"consistent and will be discarded."
+                    f"\nRefer to previous warnings for details ."
                 )
 
         return steam_file_sets
@@ -1375,8 +1372,8 @@ class RSProfileManager:
             if check_dir.exists():
                 if not check_dir.is_dir():
                     raise NotADirectoryError(
-                        "Profile manager called on invalid working directory\n   "
-                        '"{0}"'.format(fsdecode(check_dir))
+                        f"Profile manager called on invalid working directory\n   "
+                        f"'{fsdecode(check_dir)}'"
                     )
             else:
                 if not perform_setup:
@@ -1522,8 +1519,8 @@ class RSProfileManager:
 
         if not steam_dirs:
             raise RSProfileError(
-                "Moving updates failed. Steam Rocksmith save directory for user id "
-                '"{0}" does not exist'.format(target_steam_user_id)
+                f"Moving updates failed. Steam Rocksmith save directory for user id "
+                f"'{target_steam_user_id}'' does not exist"
             )
 
         steam_save_dir = steam_dirs[target_steam_user_id]
@@ -1558,8 +1555,8 @@ class RSProfileManager:
             return self._profiles[profile_name].arrangement_ids()
         else:
             raise KeyError(
-                "Profile name/id {0} does not exist in active Rocksmith file "
-                "set".format(profile_name)
+                f"Profile name/id {profile_name} does not exist in active Rocksmith "
+                f"file set"
             )
 
     def copy_player_json_value(

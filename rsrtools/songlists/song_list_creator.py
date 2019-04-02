@@ -4,521 +4,725 @@
 
 import argparse
 import simplejson
-import jsonschema # type:ignore
-import os
+import jsonschema  # type:ignore
 import sys
 
-from arrangement_db import ArrangementDB, RSFilterError
-from profile_manager import RSProfileManager, RSFileSetError
-import utils
+from pathlib import Path
+from os import fsdecode
+from typing import Callable, cast, Optional, TextIO, Union
 
-SONG_LIST_CONFIG = 'song_list_config.json'
-SONG_LIST_DEBUG_FILE = 'RS_Song_Lists.txt'
+import rsrtools.songlists.sldefs as SLDEF
+from rsrtools.songlists.arrangement_db import ArrangementDB, RSFilterError
+from rsrtools.files.profilemanager import RSProfileManager, RSFileSetError
+import rsrtools.utils as utils
 
-# json schema for config file.
-CONFIG_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "db_config": {
-            "type": "object",
-            "description": "Dictionary of configuration parameters",
-            "properties": {
-                "CFSM_Arrangement_File": {"type": ["string", "null"]},
-                "steam_user_id": {"type": ["string", "null"]},
-                "player_profile": {"type": ["string", "null"]}
-            }
-        },
-        "FilterSets": {
-            "type": "object",
-            "description": "Dictionary of filter sets.",
-            "additionalProperties": {
-                "type": "array",
-                "description": "List of filters in set or null to skip song list.",
-                "items": {"type": ["string", "null"]},
-                "minItems": 1,
-                "maxItems": 6
-            }
-        },
-        "Filters": {
-            "type": "object",
-            "description": "Dictionary of filters.",
-            "additionalProperties": {
-                "type": "object",
-                "description": "Dictionary for definition of a single filter",
-                "properties": {
-                    "BaseFilter": {"type": "string"},
-                    "QueryFields": {
-                        "type": "array",
-                        "description": "List of query field dictionaries.",
-                        "items": {
-                            "type": "object",
-                            "description": "Single query field dictionary.",
-                            "minItems": 1,
-                            "properties": {
-                                "Field": {"type": "string"},
-                                "Include": {"type": "boolean"},
-                                "Values": {
-                                    "type": "array",
-                                    "description": "List of string values.",
-                                    "items": {"type": "string"},
-                                    "minItems": 1
-                                },
-                                "Ranges": {
-                                    "type": "array",
-                                    "description": "Array of pairs of low/high values.",
-                                    "minItems": 1,
-                                    "items": {
-                                        "description": "Array of low high/values.",
-                                        "type": "array",
-                                        "items": {"type": "number", "minimum": 0},
-                                        "minItems": 2,
-                                        "maxItems": 2
-                                    }
-                                }
-                            },
-                            "required": ["Field", "Include"],
-                            "oneOf": [
-                                {"required": ["Values"]},
-                                {"required": ["Ranges"]}
-                            ]
-                        }
-                    }
-                },
-                "required": ["QueryFields"]
-            }
-        }
-    },
-    "required": ["Filters", "FilterSets"]
-}
+SONG_LIST_CONFIG = "song_list_config.json"
+SONG_LIST_DEBUG_FILE = "RS_Song_Lists.txt"
+ARRANGEMENTS_GRID = "ArrangementsGrid.xml"
 
 
 class SongListCreator:
-    """The primary function of this class is to provide a command line menu interface for creating song lists and
-    writing them back to Rocksmith profiles. Refer to the module documentation for more detail.
+    """Provide a command line interface for creating and writing Rocksmith song lists.
 
-    The public members of this class also provide hooks that could be used to implement a GUI for creating song lists.
-    The public members are:
+    Refer to the rsrtools package README documentation for more detail.
 
-    class:: SongListCreator(working_dir)
-        Sets up the song list creator working directory and files, and loads the configuration file.
+    The public members of this class also provide hooks that could be used to implement
+    a GUI for creating song lists. The public members are:
 
-        property:: cfsm_arrangement_file
-            Path to a CFSM arrangement file that can be used for setting up the arrangement database.
+        Contructor -- Sets up the song list creator working directory and files, and
+            loads the configuration file.
 
-        property:: steam_user_id
-            Steam user id (8 digit decimal number found under steam user data folder) to use for Rocksmith saves.
+        create_song_lists -- Creates song lists for the filters in a set and writes the
+            resulting song lists back to the currently specified steam user id/player
+            profile.
 
-        property:: player_profile
-            Rocksmith player profile name to use for song list generation.
+        load_cfsm_arrangements -- Loads arrangement data from the CFSM file defined in
+            self.cfsm_arrangement_file into the arrangements database.
 
-        method:: create_song_lists(filter_set, debug_target=None)
-            Creates song lists for the filters in the set and writes the resulting song lists back to the currently
-            specified steam user id/player profile.
+        save_config -- Saves the current song list generation configuration file.
 
-        method:: load_cfsm_arrangements()
-            Loads arrangement data from the CFSM file defined in self.cfsm_arrangement_file into the arrangements
-            database.
+        song_list_cli -- Runs the command line driven song list generator.
 
-        method:: save_config()
-            Saves the current song list generation configuration file.
+        cfsm_arrangement_file -- Read/write property. Path to a CFSM arrangement file
+            that can be used for setting up the arrangement database.
 
-        method:: song_list_cli()
-            Runs the command line driven song list generator.
+        steam_user_id -- Read/write property. Steam user id (8 digit decimal number
+            found under steam user data folder) to use for Rocksmith saves. Can be set
+            as an int or a string representation of the int, always returns str.
+
+        player_profile -- Read/write property. Rocksmith player profile name to use for
+            song list generation.
 
     """
+
+    # member annotations.
+    # TODO: conversion to toml may allow replacement of _cfg_dict with sub-dicts?
+    #   - Could still use json schema for validation of sub-dicts and a cleaner
+    #     implementation than one massive validation.
+    _cfg_dict: SLDEF.JSONConfig
+
+    _arr_db: ArrangementDB
+    _working_dir: Path
+    # path to configuration file
+    _cfg_path: Path
+    _profile_manager: Optional[RSProfileManager]
+
+    # variable only used in the CLI implementation.
+    # This should be either:
+    #   sys.stdout - for reports to console.
+    #   A path to a reporting file that will be overwritten
+    _cli_report_target: Union[Path, TextIO]
+
     # A lot of the properties in the following shadowing config file parameters
     # Could have done a lot of this with setattr/getattr, but given
     # the small number of properties, I've stuck with explicit definitions.
     # This also has the benefit of allowing validation along the way.
     @property
-    def _db_config(self) -> dict:
-        """Dictionary of database configuration parameters."""
-        return self._config.setdefault('db_config', dict())
+    def _db_config(self) -> SLDEF.DBConfig:
+        """Get dictionary of database configuration parameters.
+
+        Gets:
+            rsrtools.songlists.sltypes.DBConfig
+
+        Creates empty dictionary if required.
+
+        """
+        return cast(
+            SLDEF.DBConfig,
+            self._cfg_dict.setdefault(SLDEF.DB_CONFIG, cast(SLDEF.DBConfig, dict())),
+        )
 
     @property
-    def _filter_sets(self) -> dict:
-        """Dictionary of filter sets. Each filter set contains a list of filter names for generating song lists."""
-        return self._config.setdefault('FilterSets', dict())
+    def _filter_set_dict(self) -> SLDEF.FilterSetDict:
+        """Get dictionary of filter sets.
+
+        Gets:
+            rsrtools.songlists.sltypes.FilterSetDict
+
+        Each filter set contains a list of filter names for generating song lists.
+
+        Creates empty dictionary if required.
+        """
+        return cast(
+            SLDEF.FilterSetDict,
+            self._cfg_dict.setdefault(
+                SLDEF.FILTER_SET_DICT, cast(SLDEF.FilterSetDict, dict())
+            ),
+        )
 
     @property
-    def _filters(self) -> dict:
-        """Dictionary of filters, where each filter can be used to generate a song list or as a based filter for other
-        filters."""
-        return self._config.setdefault('Filters', dict())
+    def _filter_dict(self) -> SLDEF.FilterDict:
+        """Get dictionary of filters.
+
+        Gets:
+            rsrtools.songlists.sltypes.FilterDict
+
+        Each filter can be used to generate a song list or as a base filter for building
+        other filters.
+
+        Creates empty dictionary if required.
+        """
+        return cast(
+            SLDEF.FilterDict,
+            self._cfg_dict.setdefault(
+                SLDEF.FILTER_DICT, cast(SLDEF.FilterDict, dict())
+            ),
+        )
 
     @property
-    def cfsm_arrangement_file(self):
-        """Path to a CFSM arrangement file that can be used for setting up the arrangement database."""
-        ret_val = self._db_config.setdefault('CFSM_Arrangement_File', None)
+    def cfsm_arrangement_file(self) -> str:
+        """Get/set the string path to a CFSM arrangements file for database setup.
 
-        if ret_val is not None and not os.path.isfile(ret_val):
+        Gets/sets:
+            str -- The string form path the Customs Forge Song Manager arrangements
+                file, or the empty string if it has not been set.
+
+        The setter will raise an exception if the path does not point to a file, but
+        but does not validate the file.
+
+        """
+        ret_val = self._db_config.setdefault(SLDEF.CFSM_FILE, "")
+
+        if ret_val and not Path(ret_val).is_file():
             # silently discard invalid path.
-            ret_val = None
-            self._db_config['CFSM_Arrangement_File'] = None
+            ret_val = ""
+            self._db_config[SLDEF.CFSM_FILE] = ""
 
         return ret_val
 
     @cfsm_arrangement_file.setter
-    def cfsm_arrangement_file(self, value):
-        if not os.path.isfile(value):
-            raise FileNotFoundError('CFSM arrangement file "{0}" does not exist'.format(value))
+    def cfsm_arrangement_file(self, value: str) -> None:
+        """Set path to CFSM arrangements file."""
+        file_path = Path(value)
+        if not file_path.is_file():
+            self._db_config[SLDEF.CFSM_FILE] = ""
+            raise FileNotFoundError(
+                f"CFSM arrangement file '{value}' does not exist"
+            )
 
-        self._db_config['CFSM_Arrangement_File'] = os.path.abspath(value)
+        self._db_config[SLDEF.CFSM_FILE] = fsdecode(file_path.resolve())
 
     # ****************************************************
-    # Steam user id, _profile_manager, player profile and player data in database are tightly linked
-    # Initialisation uses these properties and exception handlers to manage auto-loading from json.
+    # Steam user id, _profile_manager, player profile and player data in database are
+    # tightly linked.
+    # Initialisation uses these properties and exception handlers to manage auto-loading
+    # from json.
     @property
-    def steam_user_id(self):
-        """Steam user id (8 digit decimal number found under steam user data folder) to use for Rocksmith saves.
+    def steam_user_id(self) -> str:
+        """Get/set the Steam user id to use for song list creation.
+
+        Gets/sets:
+            str -- String representation of Steam user id, or the empty string if it has
+                not been set yet.
+
+        The steam user id is an 8 digit number, which is the name of steam user data
+        directory.
+
+        Song list changes affect Rocksmith profiles in this Steam user's directories.
+        Setting the steam user id to the empty string triggers an interactive command
+        line process to choose a new steam user id and triggers the side effects below.
 
         Setting steam user id has the following side effects:
-            - Flushes and reloads steam profile data.
-            - Clears the player profile and flushes player data from the database (reset with self.player_profile)
+            - The instance flushes and reloads steam profile data.
+            - The instance clears the player profile and flushes player data from the
+              arrangement database (reset with self.player_profile)
 
-        Setting steam user id to None triggers an interactive command line process to choose a new steam user
-        id and triggers the side effects above.
         """
-        # could do extensive validation here, but there is already error checking in the profile manager,
-        # and any ui will need to find valid steam ids to load up. So no error checking here.
-        return self._db_config.setdefault('steam_user_id', None)
+        # could do extensive validation here, but there is already error checking in the
+        # profile manager, and any ui will need to find valid steam ids to load up.
+        # So no error checking here.
+        return self._db_config.setdefault(SLDEF.STEAM_USER_ID, "")
 
     @steam_user_id.setter
-    def steam_user_id(self, value):
+    def steam_user_id(self, value: str) -> None:
+        """Steam user id setter."""
         # reset shadow value to None in case of errors (correct at end of routine)
-        self._db_config['steam_user_id'] = None
+        self._db_config[SLDEF.STEAM_USER_ID] = ""
 
-        # Changing steam user id, so clear profile manager and player profile (and implicitly, flush db as well)
-        # Conservative assumption - flush  and everything, even if the assignment doesn't change the original
-        # steam id
-        self.player_profile = None
+        # Changing steam user id, so clear profile manager and player profile (and
+        # implicitly, flush db as well)
+        # Conservative assumption - flush  and everything, even if the assignment
+        # doesn't change the original steam id
+        self.player_profile = ""
         self._profile_manager = None
 
-        if value is not None:
-            value = str(value)
-
         # Create profile manager.
-        # This will trigger an interactive file set selection if steam user id is None (for command line use).
-        # I'm also disabling use of existing working set files for the song list creator
+        # This will trigger an interactive file set selection if steam user id is None
+        # (for command line use). I'm also disabling use of existing working set files
+        # for the song list creator.
         # (Working set files are really only intended for debugging).
-        self._profile_manager = RSProfileManager(self._working_dir,
-                                                 steam_user_id=value,
-                                                 auto_setup=True,
-                                                 flush_working_set=True)
+        self._profile_manager = RSProfileManager(
+            self._working_dir,
+            steam_user_id=value,
+            auto_setup=True,
+            flush_working_set=True,
+        )
 
-        if value is None:
-            # Get the steam user id resulting from an interactive call to RSProfileManager
-            value = self._profile_manager.source_steam_uid
+        str_value = value
+        if not str_value:
+            # Get the steam user id resulting from an interactive call to
+            # RSProfileManager
+            str_value = self._profile_manager.source_steam_uid
 
-        self._db_config['steam_user_id'] = value
+        self._db_config[SLDEF.STEAM_USER_ID] = str_value
 
     @property
-    def player_profile(self):
-        """Rocksmith player profile name to use for song list generation. Setting the player name also updates the
-        player data in the database.
+    def player_profile(self) -> str:
+        """Get/set the Rocksmith player profile name to use for song list generation.
+
+        Gets/sets:
+            str -- The player profile name. Get returns the empty string if the player
+                profile it has not been set yet. Setting to the empty string clears the
+                current profile data.
+
+        Setting the player name also deletes all profile data from the database and
+        loads the profile data for player_profile into the database. Setting to the
+        empty string deletes all profile data without loading new data.
 
         A steam user id must be specified before setting the player profile.
         """
-        # can't do any useful validation without loading profile, so similar to the steam user id, push it down to the
-        # profile manager or up to the ui.
-        return self._db_config.setdefault('player_profile', None)
+        # can't do any useful validation without loading profile, so similar to the
+        # steam user id, push it down to the profile manager or up to the ui.
+        return self._db_config.setdefault(SLDEF.PLAYER_PROFILE, "")
 
     @player_profile.setter
-    def player_profile(self, value):
+    def player_profile(self, value: str) -> None:
+        """Set player profile name for song list creation."""
         # new player profile, so ditch everything in player database
         self._arr_db.flush_player_profile()
         # reset to default in case of error in setter
-        self._db_config['player_profile'] = None
+        self._db_config[SLDEF.PLAYER_PROFILE] = ""
 
-        if value is not None:
-            value = str(value)
+        if value:
+            if self._profile_manager is None:
+                # shouldn't happen, but just in case
+                raise RSFilterError(
+                    f"Attempt to set player profile to {value} before steam user "
+                    f"id/file set has been chosen (profile_manager is None)."
+                )
+
             if value not in self._profile_manager.profile_names():
-                raise RSFilterError('Rocksmith player profile \'{0}\'does not exist in steam file set for '
-                                    'user \'{1}\''.format(value, self.steam_user_id))
+                raise RSFilterError(
+                    f"Rocksmith player profile '{value}' does not exist in steam file "
+                    f"set for user '{self.steam_user_id}'"
+                )
 
             self._arr_db.load_player_profile(self._profile_manager, value)
 
             # set this last in case of errors along the way.
-            self._db_config['player_profile'] = value
+            self._db_config[SLDEF.PLAYER_PROFILE] = value
+
     # End player steam_user_id, player_profile properties block
 
-    def load_cfsm_arrangements(self):
-        """Loads arrangement data from the CFSM file defined in self.cfsm_arrangement_file into the arrangements
-        database (this replaces existing data in the database)."""
-        if self.cfsm_arrangement_file is not None:
-            self._arr_db.load_cfsm_arrangements(self.cfsm_arrangement_file)
+    def load_cfsm_arrangements(self) -> None:
+        """Load arrangement data from the CFSM file into the arrangement database.
+
+        The CFSM file is defined in the property self.cfsm_arrangement_file.
+
+        This method replaces existing data in the database.
+        """
+        if self.cfsm_arrangement_file:
+            self._arr_db.load_cfsm_arrangements(Path(self.cfsm_arrangement_file))
 
     # start initialisation block
-    def __init__(self, working_dir):
-        """Initialises the filter manager, creates working files and sub-folders in the working directory, and loads
-        the configuration file (if any) from the working folder."""
+    def __init__(self, working_dir: Path) -> None:
+        """Initialise the song list creator.
 
-        self._config_file = None
-        self._config: dict = None
-        self._profile_manager: RSProfileManager = None
+        Arguments:
+            working_dir {pathlib.Path} -- Working directory path.
 
-        # variable only used in the CLI implementation.
-        self._cli_report_target = None
+        Create working files and sub-folders in the working directory, and load the
+        configuration file (if any) from the working folder.
+        """
+        # Empty config dict, should be replaced in _load_config()
+        self._cfg_dict = dict()
+        self._profile_manager = None
 
-        if not os.path.isdir(working_dir):
-            raise NotADirectoryError('SongListCreator requires a valid working directory. Invalid argument supplied:'
-                                     '\n   {0}'.format(working_dir))
-        self._working_dir = os.path.abspath(working_dir)
+        # Default to console for reporting.
+        self._cli_report_target = sys.stdout
+
+        if not working_dir.is_dir():
+            raise NotADirectoryError(
+                f"SongListCreator requires a valid working directory. Invalid argument "
+                f"supplied:\n   {fsdecode(working_dir)}"
+            )
+        self._working_dir = working_dir.resolve()
 
         self._load_config()
 
         self._arr_db = ArrangementDB(self._working_dir)
-        # next block is a slightly clumsy way of avoiding separate auto load code for setting up profile manager
-        # and player database from json parameters for steam id and player profile name
-        if self.steam_user_id is None:
+        # The next block is a slightly clumsy way of avoiding separate auto load code
+        # for setting up profile manager and player database from json parameters for
+        # steam id and player profile name
+        if not self.steam_user_id:
             # reset player profile and database (invalid with no steam id anyway).
-            tmp_profile = None
+            tmp_profile = ""
         else:
             # resetting steam id will trash player profile, so grab a temp copy
             tmp_profile = self.player_profile
             try:
-                # this looks like a non-op, but triggers the side effect of loading the profile
-                # manager for the steam user id.
+                # this looks like a non-op, but triggers the side effect of loading the
+                # profile manager for the steam user id.
                 self.steam_user_id = self.steam_user_id
             except RSFileSetError:
                 # invalid steam id, steam id will have been reset to None.
                 # discard player profile as well (meaningless without steam id)
-                tmp_profile = None
+                tmp_profile = ""
 
         try:
-            # this will load the database for the original self.player_profile if it exists.
+            # this will load the database for the original self.player_profile if it
+            # exists.
             self.player_profile = tmp_profile
         except RSFilterError:
             # player profile not found, player profile set to none, nothing more needed.
             pass
         # end auto load from json.
 
-    def _load_config(self):
-        """Loads the configuration file from the working directory, or creates a default configuration if no file
-        found."""
-        self._config_file = os.path.join(self._working_dir, SONG_LIST_CONFIG)
+    def _load_config(self) -> None:
+        """Load the configuration file from the working directory.
+
+        Create a default configuration if no file is found.
+        """
+        self._cfg_path = self._working_dir.joinpath(SONG_LIST_CONFIG)
         try:
-            with open(self._config_file, 'rt') as fp:
-                self._config = simplejson.load(fp)
+            with self._cfg_path.open("rt") as fp:
+                self._cfg_dict = simplejson.load(fp)
         except FileNotFoundError:
             # no config found, load default
-            from default_sl_config import DEFAULT_SL_CONFIG
-            self._config = simplejson.loads(DEFAULT_SL_CONFIG)
+            from rsrtools.songlists.default_sl_config import DEFAULT_SL_CONFIG
+
+            self._cfg_dict = simplejson.loads(DEFAULT_SL_CONFIG)
 
         # and finally try validating against the schema.
-        jsonschema.validate(self._config, CONFIG_SCHEMA)
+        jsonschema.validate(self._cfg_dict, SLDEF.CONFIG_SCHEMA)
+
     # end initialisation block
 
-    def save_config(self):
-        """Dumps filter configuration and database setup parameters to  the json configuration file."""
-        with open(self._config_file, 'wt') as fp:
-            simplejson.dump(self._config, fp, indent=2 * ' ')
+    def save_config(self) -> None:
+        """Save configuration file to working directory.
+
+        This method dumps the self._cf_dict JSON object to file.
+        """
+        with self._cfg_path.open("wt") as fp:
+            simplejson.dump(self._cfg_dict, fp, indent=2 * " ")
 
     # # *******************************************************************
 
-    def _cli_menu_header(self):
-        """Creates the command line interface header string."""
-        if self.steam_user_id is None:
-            steam_str = '\'not set\''
+    def _cli_menu_header(self) -> str:
+        """Create the command line interface header string."""
+        if not self.steam_user_id:
+            steam_str = "'not set'"
         else:
-            steam_str = ''
+            steam_str = ""
             if self.steam_user_id == str(utils.steam_active_user()):
-                steam_str = ', logged into steam now'
+                steam_str = ", logged into steam now"
 
-            steam_str = ''.join(('\'', self.steam_user_id, '\'', steam_str))
+            steam_str = "".join(("'", self.steam_user_id, "'", steam_str))
 
-        if self.player_profile is None:
-            player_str = '\'not set\''
+        if not self.player_profile:
+            player_str = "'not set'"
         else:
-            player_str = ''.join(('\'', self.player_profile, '\''))
+            player_str = "".join(("'", self.player_profile, "'"))
 
-        if self._cli_report_target is sys.stdout:
-            report_to = 'Standard output/console'
+        if isinstance(self._cli_report_target, Path):
+            report_to = f"File '{fsdecode(self._cli_report_target)}'."
         else:
-            report_to = f'File \'{self._cli_report_target}\' in working directory'
+            report_to = "Standard output/console"
 
-        header = f'''Rocksmith song list generator main menu.
- 
-    Steam user id:       {steam_str} 
-    Rocksmith profile:   {player_str}
-    Reporting to:        {report_to}
-    Working directory:   {self._working_dir}
-        
-Please choose from the following options:'''
+        header = (
+            f"Rocksmith song list generator main menu."
+            f"\n"
+            f"\n    Steam user id:       {steam_str}"
+            f"\n    Rocksmith profile:   {player_str}"
+            f"\n    Reporting to:        {report_to}"
+            f"\n    Working directory:   {fsdecode(self._working_dir)}"
+            f"\n"
+            f"\nPlease choose from the following options:"
+        )
+
         return header
 
-    def _cli_select_steam_user(self):
+    def _cli_select_steam_user(self) -> None:
+        """Select a steam user id from a command line menu."""
         # daft as it looks, this will trigger an interactive selection process
-        self.steam_user_id = None
+        self.steam_user_id = ""
 
-    def _cli_select_profile(self):
+    def _cli_select_profile(self) -> None:
+        """Select a Rocksmith profile from a command line menu."""
         # ask the user to select a profile to load.
         if self._profile_manager is None:
-            # can't select a player profile until the steam user/profile manager have been selected
+            # can't select a player profile until the steam user/profile manager have
+            # been selected
             return
 
         # a valid player profile will automatically refresh player database as well.
-        self.player_profile = utils.choose(
+        choice = utils.choose(
             options=self._profile_manager.profile_names(),
-            header='Select player profile for song list creation.',
-            no_action='No selection (warning - you can\'t create song lists without choosing a profile).')
+            header="Select player profile for song list creation.",
+            no_action=(
+                "No selection (warning - you can't create song lists without "
+                "choosing a profile)."
+            ),
+        )
 
-    def _cli_toggle_reporting(self):
-        if self._cli_report_target is sys.stdout:
-            self._cli_report_target = SONG_LIST_DEBUG_FILE
+        if choice is None:
+            self.player_profile = ""
         else:
+            self.player_profile = cast(str, choice)
+
+    def _cli_toggle_reporting(self) -> None:
+        """Toggles reports between stdout and the working directory report file."""
+        if isinstance(self._cli_report_target, Path):
             self._cli_report_target = sys.stdout
+        else:
+            self._cli_report_target = self._working_dir.joinpath(SONG_LIST_DEBUG_FILE)
 
-    def _cli_single_filter_report(self):
-        self._cli_song_list_action(self._filters, self._cli_report_target)
+    def _cli_single_filter_report(self) -> None:
+        """Select and run a report on a single filter from a command line interface."""
+        self._cli_song_list_action(self._filter_dict, self._cli_report_target)
 
-    def _cli_filter_set_report(self):
-        self._cli_song_list_action(self._filter_sets, self._cli_report_target)
+    def _cli_filter_set_report(self) -> None:
+        """Select and run a filter set report  from a command line interface."""
+        self._cli_song_list_action(self._filter_set_dict, self._cli_report_target)
 
-    def _cli_write_song_lists(self):
-        self._cli_song_list_action(self._filter_sets, None)
+    def _cli_write_song_lists(self) -> None:
+        """Select a filter set and write the resulting song lists to the profile.
 
-    def _cli_song_list_action(self, source_dict, report_target):
-        """Runs the song list generator and writes reports if requested."""
-        if self.player_profile is None:
+        Song list selection is by command line interface, and the method will write the
+        song lists to the currently selected Rocksmith profile.
+        """
+        self._cli_song_list_action(self._filter_set_dict, None)
+
+    def _cli_song_list_action(
+        self,
+        source_dict: Union[SLDEF.FilterSetDict, SLDEF.FilterDict],
+        report_target: Optional[Union[Path, TextIO]],
+    ) -> None:
+        """Execute song list generation, report writing and save to profiles.
+
+        Arguments:
+            source_dict {Union[SLDEF.FilterSetDict, SLDEF.FilterDict]} -- Either a list
+                of filter names, or a dictionary of filter definitions.
+            report_target {Optional[Union[Path, TextIO]]} -- The reporting target for
+                the method, which can be None, a file path or a text stream.
+
+        Raises:
+            RSFilterError -- Raised if source_dict is an invalid type.
+
+        The behaviour of this routine depends on the types of the calling arguments:
+            - If source_dict is a dictionary of filter definitions (FilterDict):
+                - If report_target is not None, raise an error.
+                - If report target is stream of Path, ask the user to select a filter,
+                  create the filter output and write to the stream/Path.
+            - If source dict is dictionary of FilterSets (where each filter set is a
+              list of up to six filter names):
+                - Ask the user to select a filter set from the dictionary.
+                - Create a song list for each filter in the filter set.
+                - If report target is None, write the song lists to the currently
+                  selected steam user id/profile.
+                - If report target is a stream/file, write the song lists to this
+                  destination.
+
+        """
+        if not self.player_profile:
             # can't do anything with song lists without a player profile.
             return
 
         # a valid player profile will automatically refresh player database as well.
         choice = utils.choose(
-            options=source_dict.keys(),
-            header='Select filter or filter set.',
-            no_action='No selection (warning - you can\'t create song lists without choosing a filter/filter set).')
+            options=tuple(source_dict.keys()),
+            header="Select filter or filter set.",
+            no_action=(
+                "No selection (warning - you can't create song lists without choosing "
+                "a filter/filter set)."
+            ),
+        )
 
         if choice is None:
             return
 
-        if source_dict is self._filters and report_target is not None:
+        choice = cast(str, choice)
+        if isinstance(source_dict, SLDEF.FilterDict) and report_target is not None:
             # testing a single filter here. Create a synthetic filter set for this case.
-            # could check report_target as well, but this should be handled within the caller.
-            filter_set = [choice]
-        elif source_dict is self._filter_sets:
+            # could check report_target as well, but this should be handled within the
+            # caller.
+            filter_set: SLDEF.FilterSet = [choice]
+        elif isinstance(source_dict, SLDEF.FilterSetDict):
             # working on filter sets
             filter_set = source_dict[choice]
         else:
-            raise RSFilterError(f'cli_song_list_action called on unknown source dictionary {source_dict}.')
+            raise RSFilterError(
+                f"cli_song_list_action called on unknown source "
+                f"dictionary {source_dict}."
+            )
 
-        confirmed = True
+        confirmed = False
         if report_target is None:
             # reconfirm write.
-            if not utils.yes_no_dialog('Please confirm that you want to create song lists and write them '
-                                       f'to profile \'{self.player_profile}\''):
-                confirmed = False
+            confirmed = utils.yes_no_dialog(
+                f"Please confirm that you want to create song lists and write them "
+                f"to profile '{self.player_profile}'"
+            )
 
         if confirmed:
             self.create_song_lists(filter_set, report_target)
 
-    def song_list_cli(self):
-        """Provides a simple menu driven command line interface to the song list generator routines."""
+    def song_list_cli(self) -> None:
+        """Provide a command line menu for the song list generator routines."""
         if not self._arr_db.has_arrangement_data:
             # check for CFSM file for now.
             # In future, offer to scan song database.
-            check_xml = os.path.join(self._working_dir, 'ArrangementsGrid.xml')
-            if os.path.isfile(check_xml):
-                self.cfsm_arrangement_file = check_xml
+            check_xml = self._working_dir.joinpath(ARRANGEMENTS_GRID)
+            if check_xml.is_file():
+                self.cfsm_arrangement_file = fsdecode(check_xml)
                 self.load_cfsm_arrangements()
             else:
-                raise RSFilterError('Database has no song arrangement data. Re-run with --CFSMxml or '
-                                    ' song scan (if available) to load this data.')
-
-        self._cli_report_target = sys.stdout
+                raise RSFilterError(
+                    "Database has no song arrangement data. Re-run with --CFSMxml or "
+                    " song scan (if available) to load this data."
+                )
 
         options = list()
-        options.append(('Change/select steam user id. This also clears the profile selection.',
-                        self._cli_select_steam_user))
-        options.append(('Change/select Rocksmith player profile.',
-                        self._cli_select_profile))
-        options.append(('Toggle the report destination.', self._cli_toggle_reporting))
-        options.append(('Choose a single filter and create a song list report.', self._cli_single_filter_report))
-        options.append(('Choose a filter set and create a song list report.', self._cli_filter_set_report))
-        options.append(('Choose a filter set and write the song list(s) to the Rocksmith profile.',
-                        self._cli_write_song_lists))
-        options.append(('Utilities (database reports, profile management.)', self._cli_utilities))
+        options.append(
+            (
+                "Change/select steam user id. This also clears the profile selection.",
+                self._cli_select_steam_user,
+            )
+        )
+        options.append(
+            ("Change/select Rocksmith player profile.", self._cli_select_profile)
+        )
+        options.append(("Toggle the report destination.", self._cli_toggle_reporting))
+        options.append(
+            (
+                "Choose a single filter and create a song list report.",
+                self._cli_single_filter_report,
+            )
+        )
+        options.append(
+            (
+                "Choose a filter set and create a song list report.",
+                self._cli_filter_set_report,
+            )
+        )
+        options.append(
+            (
+                "Choose a filter set and write the song list(s) to the Rocksmith "
+                "profile.",
+                self._cli_write_song_lists,
+            )
+        )
+        options.append(
+            ("Utilities (database reports, profile management.)", self._cli_utilities)
+        )
 
-        help_text = '''    Help:  
-        - The steam user id owns the Rocksmith profile.
-        - A steam user id must be selected before a Rocksmith profile can be selected. 
-        - Song lists are saved to Rocksmith profile. Player data is extracted from this profile.
-        - You can view/test/debug song lists by printing to the console or saving to a file. These reports contain
-          more data about the tracks than the song lists actually saved into the Rocksmith profile.
-        - You can view/test song lists for a single filter or a complete filter set (the latter can be very long - 
-          consider saving filter set reports to file).
-        - You can only save filter set song lists to Rocksmith.'''
+        help_text = (
+            "Help:  "
+            "\n    - The steam user id owns the Rocksmith profile."
+            "\n    - A steam user id must be selected before a Rocksmith profile can "
+            "be selected."
+            "\n    - Song lists are saved to Rocksmith profile. Player data is "
+            "extracted from this"
+            "\n      profile."
+            "\n    - You can view/test/debug song lists by printing to the console or "
+            "saving to a file."
+            "\n      These reports contain more data about the tracks than the song "
+            "lists actually saved"
+            "\n      into the Rocksmith profile."
+            "\n    - You can view/test song lists for a single filter or a complete "
+            "filter set (the latter"
+            "\n      can be very long - consider saving filter set reports to file)."
+            "\n    - You can only save filter set song lists to Rocksmith."
+        )
 
         while True:
             header = self._cli_menu_header()
-            action = utils.choose(options=options, header=header, no_action='Exit program.', help_text=help_text)
+            action = utils.choose(
+                options=options,
+                header=header,
+                no_action="Exit program.",
+                help_text=help_text,
+            )
 
             if action is None:
                 break
-            # execute the action
+
+            # otherwise execute the action
+            action = cast(Callable, action)
             action()
 
-        if utils.yes_no_dialog('Save config file (overwrites current config even if nothing has changed)?'):
+        if utils.yes_no_dialog(
+            "Save config file (overwrites current config even if nothing has changed)?"
+        ):
             self.save_config()
 
-    def create_song_lists(self, filter_set, debug_target=None):
-        """Creates song lists for the filters in the set and writes the resulting song lists back to player profile.
+    def create_song_lists(
+        self,
+        filter_set: SLDEF.FilterSet,
+        debug_target: Optional[Union[Path, TextIO]] = None,
+    ) -> None:
+        """Create song lists and write them to a Rocksmith profile.
 
-        The song list creator will only create up to 6 song lists, and song lists for list entries with a value of None
-        will not be changed. Further, steam_user_id and player_profile must be set to valid values before executing.
+        Arguments:
+            filter_set {SLDEF.FilterSet} -- The set of of song lists to create and
+                write.
 
-        If debug target is not None, filters are not saved.
-            - If debug_target is sys.stdout, they are printed to sys.stdout.
-            - If debug_target is a file path, they are saved to the file path.
+        Keyword Arguments:
+            debug_target {Optional[Union[Path, TextIO]]} -- If set to None, the song
+                lists will be written to the current selected steam user id and
+                Rocksmith profile. Otherwise, a diagnostic report will be written to the
+                file or stream specified by debug target.  (default: {None})
+
+        Raises:
+            RSFilterError -- Raised for an incomplete database or if the profile manager
+                is undefined.
+
+        Creates song lists for the filters in the set and writes the resulting song
+        lists back to player profile.
+
+        The song list creator will only create up to 6 song lists, and song lists for
+        list entries with an empty string value will not be changed. Further,
+        steam_user_id and player_profile must be set to valid values before executing.
+
+        If debug target is not None, filters are not saved to the instance profile.
+        Instead:
+            - If debug_target is a stream, extended song lists are writtend to the
+              stream.
+            - If debug_target is a file path, the file is opened and the extended
+              song lists are written to this file.
+
         """
-
         # error condition really shouldn't happen if properties are working properly.
         if not self._arr_db.has_arrangement_data or not self._arr_db.has_player_data:
-            raise RSFilterError('Database requires both song arrangement data and player data to generate song lists.'
-                                '\nOne or both data sets are missing')
+            raise RSFilterError(
+                "Database requires both song arrangement data and player data to "
+                "generate song lists."
+                "\nOne or both data sets are missing"
+            )
 
-        if debug_target is SONG_LIST_DEBUG_FILE:
-            fp = None
-            try:
-                fp = open(os.path.join(self._working_dir, SONG_LIST_DEBUG_FILE), 'wt')
-                song_lists = self._arr_db.generate_song_lists(filter_set, self._filters, fp)
-            finally:
-                fp.close()
+        if isinstance(debug_target, Path):
+            with debug_target.open("wt") as fp:
+                song_lists = self._arr_db.generate_song_lists(
+                    filter_set, self._filter_dict, cast(TextIO, fp)
+                )
+
         else:
-            song_lists = self._arr_db.generate_song_lists(filter_set, self._filters, debug_target)
+            song_lists = self._arr_db.generate_song_lists(
+                filter_set, self._filter_dict, debug_target
+            )
 
         if debug_target is None:
+            if self._profile_manager is None:
+                # shouldn't happen, but just in case
+                raise RSFilterError(
+                    "Attempt to write song lists to a player profile before steam "
+                    "user id/file set has been chosen (profile_manager is None)."
+                )
+
             for idx, song_list in enumerate(song_lists):
                 if song_list is not None:
-                    self._profile_manager.replace_song_list(self.player_profile, idx, song_list)
+                    self._profile_manager.replace_song_list(
+                        self.player_profile, idx, song_list
+                    )
 
             self._profile_manager.write_files()
             self._profile_manager.move_updates_to_steam(self.steam_user_id)
 
-    def _cli_utilities(self):
-        """Command line utilities menu."""
+    def _cli_utilities(self) -> None:
+        """Provide command line utilities menu."""
         while True:
-            action = utils.choose(header='Utility menu', no_action='Return to main menu.',
-                                  options=[
-                                      ('Database reports.', self._arr_db.run_cl_reports),
-                                      ('Clone profile. Copies source profile data into target profile. Replaces '
-                                       'all target profile data.\n      - Reloads steam user/profile after cloning.',
-                                       self._cli_clone_profile)
-                                  ])
+            action = utils.choose(
+                header="Utility menu",
+                no_action="Return to main menu.",
+                options=[
+                    ("Database reports.", self._arr_db.run_cl_reports),
+                    (
+                        "Clone profile. Copies source profile data into target "
+                        "profile. Replaces all target profile data."
+                        "\n      - Reloads steam user/profile after cloning.",
+                        self._cli_clone_profile,
+                    ),
+                ],
+            )
 
             if action is None:
                 break
 
+            action = cast(Callable, action)
             action()
 
-    def _cli_clone_profile(self):
-        """Command line interface for cloning profile and reloading player profile data."""
-
+    def _cli_clone_profile(self) -> None:
+        """Provide command line interface for cloning profiles."""
         # grab temp copy of profile so we can reload after cloning and write back.
         profile = self.player_profile
 
         # do the clone thing.
+        if self._profile_manager is None:
+            # shouldn't happen, but just in case
+            raise RSFilterError(
+                "Attempt to clone player profile before steam user "
+                "id/file set has been chosen (profile_manager is None)."
+            )
         self._profile_manager.cl_clone_profile()
 
         # force a reload regardless of outcome.
@@ -527,21 +731,30 @@ Please choose from the following options:'''
         self.player_profile = profile
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Command line interface for generating song list from config files. '
-                                     'Provides minimal command line menus to support this activity.')
-    parser.add_argument('working_dir', help='Working directory for database, config files, working '
-                        'sub-directories amd working files.')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Command line interface for generating song list from config "
+        "files. Provides minimal command line menus to support this activity."
+    )
+    parser.add_argument(
+        "working_dir",
+        help="Working directory for database, config files, working "
+        "sub-directories amd working files.",
+    )
 
-    parser.add_argument('--CFSMxml', help='Loads database with song arrangement data from CFSM xml file (replaces all '
-                                          'existing data). Expects CFSM ArrangementsGrid.xml file structure.',
-                        metavar='CFSM_file_name')
+    parser.add_argument(
+        "--CFSMxml",
+        help="Loads database with song arrangement data from CFSM xml file (replaces "
+        "all existing data). Expects CFSM ArrangementsGrid.xml file structure.",
+        metavar="CFSM_file_name",
+    )
 
     args = parser.parse_args()
 
-    main = SongListCreator(args.working_dir)
+    main = SongListCreator(Path(args.working_dir))
 
     if args.CFSMxml:
+        # String path by definition here.
         main.cfsm_arrangement_file = args.CFSMxml
         main.load_cfsm_arrangements()
 
