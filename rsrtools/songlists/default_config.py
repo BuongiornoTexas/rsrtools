@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Provides a default configuration set for the song list creator."""
 
-import rsrtools.songlists.sldefs as SLDEF
+import rsrtools.songlists.song_list_config as config
 
-DEFAULT_SL_CONFIG = f'''
+DEFAULT_SONG_LIST_CONFIG = f'''
 {{
-  "{SLDEF.DB_CONFIG}": {{
-    "{SLDEF.CFSM_FILE}": "",
-    "{SLDEF.STEAM_USER_ID}": "",
-    "{SLDEF.PLAYER_PROFILE}": ""
+  "{config.DB_CONFIG}": {{
+    "{config.CFSM_FILE}": "",
+    "{config.STEAM_USER_ID}": "",
+    "{config.PLAYER_PROFILE}": ""
   }},
-  "{SLDEF.FILTER_SET_DICT}": {{
+  "{config.FILTER_SET_DICT}": {{
     "E Standard": [
       "E Std 1",
       "E Std 2",
@@ -32,7 +32,7 @@ DEFAULT_SL_CONFIG = f'''
       "Played Count of 1 to 15"
     ]
   }},
-  "{SLDEF.FILTER_DICT}": {{
+  "{config.FILTER_DICT}": {{
     "Easy E Plat Badge in progress": {{
       "QueryFields": [
         {{

@@ -20,9 +20,10 @@ from typing import cast
 from pathlib import Path
 from os import fsdecode
 
+from rsrtools import utils
+from rsrtools.files.fileconfig import ProfileKey, MAX_SONG_LIST_COUNT
 from rsrtools.files.savefile import RSSaveFile, RSJsonRoot
 from rsrtools.files.steamcache import SteamMetadata, SteamMetadataError
-from rsrtools import utils
 
 # Rocksmith meta data file. Ties profile name to profile id.
 LOCAL_PROFILES = "LocalProfiles.json"
@@ -34,8 +35,14 @@ PROFILE_DB_STR = "_PRFLDB"
 RS_APP_ID = "221680"
 MINUS_ONE = "-1"
 
+# Local profiles keys
+LP_PLAYER_NAME = "PlayerName"
+LP_PROFILES = "Profiles"
+LP_UNIQUE_ID = "UniqueID"
+LP_LAST_MODIFIED = "LastModified"
+
 # type alias
-JSON_path_type = Sequence[Union[int, str]]
+JSON_path_type = Sequence[Union[int, str, ProfileKey]]
 
 
 class RSFileSetError(Exception):
@@ -158,7 +165,7 @@ class RSSaveWrapper:
 
     @property
     def file_path(self) -> Path:
-        """Gets the original save file path.
+        """Get the original save file path.
 
         Gets:
             pathlib.Path -- Original file save path used in __init__.
@@ -209,7 +216,7 @@ class RSSaveWrapper:
 
     @property
     def _rs_file(self) -> RSSaveFile:
-        """Gets a reference to the RSSaveFile instance for the save file.
+        """Get a reference to the RSSaveFile instance for the save file.
 
         Create the instance if this is the first reference to it (lazy loading).
 
@@ -269,8 +276,9 @@ class RSSaveWrapper:
         """Return container and key/index pair for JSON path.
 
         Arguments:
-            json_path {Sequence[Union[int, str]]} -- Path to json sub container or data
-                value. See class documentation for a description of json_path.
+            json_path {Sequence[Union[int, str, ProfileKey]]} -- Path to json sub
+                container or data value. See class documentation for a description of
+                json_path.
 
         Raises:
             KeyError -- Raised on invalid key in json_path.
@@ -290,50 +298,57 @@ class RSSaveWrapper:
         node = self.json_tree
         prev_node = node
 
-        for key in json_path:
+        for iter_value in json_path:
             # traverse full path to check existence of each node.
             prev_node = node
-            if isinstance(key, str):
+            if isinstance(iter_value, ProfileKey):
+                path_item = iter_value.value
+            else:
+                path_item = iter_value
+
+            if isinstance(path_item, str):
                 if isinstance(node, dict):
                     try:
-                        node = node[key]
+                        node = node[path_item]
                     except KeyError:
                         raise KeyError(
-                            f"Invalid key {key} in JSON path {json_path}."
+                            f"Invalid key {path_item} in JSON path {json_path}."
                         )
                 else:
                     raise KeyError(
-                        f"Key {key} supplied in JSON path {json_path}, but JSON dict "
-                        f"not found."                        
+                        f"Key {path_item} supplied in JSON path {json_path}, but JSON "
+                        f"dict not found."
                     )
-            elif isinstance(key, int):
+            elif isinstance(path_item, int):
                 if isinstance(node, list):
                     try:
-                        node = node[key]
+                        node = node[path_item]
                     except IndexError:
                         raise IndexError(
-                            f"Invalid index {key} in JSON path {json_path}."
+                            f"Invalid index {path_item} in JSON path {json_path}."
                         )
                 else:
                     raise IndexError(
-                        f"Index {key} supplied in JSON path {json_path}, but JSON list "
-                        f"not found."
+                        f"Index {path_item} supplied in JSON path {json_path}, but "
+                        f"JSON list not found."
                     )
             else:
                 raise TypeError(
-                    f"Invalid value {key} in JSON path {json_path}.\nJson path should "
-                    f"be a tuple of string and integer values."
+                    f"Invalid value {path_item} in JSON path {json_path}.\nJson path "
+                    f"should be a tuple of string and integer values."
                 )
 
         # actually want to return  final node (prev_node) rather than final value (node)
-        return prev_node, json_path[-1]
+        # path_item should be the final key in json_path and have either int or str type
+        return prev_node, path_item
 
     def get_json_subtree(self, json_path: JSON_path_type) -> Any:
         """Return a json subtree or value based on the json_path sequence.
 
         Arguments:
-            json_path {Sequence[Union[int, str]]} -- Path to json sub container or data
-                value. See class documentation for a description of json_path.
+            json_path {Sequence[Union[int, str, ProfileKey]]} -- Path to json sub
+                container or data value. See class documentation for a description of
+                json_path.
 
         Returns:
             Any -- A json subtree (list, dict), or a json value (str, bool, Decimal)
@@ -350,8 +365,9 @@ class RSSaveWrapper:
         """Replace subtree or value at the end of json_path.
 
         Arguments:
-            json_path {Sequence[Union[int, str]]} -- Path to json sub container or data
-                value. See class documentation for a description of json_path.
+            json_path {Sequence[Union[int, str, ProfileKey]]} -- Path to json sub
+                container or data value. See class documentation for a description of
+                json_path.
             subtree_or_value {Any} -- A json subtree (list, dict), or a json value
                 (str, bool, Decimal) that replaces the subtree/value found at the end
                 of the json_path. The caller is responsible for ensuring the
@@ -408,8 +424,8 @@ class RSLocalProfiles(RSSaveWrapper):
 
         """
         ret_val = None
-        for profile in self.get_json_subtree(("Profiles",)):
-            if profile["UniqueID"] == unique_id:
+        for profile in self.get_json_subtree((LP_PROFILES,)):
+            if profile[LP_UNIQUE_ID] == unique_id:
                 ret_val = profile
                 break
         return ret_val
@@ -429,13 +445,11 @@ class RSLocalProfiles(RSSaveWrapper):
         if profile is None:
             return ""
 
-        ret_val = profile["PlayerName"]
+        ret_val = profile[LP_PLAYER_NAME]
         if isinstance(ret_val, str):
             return ret_val
 
-        raise TypeError(
-            f"Expected string type for player name, got {type(ret_val)}."
-        )
+        raise TypeError(f"Expected string type for player name, got {type(ret_val)}.")
 
     def update_local_profiles(self, unique_id: str, file_path: Path) -> None:
         """Update last modified time for profile unique_id in LocalProfiles.json.
@@ -459,8 +473,8 @@ class RSLocalProfiles(RSSaveWrapper):
             last_modified = Decimal(int(file_path.stat().st_mtime)) + Decimal(
                 "0.000000"
             )
-            if last_modified != profile["LastModified"]:
-                profile["LastModified"] = last_modified
+            if last_modified != profile[LP_LAST_MODIFIED]:
+                profile[LP_LAST_MODIFIED] = last_modified
                 self.mark_as_dirty()
 
 
@@ -528,7 +542,7 @@ class RSProfileDB(RSSaveWrapper):
 
     @property
     def unique_id(self) -> str:
-        """Gets the unique_id {str} for the Rocksmith profile.
+        """Get the unique_id {str} for the Rocksmith profile.
 
         This is/should be the save file name excluding _PRFLDB suffix.
         """
@@ -536,7 +550,7 @@ class RSProfileDB(RSSaveWrapper):
 
     @property
     def player_name(self) -> str:
-        """Gets the Rocksmith player name {str} associated with the profile.
+        """Get the Rocksmith player name {str} associated with the profile.
 
         Return empty string ('') if there is no player name associated with the profile.
         """
@@ -557,10 +571,10 @@ class RSProfileDB(RSSaveWrapper):
         json_path: Any
         # noinspection SpellCheckingInspection
         for json_path in (
-            ("Playnexts", "Songs"),
-            ("Songs",),
-            ("Stats", "Songs"),
-            ("SongsSA",),
+            (ProfileKey.PLAY_NEXTS, ProfileKey.SONGS),
+            (ProfileKey.SONGS,),
+            (ProfileKey.STATS, ProfileKey.SONGS),
+            (ProfileKey.SONG_SA,),
         ):
             try:
                 arrangement_dict = self.get_json_subtree(json_path)
@@ -572,20 +586,64 @@ class RSProfileDB(RSSaveWrapper):
         for a_id in arrangement_ids:
             yield a_id
 
-    def replace_song_list(self, list_index: int, new_song_list: List[str]) -> None:
-        """Replace indexed song list with a new song list.
+    def replace_song_list(
+        self, target: ProfileKey, new_song_list: List[str], list_index: int = -1
+    ) -> None:
+        """Replace Favorites or indexed Song List with a new song list.
 
         Arguments:
-            list_index {int} -- The index of the song list to replace in the range 0-5.
+            target {ProfileKey} -- must be either ProfileKey.SONG_LISTS or
+                ProfileKey.FAVORITES_LIST (import from rsrtools.files.fileconfig).
             new_song_list {List[str]} -- The list of new songs to be inserted into the
                 song list. Refer rsrtools.songlists.arrangement_db for details on song
                 list generation and structure. In summary, this is a list of the short
                 form song names: e.g. ["BlitzkriegBop", "CallMe"].
+            list_index {int} -- If target is SONG_LISTS, the index of the song list to
+                replace in the range 0-5. Ignored if target is FAVORITES.
+
+        Raises:
+            RSProfileError -- If the target is invalid, if the new_song_list is not a
+                List[str], or if list_index is invalid for SONG_LISTS.
 
         Note: Rocksmith has 6 user specifiable song lists. Following python convention,
         we index these from 0 to 5.
+
         """
-        node, key = self._json_node(("SongListsRoot", "SongLists", list_index))
+        if not isinstance(new_song_list, List):
+            raise RSProfileError(
+                f"Invalid song list argument. Song lists must be a list of strings."
+                f"\nArgument is of type {type(new_song_list)}."
+            )
+
+        if not all(isinstance(songkey, str) for songkey in new_song_list):
+            raise RSProfileError(
+                "Invalid song list argument. Song lists must be a list of strings."
+                "\nSome non-string types found in list."
+            )
+
+        if target is not ProfileKey.FAVORITES_LIST:
+            if target is not ProfileKey.SONG_LISTS:
+                raise RSProfileError(
+                    "Invalid song list argument. The target for replacement must be "
+                    "either ProfileKey.FAVORITES_LIST or ProfileKey.SONG_LISTS"
+                )
+
+            if not (0 <= list_index <= MAX_SONG_LIST_COUNT - 1):
+                raise RSProfileError(
+                    f"List index must be in the range 0 to 5 for SONG_LISTS. "
+                    f"Got {list_index}."
+                )
+
+            json_path: JSON_path_type = (
+                ProfileKey.SONG_LISTS_ROOT,
+                ProfileKey.SONG_LISTS,
+                list_index,
+            )
+
+        else:
+            json_path = (ProfileKey.FAVORITES_LIST_ROOT, ProfileKey.FAVORITES_LIST)
+
+        node, key = self._json_node(json_path)
 
         node[key] = new_song_list
         self.mark_as_dirty()
@@ -603,7 +661,13 @@ class RSProfileDB(RSSaveWrapper):
         """
         dec_play_count = Decimal(int(play_count)) + Decimal("0.000000")
         self.set_json_subtree(
-            ("Stats", "Songs", arrangement_id, "PlayedCount"), dec_play_count
+            (
+                ProfileKey.STATS,
+                ProfileKey.SONGS,
+                arrangement_id,
+                ProfileKey.PLAYED_COUNT,
+            ),
+            dec_play_count,
         )
 
 
@@ -870,7 +934,7 @@ class RSFileSet:
 
     @property
     def steam_metadata(self) -> Optional[SteamMetadata]:
-        """Gets the Steam metadata for the file set if it exists. Read only property.
+        """Get the Steam metadata for the file set if it exists. Read only property.
 
         Gets:
             Optional[SteamMetadata] -- The file set steam metadata.
@@ -880,7 +944,7 @@ class RSFileSet:
 
     @property
     def local_profiles(self) -> Optional[RSLocalProfiles]:
-        """Gets the RSLocalProfiles for the file set if it exists. Read only property.
+        """Get the RSLocalProfiles for the file set if it exists. Read only property.
 
         Gets:
             Optional[RSLocalProfiles] -- The local profiles instance for the file set.
@@ -890,7 +954,7 @@ class RSFileSet:
 
     @property
     def profiles(self) -> Dict[str, RSProfileDB]:
-        """Gets a dictionary of the RSProfileDB objects for the file set. Read only.
+        """Get a dictionary of the RSProfileDB objects for the file set. Read only.
 
         Gets:
             Dict[str, RSProfileDB] -- The keys are the Rocksmith unique ids and profile
@@ -902,7 +966,7 @@ class RSFileSet:
 
     @property
     def m_time(self) -> str:
-        """Gets data/time of most recently modified Rocksmith profile. Read only.
+        """Get data/time of most recently modified Rocksmith profile. Read only.
 
         Gets:
             str -- Returns the most recent modification date/time for all of the
@@ -1125,7 +1189,7 @@ class RSProfileManager:
 
     @property
     def source_steam_uid(self) -> str:
-        """Gets the source steam user id for the profile manager file set.
+        """Get the source steam user id for the profile manager file set.
 
         Gets:
             str -- The string representation of an integer steam user id.
@@ -1566,9 +1630,9 @@ class RSProfileManager:
 
         Arguments:
             profile_name {str} -- The target profile name or unique id.
-            json_path {Sequence[Union[int, str]]} -- A JSON path to a subtree of the
-                player profile data. This is either a part of the profile JSON data
-                dictionary, or a leaf value in the data dictionary.
+            json_path {Sequence[Union[int, str, ProfileKey]]} -- Path to json sub
+                container or data value. See class documentation for a description of
+                json_path.
 
         Returns:
             Any -- A json subtree (list, dict), or a json value (str, bool, Decimal)
@@ -1578,22 +1642,31 @@ class RSProfileManager:
         return copy.deepcopy(self._profiles[profile_name].get_json_subtree(json_path))
 
     def replace_song_list(
-        self, profile_name: str, list_index: int, new_song_list: List[str]
+        self,
+        profile_name: str,
+        target: ProfileKey,
+        new_song_list: List[str],
+        list_index: int = -1,
     ) -> None:
-        """Replace indexed song list in a profile with a new song list.
+        """Replace Favorites or indexed Song List with a new song list.
 
         Arguments:
             profile_name {str} -- The target profile name or unique id.
-            list_index {int} -- The index of the song list to replace in the range 0-5.
+            target {ProfileKey} -- must be either ProfileKey.SONG_LISTS or
+                ProfileKey.FAVORITES_LIST (import from rsrtools.files.fileconfig).
             new_song_list {List[str]} -- The list of new songs to be inserted into the
                 song list. Refer rsrtools.songlists.arrangement_db for details on song
                 list generation and structure. In summary, this is a list of the short
                 form song names: e.g. ["BlitzkriegBop", "CallMe"].
+            list_index {int} -- If target is SONG_LISTS, the index of the song list to
+                replace in the range 0-5. Ignored if target is FAVORITES.
 
         Note: Rocksmith has 6 user specifiable song lists. Following python convention,
         we index these from 0 to 5.
         """
-        self._profiles[profile_name].replace_song_list(list_index, new_song_list)
+        self._profiles[profile_name].replace_song_list(
+            target, new_song_list, list_index
+        )
 
     def set_arrangement_play_count(
         self, profile_name: str, arrangement_id: str, play_count: int

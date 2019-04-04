@@ -30,8 +30,7 @@ import zlib
 import argparse
 from os import fsdecode
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any, Union, List
-from decimal import Decimal
+from typing import Optional, Tuple, Dict, Any
 
 import simplejson
 

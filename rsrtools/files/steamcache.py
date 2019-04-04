@@ -401,7 +401,7 @@ class SteamMetadata:
 
     @property
     def file_path(self) -> Path:
-        """Gets the path to the underlying Steam metadata file.
+        """Get the path to the underlying Steam metadata file.
 
         Gets:
             pathlib.Path -- Path to metadata file.

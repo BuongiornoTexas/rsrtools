@@ -14,9 +14,7 @@ FilterField = str
 FilterInclude = bool
 FilterValue = str
 FilterRange = List[List[Union[float, int]]]
-FilterQuery = Dict[str,
-    Union[FilterField, FilterInclude, FilterValue, FilterRange]
-]
+FilterQuery = Dict[str, Union[FilterField, FilterInclude, FilterValue, FilterRange]]
 BaseFilter = str
 # Filters dict - can provide a base filter name or Filter definition.
 FilterDict = Dict[str, Union[BaseFilter, FilterQuery]]
@@ -24,7 +22,7 @@ FilterDict = Dict[str, Union[BaseFilter, FilterQuery]]
 # The first Union describes the "db_config" entry
 JSONConfig = Dict[str, Union[DBConfig, FilterSetDict, FilterDict]]
 
-# Setup strings for config, should be consistent with type aliases and 
+# Setup strings for config, should be consistent with type aliases and
 # json schema where applicable (lists are anonymous in schema).
 DB_CONFIG = "db_config"
 CFSM_FILE = "CFSM_Arrangement_File"

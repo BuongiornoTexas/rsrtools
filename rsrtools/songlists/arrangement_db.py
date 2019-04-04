@@ -19,8 +19,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, TextIO
 
-import rsrtools.songlists.sldefs as SLDEF
+import rsrtools.songlists.song_list_config as config
 from rsrtools.utils import choose
+from rsrtools.files.fileconfig import MAX_SONG_LIST_COUNT
 from rsrtools.files.profilemanager import RSProfileManager
 
 DB_NAME = "RS_Arrangements.sqlite"
@@ -176,7 +177,7 @@ class SongListSQLGenerator:
     """
 
     _next_table_index: int
-    _filter_names: SLDEF.FilterSet
+    _filter_names: config.FilterSet
 
     def _next_table_name(self) -> str:
         """Return the next temporary table name.
@@ -210,7 +211,7 @@ class SongListSQLGenerator:
         query = "".join((query, "\n", where_clause, ";"))
         self.tmp_table_sql.append((query, where_values))
 
-    def __init__(self, filter_set: SLDEF.FilterSet, filter_definition, list_validators):
+    def __init__(self, filter_set: config.FilterSet, filter_definition, list_validators):
         """Generates song list sql queries for the filter set based on the filter definitions and list list_validators.
 
         :param filter_set: List of filter names for sql query generation.
@@ -222,9 +223,9 @@ class SongListSQLGenerator:
         """
         self.filter_definitions = filter_definitions
         self.list_validators = list_validators
-        if len(filter_set) > 6:
+        if len(filter_set) > MAX_SONG_LIST_COUNT:
             # Rocksmith supports up to 6 song lists. Discard any beyond this.
-            self._filter_names = filter_set[0:5]
+            self._filter_names = filter_set[0: MAX_SONG_LIST_COUNT - 1]
         else:
             self._filter_names = filter_set[:]
 
@@ -821,7 +822,7 @@ class ArrangementDB:
 
     def generate_song_lists(
         self,
-        filter_set: SLDEF.FilterSet,
+        filter_set: config.FilterSet,
         filter_definitions,
         debug_target: Optional[TextIO] = None,
     ):
