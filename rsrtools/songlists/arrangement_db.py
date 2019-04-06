@@ -927,7 +927,8 @@ class ArrangementDB:
             self.load_player_profile(p_manager, profile_name)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Provide a basic command line interface to arrangements database."""
     parser = argparse.ArgumentParser(
         description="Command line interface to the arrangements database."
     )
@@ -967,3 +968,6 @@ if __name__ == "__main__":
 
     if args.reports:
         db.run_cl_reports()
+
+if __name__ == "__main__":
+    main()

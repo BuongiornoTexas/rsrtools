@@ -777,7 +777,8 @@ class SongListCreator:
         self.player_profile = profile
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Provide basic command line interface to song list creator."""
     parser = argparse.ArgumentParser(
         description="Command line interface for generating song list from config "
         "files. Provides minimal command line menus to support this activity."
@@ -806,3 +807,7 @@ if __name__ == "__main__":
 
     # run the command line interface.
     main.song_list_cli()
+
+
+if __name__ == "__main__":
+    main()
