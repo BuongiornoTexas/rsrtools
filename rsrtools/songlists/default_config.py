@@ -2,15 +2,16 @@
 """Provides a default configuration set for the song list creator."""
 
 import rsrtools.songlists.song_list_config as config
+from rsrtools.songlists.song_list_config import ListField, RangeField
 
 DEFAULT_SONG_LIST_CONFIG = f'''
 {{
-  "{config.DB_CONFIG}": {{
-    "{config.CFSM_FILE}": "",
-    "{config.STEAM_USER_ID}": "",
-    "{config.PLAYER_PROFILE}": ""
+  "{config.DB_CONFIG_KEY}": {{
+    "{config.CFSM_FILE_KEY}": "",
+    "{config.STEAM_USER_ID_KEY}": "",
+    "{config.PLAYER_PROFILE_KEY}": ""
   }},
-  "{config.FILTER_SET_DICT}": {{
+  "{config.FILTER_SET_DICT_KEY}": {{
     "E Standard": [
       "E Std 1",
       "E Std 2",
@@ -32,13 +33,13 @@ DEFAULT_SONG_LIST_CONFIG = f'''
       "Played Count of 1 to 15"
     ]
   }},
-  "{config.FILTER_DICT}": {{
+  "{config.FILTER_DICT_KEY}": {{
     "Easy E Plat Badge in progress": {{
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "SA_EASY_BADGES",
-          "Include": true,
-          "Ranges": [
+          "{config.FIELD_NAME_KEY}": "{RangeField.SA_EASY_BADGES.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.RANGES_KEY}": [
             [
               1,
               4
@@ -48,11 +49,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
       ]
     }},
     "E Standard": {{
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "TUNING",
-          "Include": true,
-          "Values": [
+          "{config.FIELD_NAME_KEY}": "{ListField.TUNING.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.VALUES_KEY}": [
             "E Standard"
           ]
         }}
@@ -60,11 +61,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
     }},
     "E Standard 440": {{
       "BaseFilter": "E Standard",
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "PITCH",
-          "Include": true,
-          "Ranges": [
+          "{config.FIELD_NAME_KEY}": "{RangeField.PITCH.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.RANGES_KEY}": [
             [
               439.5,
               440.5
@@ -75,11 +76,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
     }},
     "E Std 1": {{
       "BaseFilter": "E Standard 440",
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "PLAYED_COUNT",
-          "Include": true,
-          "Ranges": [
+          "{config.FIELD_NAME_KEY}": "{RangeField.PLAYED_COUNT.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.RANGES_KEY}": [
             [
               1,
               12
@@ -90,11 +91,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
     }},
     "E Std 2": {{
       "BaseFilter": "E Standard 440",
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "PLAYED_COUNT",
-          "Include": true,
-          "Ranges": [
+          "{config.FIELD_NAME_KEY}": "{RangeField.PLAYED_COUNT.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.RANGES_KEY}": [
             [
               13,
               27
@@ -105,11 +106,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
     }},
     "E Std 3": {{
       "BaseFilter": "E Standard 440",
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "PLAYED_COUNT",
-          "Include": true,
-          "Ranges": [
+          "{config.FIELD_NAME_KEY}": "{RangeField.PLAYED_COUNT.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.RANGES_KEY}": [
             [
               27,
               27
@@ -120,11 +121,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
     }},
     "E Std Non Concert": {{
       "BaseFilter": "E Standard",
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "PITCH",
-          "Include": false,
-          "Ranges": [
+          "{config.FIELD_NAME_KEY}": "{RangeField.PITCH.value}",
+          "{config.INCLUDE_KEY}": false,
+          "{config.RANGES_KEY}": [
             [
               439.5,
               440.5
@@ -132,9 +133,9 @@ DEFAULT_SONG_LIST_CONFIG = f'''
           ]
         }},
         {{
-          "Field": "PLAYED_COUNT",
-          "Include": true,
-          "Ranges": [
+          "{config.FIELD_NAME_KEY}": "{RangeField.PLAYED_COUNT.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.RANGES_KEY}": [
             [
               1,
               5000
@@ -145,11 +146,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
     }},
     "Drop D": {{
       "BaseFilter": "Not Bass, Rhythm",
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "TUNING",
-          "Include": true,
-          "Values": [
+          "{config.FIELD_NAME_KEY}": "{ListField.TUNING.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.VALUES_KEY}": [
             "Drop D"
           ]
         }}
@@ -157,11 +158,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
     }},
     "Eb Standard": {{
       "BaseFilter": "Not Bass, Rhythm",
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "TUNING",
-          "Include": true,
-          "Values": [
+          "{config.FIELD_NAME_KEY}": "{ListField.TUNING.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.VALUES_KEY}": [
             "Eb Standard"
           ]
         }}
@@ -169,11 +170,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
     }},
     "Eb Drop Db": {{
       "BaseFilter": "Not Bass, Rhythm",
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "TUNING",
-          "Include": true,
-          "Values": [
+          "{config.FIELD_NAME_KEY}": "{ListField.TUNING.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.VALUES_KEY}": [
             "Eb Drop Db"
           ]
         }}
@@ -181,11 +182,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
     }},
     "D Standard": {{
       "BaseFilter": "Not Bass, Rhythm",
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "TUNING",
-          "Include": true,
-          "Values": [
+          "{config.FIELD_NAME_KEY}": "{ListField.TUNING.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.VALUES_KEY}": [
             "D Standard"
           ]
         }}
@@ -193,11 +194,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
     }},
     "D Drop C": {{
       "BaseFilter": "Not Bass, Rhythm",
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "TUNING",
-          "Include": true,
-          "Values": [
+          "{config.FIELD_NAME_KEY}": "{ListField.TUNING.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.VALUES_KEY}": [
             "D Drop C"
           ]
         }}
@@ -205,11 +206,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
     }},
     "Other Tunings": {{
       "BaseFilter": "Not Bass, Rhythm",
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "TUNING",
-          "Include": false,
-          "Values": [
+          "{config.FIELD_NAME_KEY}": "{ListField.TUNING.value}",
+          "{config.INCLUDE_KEY}": false,
+          "{config.VALUES_KEY}": [
             "E Standard",
             "Drop D",
             "Eb Standard",
@@ -221,11 +222,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
       ]
     }},
     "Played Count of 1 to 15": {{
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "PLAYED_COUNT",
-          "Include": true,
-          "Ranges": [
+          "{config.FIELD_NAME_KEY}": "{RangeField.PLAYED_COUNT.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.RANGES_KEY}": [
             [
               1,
               15
@@ -235,11 +236,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
       ]
     }},
     "Artist test": {{
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "ARTIST",
-          "Include": true,
-          "Values": [
+          "{config.FIELD_NAME_KEY}": "{ListField.ARTIST.value}",
+          "{config.INCLUDE_KEY}": true,
+          "{config.VALUES_KEY}": [
             "The Rolling Stones",
             "Franz Ferdinand"
           ]
@@ -247,11 +248,11 @@ DEFAULT_SONG_LIST_CONFIG = f'''
       ]
     }},
     "Not Bass, Rhythm": {{
-      "QueryFields": [
+      "{config.FIELD_FILTER_LIST_KEY}": [
         {{
-          "Field": "ARRANGEMENT_NAME",
-          "Include": false,
-          "Values": [
+          "{config.FIELD_NAME_KEY}": "{ListField.ARRANGEMENT_NAME.value}",
+          "{config.INCLUDE_KEY}": false,
+          "{config.VALUES_KEY}": [
             "Bass",
             "Rhythm",
             "Rhythm1",

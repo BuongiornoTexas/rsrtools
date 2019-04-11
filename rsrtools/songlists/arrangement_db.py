@@ -15,16 +15,94 @@ import argparse
 
 import xml.etree.ElementTree as eTree
 
-from enum import Enum
 from pathlib import Path
-from typing import Optional, TextIO
+# I'd prefer to import OrderedDict from typing, but this isn't quite working as at 3.7.
+from collections import OrderedDict
+from typing import cast, Dict, List, MutableMapping, Optional, TextIO, Tuple, Union
 
 import rsrtools.songlists.song_list_config as config
+from rsrtools.songlists.song_list_config import ListField, RangeField, SQLField
 from rsrtools.utils import choose
 from rsrtools.files.fileconfig import MAX_SONG_LIST_COUNT
 from rsrtools.files.profilemanager import RSProfileManager
 
+# type aliases
+ListValidator = Dict[ListField, List[str]]
+# SQL Clause - SQL text + Value tuple for substitution
+SQLClause = Tuple[Optional[str], Optional[Tuple[Union[str, int, float], ...]]]
+# Waiting on fix for OrderedDict in typing.py to change this OrderedDict[SQLField, str]
+SQLTableDict = MutableMapping[SQLField, str]
+
+# database file name
 DB_NAME = "RS_Arrangements.sqlite"
+# base table name for all filter queries.
+TEMP_TABLE_BASE = "RSRTempTable"
+
+# We use these two field constants an awful lot, so define module level shortener here.
+ARRANGEMENT_NAME = ListField.ARRANGEMENT_NAME
+ARRANGEMENT_ID = ListField.ARRANGEMENT_ID
+
+# Arrangements and player profile table names, field definitions
+ARRANGEMENTS_TABLE = "Arrangements"
+ARRANGEMENT_FIELDS: SQLTableDict = OrderedDict(
+    [
+        (ListField.ARRANGEMENT_ID, "text"),
+        (ListField.RS_SONG_ID, "text"),
+        (ListField.ARRANGEMENT_NAME, "text"),
+        (ListField.ARTIST, "text"),
+        (ListField.TITLE, "text"),
+        (ListField.ALBUM, "text"),
+        (RangeField.YEAR, "integer"),
+        (RangeField.TEMPO, "integer"),
+        (ListField.TUNING, "text"),
+        (RangeField.PITCH, "real"),
+        (RangeField.NOTE_COUNT, "integer"),
+    ]
+) 
+
+PROFILE_TABLE = "PlayerProfile"
+PROFILE_FIELDS: SQLTableDict = OrderedDict(
+    [
+        (ListField.ARRANGEMENT_ID, "text"),
+        (RangeField.PLAYED_COUNT, "integer"),
+        (RangeField.MASTERY_PEAK, "real"),
+        (RangeField.SA_PLAYED_COUNT, "integer"),
+        (RangeField.SA_EASY_COUNT, "integer"),
+        (RangeField.SA_MEDIUM_COUNT, "integer"),
+        (RangeField.SA_HARD_COUNT, "integer"),
+        (RangeField.SA_MASTER_COUNT, "integer"),
+        (RangeField.SA_EASY_BADGES, "integer"),
+        (RangeField.SA_MEDIUM_BADGES, "integer"),
+        (RangeField.SA_HARD_BADGES, "integer"),
+        (RangeField.SA_MASTER_BADGES, "integer"),
+    ]
+)
+
+SONG_LIST_FIELDS: SQLTableDict = OrderedDict(
+    [
+        (ListField.RS_SONG_ID, ""),
+        (ListField.ARRANGEMENT_ID, ""),
+        (ListField.ARRANGEMENT_NAME, ""),
+        (ListField.ARTIST, ""),
+        (ListField.TITLE, ""),
+        (ListField.ALBUM, ""),
+        (RangeField.YEAR, ""),
+        (ListField.TUNING, ""),
+        (RangeField.PITCH, ""),
+        (RangeField.PLAYED_COUNT, ""),
+    ]
+)
+
+NO_PLAYER_FIELDS: SQLTableDict = OrderedDict(
+    [
+        (ListField.ARRANGEMENT_ID, ""),
+        (ListField.ARRANGEMENT_NAME, ""),
+        (ListField.ARTIST, ""),
+        (ListField.TITLE, ""),
+        (ListField.ALBUM, ""),
+    ]
+)
+
 # CFSM_MAP translates Customs Forge column arrangement titles to database fields.
 # CFSM map is ugly, but allows for easy remapping in the future if needed
 # See cfsm function for use and for manual processing of album, year
@@ -91,68 +169,6 @@ PLAYER_PROFILE_MAP = {
     "SAMasterBadges": (("SongsSA", ":a_id", "Badges", "Master"), 0, int),
 }
 
-# base table name for all filter queries.
-FILTER_TABLE_BASE = "__TempTable"
-
-
-class FieldTypes(Enum):
-    """Provide list of database field names that can be used as filters."""
-
-    # list types. Automatically validated before use.
-    TUNING = "Tuning"
-    ARRANGEMENT_NAME = "ArrangementName"
-    ARRANGEMENT_ID = "ArrangementId"
-    ARTIST = "Artist"
-    TITLE = "Title"
-    ALBUM = "Album"
-
-    # numerical types. Range filters can be applied to these.
-    PITCH = "Pitch"
-    TEMPO = "Tempo"
-    NOTE_COUNT = "NoteCount"
-    YEAR = "Year"
-    PLAYED_COUNT = "PlayedCount"
-    MASTERY_PEAK = "MasteryPeak"
-    SA_EASY_COUNT = "SAEasyCount"
-    SA_MEDIUM_COUNT = "SAMediumCount"
-    SA_HARD_COUNT = "SAHardCount"
-    SA_MASTER_COUNT = "SAMasterCount"
-    SA_PLAYED_COUNT = "SAPlayedCount"
-    SA_EASY_BADGES = "SAEasyBadges"
-    SA_MEDIUM_BADGES = "SAMediumBadges"
-    SA_HARD_BADGES = "SAHardBadges"
-    SA_MASTER_BADGES = "SAMasterBadges"
-
-
-# bucket of field types that will be processed as string list filters.
-LIST_FILTERS = (
-    FieldTypes.TUNING,
-    FieldTypes.ARRANGEMENT_NAME,
-    FieldTypes.ARRANGEMENT_ID,
-    FieldTypes.TITLE,
-    FieldTypes.ARTIST,
-    FieldTypes.ALBUM,
-)
-
-# bucket of field types that will be processed as positive range filters.
-POSITIVE_RANGE_FILTERS = (
-    FieldTypes.PITCH,
-    FieldTypes.TEMPO,
-    FieldTypes.NOTE_COUNT,
-    FieldTypes.YEAR,
-    FieldTypes.PLAYED_COUNT,
-    FieldTypes.MASTERY_PEAK,
-    FieldTypes.SA_EASY_COUNT,
-    FieldTypes.SA_MEDIUM_COUNT,
-    FieldTypes.SA_HARD_COUNT,
-    FieldTypes.SA_MASTER_COUNT,
-    FieldTypes.SA_PLAYED_COUNT,
-    FieldTypes.SA_EASY_BADGES,
-    FieldTypes.SA_MEDIUM_BADGES,
-    FieldTypes.SA_HARD_BADGES,
-    FieldTypes.SA_MASTER_BADGES,
-)
-
 
 class RSFilterError(Exception):
     def __init__(self, message: str = None) -> None:
@@ -162,22 +178,190 @@ class RSFilterError(Exception):
         super().__init__(message)
 
 
+class SQLTable:
+    """Provide a limited SQL table creator/filler and field list generator.
+    
+    Public members:
+        Constructor.
+        field_list -- Return a partial SQL expression containing a list of all fields
+            in the table.
+        rebuild_table -- Runs an SQL script to drop the current table and recreate a new
+            empty version of the table.
+        write_row -- Write a row of data to the table.
+        table_name -- Read only, the table name.
+
+    """
+
+    # dictionary of field types and SQL types for those fields.
+    _fields_dict: SQLTableDict
+    # table name  and primary key only needed for table functionality
+    _table_name: str
+    _primary: Optional[SQLField]
+    _new_table_script: str
+    _write_row_script: str
+
+    def __init__(
+        self,
+        fields_dict: SQLTableDict,
+        table_name: str,
+        primary: Optional[SQLField],
+    ) -> None:
+        """Provide SQL table constructor.
+        
+        Arguments:
+            fields {OrderedDict[SQLField, str]} -- An ordered dictionary of SQL fields
+                and the SQL types of these fields. The dictionary values (SQL types) can
+                be empty strings if the instance is only being used for field list
+                generation. While the specific order of the keys is not important,
+                repeatability of iteration is important for row writing, so we 
+                explicitly require an ordered dictionary.
+            table_name {str} -- The SQL table name. Not required for field
+                list generation. (default: {""})
+            primary {Optional[SQLField]} -- The SQL primary key field. Not required for
+                field list generation. (default: {None})
+
+        """
+        self._fields_dict = fields_dict
+        self._table_name = table_name
+        self._primary = primary
+        self._new_table_script = ""
+        self._write_row_script = ""
+
+    @property
+    def table_name(self) -> str:
+        """Return the string table name, or an exception if not defined."""
+        if not (self._table_name):
+            raise RSFilterError("Table name is not defined (maybe only a field list?).")
+
+        return self._table_name
+
+    def field_list(self, prefix: str = "", new_table: bool = False) -> str:
+        """Generate a SQL string list of the field names, with one field per line.
+                
+        Keyword Arguments:
+            prefix {str} -- Optional prefix on each line, which can be used for
+                indenting/pretty printing. (default: {""})
+            new_table {bool}: If true will generate the field list with type information
+                and primary key (primarily a utility for rebuild_table).
+        """
+        if new_table and self._primary is None:
+            raise RSFilterError(
+                f"Can't generate a new table field list without a primary key."
+                f"\nTable named '{self._table_name}'' has no primary key."
+            )
+
+        sql_text = ""
+        for field, type_str in self._fields_dict.items():
+            primary = ""
+            if new_table:
+                type_text = f" {type_str}"
+                if field is self._primary:
+                    primary = " PRIMARY KEY"
+            else:
+                type_text = ""
+
+            sql_text = f"{sql_text}{prefix}{field.value}{type_text}{primary}\n"
+
+        return sql_text
+
+    def rebuild_table(self, conn: sqlite3.Connection) -> None:
+        """Flush and rebuild table. Drops the table and creates a new, empty table.
+        
+        Arguments:
+            conn {sqlite3.Connection} -- Connection to database for table. 
+        """
+        if not self._new_table_script:
+            # generate the script
+            script = self.field_list(prefix="  ", new_table=True)
+
+            # Raise an error if table name doesn't exist.
+            script = (
+                f"DROP TABLE IF EXISTS {self.table_name};"
+                f"\nCREATE TABLE {self.table_name} ("
+                f"\n{script}"
+                f");"
+            )
+            # cache in case of re-use.
+            self._new_table_script = script
+
+        conn.executescript(self._new_table_script)
+        conn.commit()
+        conn.close()
+
+    def write_row(
+        self, conn: sqlite3.Connection, values: Dict[SQLField, Union[float, int, str]]
+    ) -> None:
+        """Write a dictionary of values into a a row in the database.
+
+        Arguments:
+            conn {sqlite3.Connection} -- Connection to database for table. 
+            values {Dict[SQLField, Union[float, int, str]]} -- The dictionary of values
+                to be written. There should be one value per field in the table, and
+                the method will raise an exception if the primary key does not exist
+                or if the values dictionary does not contain value for the primary key.
+        
+        As this routine should be called repeatedly, the caller is responsible for
+        commit and close.
+        """
+        if not self._write_row_script:
+            if self._primary is None:
+                raise RSFilterError(
+                    f"\nTable named '{self._table_name}'' has no primary key."
+                )
+
+            try:
+                values[self._primary]
+            except:
+                raise RSFilterError(
+                    f"There is no value for primary key {self._primary} in "
+                    f"table named '{self._table_name}'."
+                )
+
+            # create the script.
+            field_list = self.field_list(prefix="  ")
+            target_list = self.field_list(prefix="    :")
+
+            # Property will raise exception if table name doesn't exist.
+            self._write_row_script = (
+                f"INSERT INTO {self.table_name} ("
+                f"\n{field_list}"
+                f")"
+                f"\n  VALUES ("
+                f"\n{target_list}"
+                f"  );"
+            )
+
+        conn.execute(self._write_row_script, values)
+
+
 class SongListSQLGenerator:
     """Single use class for generating song list sql. This is a helper class for ArrangementDB.
 
-    The class creates two sets of sql queries for song list generation, both of which are public attributes:
-        attribute:: tmp_table_sql
-            Provides the sql for the temporary tables.
-        attribute:: song_list_sql
-            Provides the sql for the song lists.
+    The class creates two sets of sql queries for song list generation, both of which
+    are public attributes:
+        tmp_table_sql -- An attribute that provides the sql for the temporary tables.
+        song_list_sql -- An attribute that provides the sql for the song lists.
 
-    Both of these fields are lists, where each element is a tuple consisting of:
-        - The SQL query text.
-        - The where values to be substituted into the SQL query ((?) form).
+    Both of these attributes are lists, where each element is a tuple consisting of:
+        - The SQL query text {Optional[str]}.
+        - A sub-tuple of where values to be substituted into the SQL query ((?) form)
+          {Optional[Tuple[Union[str, int, float]]]}.
+        - An empty song list is represented by the tuple (None, None).
+    
+    Both attributes are mutable, but are only intended for use in a read-only mode by
+    ArrangementDB.
+
     """
 
+    song_list_sql: List[SQLClause]
+    tmp_table_sql: List[SQLClause]
+    _list_validator: ListValidator
     _next_table_index: int
     _filter_names: config.FilterSet
+    _filter_definitions: config.FilterDict
+    # table_map maps filter names to table names
+    _table_map: Dict[str, str]
+    _root_table: str
 
     def _next_table_name(self) -> str:
         """Return the next temporary table name.
@@ -185,47 +369,75 @@ class SongListSQLGenerator:
         Returns:
             str -- SQL temporary table name
         """
-        table_name = "".join((FILTER_TABLE_BASE, str(self._next_table_index)))
+        table_name = f"{TEMP_TABLE_BASE}{self._next_table_index}"
         self._next_table_index = self._next_table_index + 1
         return table_name
 
-    def _table_setup(self, filter_name: str, where_clause, where_values):
-        """Construct an SQL query for creating a song list filter temporary table.
+    def _table_setup(
+        self,
+        filter_name: str,
+        where_clause: str,
+        where_values: Tuple[Union[str, int, float]],
+    ) -> None:
+        """Construct the SQL query for temporary table that represents a filter.
         
         Arguments:
-            filter_name {str} -- [description]
-            where_clause {str} -- [description]
-            where_values {[type]} -- [description]
+            filter_name {str} -- The filter that the temporary table will represent.
+            where_clause {str} -- The SQL WHERE clause text for the filter.
+            where_values {Tuple[Union[str, int, float]]} -- Values for ? substitution
+                into the where_clause.
         
+        The temporary table will be used as a foundation for either further temporary
+        tables or as a foundation for one or more song list queries.
         based on where_clause, where_values and the base filter for
         filter_name.
         """
 
         new_table = self._next_table_name()
         self._table_map[filter_name] = new_table
+        # find the name of the base table this table will be built on.
         base_table = self._table_map[self._base_filter(filter_name)]
 
         # set up the start of the SQL query for the table
         self.tmp_table_sql.append((f"DROP TABLE IF EXISTS {new_table};", ()))
-        query = f"CREATE TEMP TABLE {new_table} AS SELECT * FROM {base_table}"
-        query = "".join((query, "\n", where_clause, ";"))
+
+        query = (
+            f"CREATE TEMP TABLE {new_table} AS SELECT * FROM {base_table}"
+            f"\n{where_clause};"
+        )
         self.tmp_table_sql.append((query, where_values))
 
-    def __init__(self, filter_set: config.FilterSet, filter_definition, list_validators):
-        """Generates song list sql queries for the filter set based on the filter definitions and list list_validators.
-
-        :param filter_set: List of filter names for sql query generation.
-        :param filter_definitions: Dictionary of filter definitions. Refer song_list_creator for structure of items.
-        :param list_validators: Dictionary of list_validators for list based fields. Refer ArrangementDB for structure.
-
-        After initialisation, the sql queries are provided in fields tmp_table_sql and song_list_sql. Refer to the
-        class documentation for more details.
+    def __init__(
+        self,
+        filter_set: config.FilterSet,
+        filter_definitions: config.FilterDict,
+        list_validator: ListValidator,
+        arrangements_name: str,
+        profile_name: str,
+    ) -> None:
+        """Generate song list sql queries for a filter set and filter definitions.
+        
+        Arguments:
+            filter_set {config.FilterSet} -- A list of filter names that will be used
+                for song list definition. That is, each song list corresponds to a
+                filter name in this list, and SQL will be generated for each of these
+                names.
+            filter_definitions {config.FilterDict} -- A dictionary of filter definitions
+                that will be used for SQL generation. Refer to the package
+                documentation, song_list_config and default_config for more details.
+            list_validator {Dict[ListField, List[str]]} -- For each list field in the
+                dictionary, a list of valid values for this field.
+            arrangements_name {str} -- Rocksmith arrangements table name.
+            profile_name {str} -- Player profile table name.
+        
+        After initialisation, the sql queries are provided in fields tmp_table_sql and
+        song_list_sql. Refer to the class documentation for more details.
         """
-        self.filter_definitions = filter_definitions
-        self.list_validators = list_validators
+        self._filter_definitions = filter_definitions
+        self._list_validator = list_validator
         if len(filter_set) > MAX_SONG_LIST_COUNT:
             # Rocksmith supports up to 6 song lists. Discard any beyond this.
-            self._filter_names = filter_set[0: MAX_SONG_LIST_COUNT - 1]
+            self._filter_names = filter_set[0 : MAX_SONG_LIST_COUNT - 1]
         else:
             self._filter_names = filter_set[:]
 
@@ -236,19 +448,22 @@ class SongListSQLGenerator:
 
         # set up for the root table for all filters
         self._root_table = self._next_table_name()
-        # map name to itself. Might be a problem if someone cleverly names their base table to match the root table.
+        # Map the root table name to itself. This might be a problem if someone cleverly
+        # names their base table to match the root table.
         self._table_map[self._root_table] = self._root_table
+
         # note that we exclude vocals here
         self.tmp_table_sql.append((f"DROP TABLE IF EXISTS {self._root_table};", ()))
 
-        query = (
-            f"CREATE TEMP TABLE {self._root_table} AS SELECT * "
-            f"\n    FROM Arrangements LEFT JOIN PlayerProfile ON "
-            f"\n    Arrangements.ArrangementId == PlayerProfile.ArrangementId"
-            f'\n    WHERE ArrangementName != "Vocals";'
+        sql_text = (
+            f"CREATE TEMP TABLE {self._root_table} AS SELECT *"
+            f"\n  FROM {arrangements_name} LEFT JOIN {profile_name} ON"
+            f"\n    {arrangements_name}.{ARRANGEMENT_ID.value}"
+            f"\n      == {profile_name}.{ARRANGEMENT_ID.value}"
+            f'\n  WHERE {ARRANGEMENT_NAME.value} != "Vocals";'
         )
 
-        self.tmp_table_sql.append((query, ()))
+        self.tmp_table_sql.append((sql_text, ()))
 
         # create the rest of the tables
         self._generate_table_sql()
@@ -258,7 +473,7 @@ class SongListSQLGenerator:
         """Returns the name of the base filter for filter_name, or if it is not defined, the root table for song list
         queries.
         """
-        return self.filter_definitions[filter_name].get("BaseFilter", self._root_table)
+        return self._filter_definitions[filter_name].get("BaseFilter", self._root_table)
 
     def _generate_table_sql(self):
         """Creates the sql queries for all temporary tables required by the filter set."""
@@ -269,14 +484,14 @@ class SongListSQLGenerator:
                 # nothing needed for empty filter set.
                 continue
 
-            if filter_name not in self.filter_definitions:
+            if filter_name not in self._filter_definitions:
                 raise KeyError(f"No definition for filter {filter_name}.")
 
             # only generating sql for temp tables, not for target song lists.
             this_filter = self._base_filter(filter_name)
             while True:
                 if this_filter not in self._table_map:
-                    if this_filter not in self.filter_definitions:
+                    if this_filter not in self._filter_definitions:
                         raise KeyError(f"No definition for filter {this_filter}.")
 
                     # table needs to be defined for this filter.
@@ -308,7 +523,7 @@ class SongListSQLGenerator:
                     break
 
     def _generate_song_list_sql(self):
-        """Creates the sql for the song lists in the filter set."""
+        """Create the sql for the song lists in the filter set."""
         # temporary tables have already been created and consistency tests run previously,
         # so the code for the song list sql is a lot cleaner than that for table generation.
         for filter_name in self._filter_names:
@@ -319,98 +534,168 @@ class SongListSQLGenerator:
                 base_table = self._table_map[self._base_filter(filter_name)]
                 where_clause, where_values = self._where_clause(filter_name)
 
-                query = (
-                    f"SELECT "
-                    f"\n    RSSongId, ArrangementId, ArrangementName, Artist,"
-                    f"\n    Title, Album, Year, Tuning, Pitch, PlayedCount"
-                    f"\n    FROM {base_table}"
+                sql_text = SQLTable(SONG_LIST_FIELDS).field_list(prefix="    ")
+
+                sql_text = (
+                    f"SELECT"
+                    f"\n{sql_text}"
+                    f"  FROM {base_table}"
+                    f"\n{where_clause};"
                 )
 
-                query = "".join((query, "\n", where_clause, ";"))
-                self.song_list_sql.append((query, where_values))
+                self.song_list_sql.append((sql_text, where_values))
 
-    def _where_clause(self, filter_name):
-        """Returns the sql WHERE clause for filter_name."""
-        where_text = list()
-        where_values = list()
+    def _where_clause(self, filter_name: str) -> SQLClause:
+        """Return a SQL WHERE clause for a named filter.
+        
+        Arguments:
+            filter_name {str} -- The name of the filter that will be used to generate
+                the SQL.
+        
+        Raises:
+            KeyError, ValueError, TypeError, RSFilterError -- For validation errors in
+                the filter definition.
+        
+        Returns:
+            Tuple[str, Tuple[Union[str, int, float], ...]] -- The WHERE clause for the
+                filter and the tuple of values to be substituted into the filter.
 
-        if "QueryFields" not in self.filter_definitions[filter_name]:
-            raise KeyError(f"Missing QueryFields in filter {filter_name}")
+        """
+        field_clauses: List[str] = list()
+        where_values: List[Union[str, int, float]] = list()
 
-        for idx, field_dict in enumerate(
-            self.filter_definitions[filter_name]["QueryFields"]
+        if config.FIELD_FILTER_LIST_KEY not in self._filter_definitions[filter_name]:
+            raise KeyError(
+                f"Missing '{config.FIELD_FILTER_LIST_KEY}'/field filter list pair in "
+                f"filter '{filter_name}'."
+            )
+
+        # work through each field filter in the list.
+        for idx, field_filter in enumerate(
+            cast(
+                config.FieldFilterList,
+                self._filter_definitions[filter_name][config.FIELD_FILTER_LIST_KEY]
+            )
         ):
-            # do a whack of validation here to provide help debugging json. Would have been better
-            # to learn how to use the json schema validator, but I found it a bit late.
-            field_type = field_dict.get("Field", None)
-            if field_type is None:
+            # do a whack of validation here to provide help debugging json. It would
+            # have been better to learn how to use the json schema validator, but I
+            # found it a bit late.
+            field_name = field_filter.get(config.FIELD_NAME_KEY, None)
+            if field_name is None:
                 raise KeyError(
-                    f"Missing Field type definition in QueryFields[{idx}] for "
-                    f"filter {filter_name}."
-                )
-            try:
-                field_type = FieldTypes[field_type]
-            except KeyError:
-                raise AttributeError(
-                    f"Invalid field type {field_type} in QueryFields[{idx}] of "
-                    f"filter {filter_name}."
+                    f"Missing '{config.FIELD_NAME_KEY}'/value pair in "
+                    f"'{config.FIELD_FILTER_LIST_KEY}[{idx}]' "
+                    f"for filter '{filter_name}'."
                 )
 
-            include = field_dict.get("Include", None)
+            # Convert field name to enum.
+            field_name = cast(str, field_name)
+            try:
+                field = SQLField.getsubclass(field_name)
+            except ValueError:
+                raise ValueError(
+                    f"Invalid field name '{field_name}' in "
+                    f"'{config.FIELD_FILTER_LIST_KEY}[{idx}]' of "
+                    f"filter '{filter_name}'."
+                    f"\n(No SQLField subclass with Enum value of '{field_name}'.)"
+                )
+
+            include = field_filter.get(config.INCLUDE_KEY, None)
             if include is None:
                 raise KeyError(
-                    f"Missing Include field definition in QueryFields[{idx}] for "
-                    f"filter {filter_name}."
+                    f"Missing '{config.INCLUDE_KEY}'/value definition in "
+                    f"'{config.FIELD_FILTER_LIST_KEY}[{idx}]' for "
+                    f"filter '{filter_name}'."
                 )
             if not isinstance(include, bool):
-                raise KeyError(
-                    f"Include field definition in QueryFields[{idx}] of filter "
-                    f"{filter_name} is not a valid boolean."
+                raise TypeError(
+                    f"'{config.INCLUDE_KEY}' value "
+                    f"in '{config.FIELD_FILTER_LIST_KEY}[{idx}]' "
+                    f"of filter '{filter_name}'' is not a valid boolean."
                 )
 
-            if field_type in self.list_validators:
-                values = field_dict.get("Values", None)
-                if values is None or not values:
-                    raise KeyError(
-                        f"Missing or empty Values field definition in "
-                        f"QueryFields[{idx}] for filter {filter_name}."
+            # Process the filter based on type.
+            if isinstance(field, ListField):
+                if (field not in self._list_validator) or not self._list_validator[
+                    field
+                ]:
+                    raise ValueError(
+                        f"Validator list for field '{field.value}' in "
+                        f"'{config.FIELD_FILTER_LIST_KEY}[{idx}]' of "
+                        f"filter '{filter_name}' either"
+                        f"\n doesn't exist or is empty."
                     )
-                sql_text = self._list_clause(field_type, include, values)
-                sql_values = values
 
-            elif field_type in POSITIVE_RANGE_FILTERS:
-                values = field_dict.get("Ranges", None)
+                values: config.FilterValues = field_filter.get(config.VALUES_KEY, None)
                 if values is None or not values:
                     raise KeyError(
-                        f"Missing or empty Ranges field definition in "
-                        f"QueryFields[{idx}] for filter {filter_name}."
+                        f"Missing or empty '{config.VALUES_KEY}' field definition in "
+                        f"'{config.FIELD_FILTER_LIST_KEY}[{idx}]' for "
+                        f"filter '{filter_name}'."
                     )
-                sql_text, sql_values = self._positive_range_clause(
-                    field_type, include, values
+
+                sql_text = self._list_clause(field, include, values)
+                # grab the list values for later use
+                where_values.extend(values)
+
+            elif isinstance(field, RangeField):
+                ranges: config.FilterRanges = field_filter.get(config.RANGES_KEY, None)
+                if ranges is None or not ranges:
+                    raise KeyError(
+                        f"Missing or empty '{config.RANGES_KEY}' field definition in "
+                        f"'{config.FIELD_FILTER_LIST_KEY}[{idx}]' for "
+                        f"filter '{filter_name}'."
+                    )
+                sql_text, range_values = self._positive_range_clause(
+                    field, include, ranges
                 )
+                # grab the range values for later use
+                where_values.extend(range_values)
 
             else:
                 raise RSFilterError(
-                    f"Clause generator not implemented for field type {field_type.name}"
+                    f"Clause generator not implemented for SQL field type {field.name}."
                 )
 
-            where_text.append(sql_text)
-            where_values.extend(sql_values)
+            # Capture the text clause from this iteration of the loop
+            field_clauses.append(sql_text)
 
-        # this is clumsy, but allows dumping of SQL for debugging.
-        joiner = "".join(("\n", " " * 8, "AND "))
-        where_text = joiner.join(where_text)
-        where_text = "".join((" " * 4, "WHERE", "\n", " " * 8, where_text))
+        # This is clumsy, but allows dumping of SQL for debugging.
+        where_text = "\n    AND ".join(field_clauses)
+        where_text = f"  WHERE\n    {where_text}"
 
         return where_text, tuple(where_values)
 
-    def _list_clause(self, field_type, include, values):
-        """Creates list clause and validates data against the validator list."""
-        val_list = self.list_validators[field_type]
-        for value in values:
-            if value not in val_list:
+    def _list_clause(
+        self, field_type: ListField, include: bool, filter_values: config.FilterValues
+    ) -> str:
+        """Create SQL list field clause.
+        
+        Arguments:
+            field_type {ListField} -- The list field target for the clause.
+            include {bool} -- True if the clause includes the values, False if the
+                clause excludes the values. 
+            filter_values {config.FilterValues} -- The values that will be used for the
+                field filter.
+        
+        Raises:
+            RSFilterError -- If a filter value is not valid (doesn't appear in the
+                database).
+        
+        Returns:
+            str -- SQL clause for the field, including question marks for
+                value substitution. For example, a for a field type of ARTIST, and
+                values of ["Queen", "Big Country"] will result in the following
+                clause (depending on the value of include):
+
+                    Artist IN (? ?)
+                    Artist NOT IN (? ?)
+
+        """
+        for value in filter_values:
+            if value not in self._list_validator[field_type]:
                 raise RSFilterError(
-                    f"Invalid value ({value}) for field type {field_type.value}"
+                    f"Invalid filter value ({value}) for field type {field_type.value}"
                 )
 
         if include:
@@ -418,8 +703,8 @@ class SongListSQLGenerator:
         else:
             not_text = "NOT "
 
-        if len(values) > 1:
-            q_marks = "?, " * (len(values) - 1)
+        if len(filter_values) > 1:
+            q_marks = "?, " * (len(filter_values) - 1)
         else:
             q_marks = ""
 
@@ -428,21 +713,54 @@ class SongListSQLGenerator:
         return sql_text
 
     @staticmethod
-    def _positive_range_clause(field_type, include, values):
-        """Creates positive range clause and performs very limited validation of values."""
-        ret_values = list()
-        text_list = list()
+    def _positive_range_clause(
+        field_type: RangeField, include: bool, ranges: config.FilterRanges
+    ) -> Tuple[str, List[Union[float, int]]]:
+        """Create (positive) range field SQL clause with limited validation.
+        
+        Arguments:
+            field_type {RangeField} -- The list field target for the clause.
+            include {bool} -- True if the filter will include the specified ranges,
+                False if the filter will exclude them.
+            ranges {config.FilterRanges} -- Nested list of low/high value pairs that
+                will form the basis of the filter. E.g. [[1, 2], [5, 10]]
+        
+        Raises:
+            IndexError, RSFilterError, ValueError -- On validation errors in the ranges
+                values.
+
+        Returns:
+            Tuple[str, List[Union[float, int]]] -- The text of the SQL clause and the 
+                list of values to be subsituted into the clause.
+
+        For example, for the field PLAYED_COUNT and ranges [[1,10], [25, 20]], and
+        include of True, the clause will be:
+
+            PlayedCount BETwEEN ? AND ?
+            OR PlayedCount BETWEEN ? AND ?
+
+        The returned values will be [1, 10, 20, 25]. The method does not check for
+        overlapping ranges - weird things may happen if you try.
+
+        For an include value of False, the expression changes to:
+
+            PlayedCount NOT BETwEEN ? AND ?
+            AND PlayedCount NOT BETWEEN ? AND ?            
+
+        """
+        ret_values: List[Union[float, int]] = list()
+        text_list: List[str] = list()
 
         if include:
             not_text = ""
         else:
             not_text = "NOT "
 
-        for value_pair in values:
+        for value_pair in ranges:
             if len(value_pair) != 2:
                 raise IndexError(
-                    f"Range field type {field_type} expected high/low pair, got "
-                    f"{value_pair}."
+                    f"Range field type '{field_type.value}' expected [high, low] pair, "
+                    f"got {value_pair}."
                 )
 
             if not isinstance(value_pair[0], (int, float)) or not isinstance(
@@ -453,6 +771,12 @@ class SongListSQLGenerator:
                     f"define range. Got {value_pair}."
                 )
 
+            if value_pair[0] < 0 or value_pair[1] < 0:
+                raise ValueError(
+                    f"Range field type {field_type} expects numeric pairs of values "
+                    f">= 0 to define range. Got {value_pair}."
+                )
+
             # silent tidy.
             if value_pair[1] > value_pair[0]:
                 high_val = value_pair[1]
@@ -460,34 +784,28 @@ class SongListSQLGenerator:
             else:
                 high_val = value_pair[0]
                 low_val = value_pair[1]
-            if low_val < 0:
-                low_val = 0
 
             # and finally the SQL
-            text_list.append(
-                f"{field_type.value} {not_text}BETWEEN ? AND ?"
-            )
+            text_list.append(f"{field_type.value} {not_text}BETWEEN ? AND ?")
             ret_values.append(low_val)
             ret_values.append(high_val)
 
         if include:
-            joiner = "".join(("\n", " " * 12, "OR "))
+            joiner = "\n      OR "
         else:
-            joiner = "".join(("\n", " " * 12, "AND "))
+            joiner = "\n      AND "
 
         sql_text = joiner.join(text_list)
-        sql_text = "".join(("(", sql_text, ")"))
+        sql_text = f"({sql_text})"
 
-        return sql_text, tuple(ret_values)
+        return sql_text, ret_values
 
 
 class ArrangementDB:
-    """Class for creating, updating and querying SQLite database of Rocksmith song arrangements.
+    """Create, update and query database of Rocksmith song arrangements.
 
-    The public members of ArrangementDB are:
-
-    class:: ArrangementDB(db_path)
-        db_path: String path to directory that contains the database. The database will be created if it doesn't exist.
+    Public members:
+        Constructor -- Sets up path to database, initialises data table descriptions.
 
         method:: generate_song_lists(filter_set, filter_definitions, debug_target=None)
             Generates up to 6 song lists based on the first six filters named in filter_set (list of strings).
@@ -509,28 +827,29 @@ class ArrangementDB:
             Replaces all player specific arrangement data with data read from the named profile in the profile_manager
             (an RSProfileManager instance).
 
-        method:: open_db()
-            Utility method for opening the database.
+        open_db -- Utility method for opening the database.
 
-        property:: has_arrangement_data
-            Read only bool, True if the database contains song specific arrangement data (title, tuning, artist, etc).
+        flush_player_profile -- Deletes the player profile table and re-creates an empty
+            player profile table.
 
-        property:: has_player_data
-            Read only bool, True if the database contains player profile data (play count, badge performance, etc.)
+        list_validator -- Returns a dictionary of all of the unique list field values in
+            the database (e.g. unique tunings, artists, album names).
+        
+        has_arrangement_data -- Read only bool, True if the database contains song
+            specific arrangement data (title, tuning, artist, etc).
 
-        method:: flush_player_profile()
-            Deletes the player profile table and re-creates an empty player profile table.
+        has_player_data -- Read only bool, True if the database contains player profile
+            data (play count, badge performance, etc.).
 
-        method:: list_validators()
-            Returns a dictionary of all of the unique list field values in the database (e.g. unique tunings, artists,
-            album names).
     """
 
     # Type declarations
     _db_file_path: Path
+    _arrangements_sql: SQLTable
+    _profile_sql: SQLTable
 
     def __init__(self, db_path: Path = None) -> None:
-        """Initialise instance path to database.
+        """Initialise instance path to database, initialise table structure classes.
         
         Keyword Arguments:
             db_path {Path} -- Path to directory containing SQLite3 database file.
@@ -543,33 +862,38 @@ class ArrangementDB:
 
         self._db_file_path = self._db_file_path.resolve()
 
-    def open_db(self):
+        # table definitions
+        self._arrangements_sql = SQLTable(
+            ARRANGEMENT_FIELDS, ARRANGEMENTS_TABLE, ARRANGEMENT_ID
+        )
+        self._profile_sql = SQLTable(PROFILE_FIELDS, PROFILE_TABLE, ARRANGEMENT_ID)
+
+    def open_db(self) -> sqlite3.Connection:
         """Utility for opening/connecting to database."""
         return sqlite3.connect(self._db_file_path)
 
-    def _refresh_arrangements(self):
-        """Deletes song specific arrangements table and creates a new one."""
-        conn = self.open_db()
-        conn.executescript(
-            "DROP TABLE IF EXISTS Arrangements;"
-            "\nCREATE TABLE Arrangements"
-            "\n    (ArrangementId text PRIMARY KEY, RSSongId text, "
-            "\n    ArrangementName text, Artist text, Title text, "
-            "\n    Album text, Year integer, Tempo integer, Tuning text, Pitch real, "
-            "\n    NoteCount integer);"
-        )
-        conn.commit()
-        conn.close()
-
-    def _table_has_data(self, name):
-        """Returns boolean indicating if the named table is empty, or has one or more records."""
-        if name not in ("Arrangements", "PlayerProfile"):
+    def _table_has_data(self, name: str) -> bool:
+        """Return boolean indicating if the named table contains data.
+        
+        Arguments:
+            name {str} -- SQL table name.
+        
+        Raises:
+            ValueError -- If the table name is invalid.
+        
+        Returns:
+            bool -- True if the table contains one or more records.
+        """
+        if name not in (
+            self._arrangements_sql.table_name,
+            self._profile_sql.table_name,
+        ):
             raise ValueError(f"Invalid table name {name}")
 
         conn = self.open_db()
         ret_val = True
         try:
-            count = conn.execute(f"select count(*) from {name}").fetchone()
+            count = conn.execute(f"SELECT COUNT(*) FROM {name};").fetchone()
         except sqlite3.OperationalError:
             ret_val = False
         else:
@@ -580,41 +904,24 @@ class ArrangementDB:
         return ret_val
 
     @property
-    def has_arrangement_data(self):
-        """True if the Arrangements table has one or more records."""
-        return self._table_has_data("Arrangements")
+    def has_arrangement_data(self) -> bool:
+        """Return True if the Arrangements table contains one or more records."""
+        return self._table_has_data(self._arrangements_sql.table_name)
 
     @property
-    def has_player_data(self):
-        """True if the player profile table has one or more records."""
-        return self._table_has_data("PlayerProfile")
-
-    @staticmethod
-    def _fill_arrangements(conn, value_dict):
-        """Writes song data from value dictionary into a row in song arrangements.
-
-        Will skip the row if ArrangementId is None."""
-        if value_dict["ArrangementId"] is not None:
-            # may need to modify this test in the future? Let calling routine decide if row should be recorded or not?
-            conn.execute(
-                "INSERT INTO Arrangements"
-                "\n    (ArrangementId, RSSongId, ArrangementName, Artist, Title, "
-                "\n    Album, Year, Tempo, Tuning, Pitch, NoteCount)"
-                "\n    VALUES"
-                "\n    (:ArrangementId,:RSSongId,:ArrangementName,:Artist,:Title, "
-                "\n    :Album, :Year, :Tempo, :Tuning, :Pitch, :NoteCount);",
-                value_dict,
-            )
+    def has_player_data(self) -> bool:
+        """Return True if the player profile table contains one or more records."""
+        return self._table_has_data(self._profile_sql.table_name)
 
     def load_cfsm_arrangements(self, cfsm_xml_file: Path) -> None:
         """Reads CFSM arrangement file into arrangements table. 
         
         Arguments:
-            cfsm_xml_file {pathlib.Path} -- Path to the CFSM ArrangmentsGrid.xml file.
+            cfsm_xml_file {pathlib.Path} -- Path to the CFSM ArrangementsGrid.xml file.
         
         Replaces any existing table.
         """
-        self._refresh_arrangements()
+        self._arrangements_sql.rebuild_table(self.open_db())
         # create file object from path to keep mypy happy
         # (etree seems to grok pathlikes, but annotations don't reflect this)
         with cfsm_xml_file.open("rt") as fp:
@@ -643,25 +950,14 @@ class ArrangementDB:
                 sql_values["Album"] = None
                 sql_values["Year"] = None
 
-            self._fill_arrangements(conn, sql_values)
+            self._arrangements_sql.write_row(conn, sql_values)
 
         conn.commit()
         conn.close()
 
-    def flush_player_profile(self):
-        """Deletes Player Profile table and creates a new one."""
-        conn = self.open_db()
-        conn.executescript(
-            "DROP TABLE IF EXISTS PlayerProfile;"
-            "\nCREATE TABLE PlayerProfile"
-            "\n    (ArrangementId text PRIMARY KEY, PlayedCount integer, "
-            "\n    MasteryPeak real, SAPlayedCount integer, SAEasyCount integer, "
-            "\n    SAMediumCount integer, SAHardCount integer, SAMasterCount integer, "
-            "\n    SAEasyBadges integer, SAMediumBadges integer, SAHardBadges integer, "
-            "\n    SAMasterBadges integer);"
-        )
-        conn.commit()
-        conn.close()
+    def flush_player_profile(self) -> None:
+        """Deletes Player Profile table and creates a new, empty one."""
+        self._profile_sql.rebuild_table(self.open_db())
 
     def load_player_profile(self, profile_manager, profile_name: str):
         """Loads data from profile name into player profile table.  Replaces any existing table."""
@@ -710,18 +1006,7 @@ class ArrangementDB:
             value_dict["MasteryPeak"] = 100 * value_dict["MasteryPeak"]
 
             # Database update
-            conn.execute(
-                "INSERT INTO PlayerProfile"
-                "\n    (ArrangementId, PlayedCount, MasteryPeak, SAPlayedCount,"
-                "\n    SAEasyCount, SAMediumCount, SAHardCount, SAMasterCount,"
-                "\n    SAEasyBadges, SAMediumBadges, SAHardBadges, SAMasterBadges)"
-                "\n    VALUES"
-                "\n    (:ArrangementId, :PlayedCount, :MasteryPeak, :SAPlayedCount,"
-                "\n    :SAEasyCount, :SAMediumCount, :SAHardCount, :SAMasterCount,"
-                "\n    :SAEasyBadges, :SAMediumBadges, :SAHardBadges,"
-                "\n    :SAMasterBadges);",
-                value_dict,
-            )
+            self._profile_sql.write_row(conn, value_dict)
 
         conn.commit()
         conn.close()
@@ -730,19 +1015,31 @@ class ArrangementDB:
         """Quick and dirty report on song data that doesn't appear in the player profile. Most likely to occur if an
         arrangement hasn't been played yet."""
 
+        # readability variables
+        arrangements_name = self._arrangements_sql.table_name
+        profile_name = self._profile_sql.table_name
+
         conn = self.open_db()
 
         # Automatically exclude vocal data. There should never be any player data for vocals anyway.
-        query = (
-            "SELECT ArrangementId, ArrangementName, Artist, Title, Album "
-            "\n    FROM Arrangements"
-            "\n    WHERE NOT EXISTS"
-            "\n    (SELECT ArrangementId FROM PlayerProfile"
-            "\n        WHERE Arrangements.ArrangementId == PlayerProfile.ArrangementId)"
-            '\n     AND (Arrangements.ArrangementName != "Vocals")'
+        sql_text = SQLTable(NO_PLAYER_FIELDS).field_list(prefix="    ")
+        sql_text = (
+            f"SELECT"
+            f"\n{sql_text}"
+            f"  FROM {arrangements_name}"
+            f"\n  WHERE"
+            f"\n    NOT EXISTS ("
+            f"\n      SELECT {ARRANGEMENT_ID.value} FROM {profile_name}"
+            f"\n        WHERE {arrangements_name}.{ARRANGEMENT_ID.value}"
+            f"\n          == {profile_name}.{ARRANGEMENT_ID.value}"
+            f"\n    )"
+            f"\n    AND ("
+            f"\n      {arrangements_name}.{ARRANGEMENT_NAME.value}"
+            f'\n      != "Vocals"'
+            f"\n    );"
         )
 
-        for row in conn.execute(query):
+        for row in conn.execute(sql_text):
             print(row)
 
         conn.close()
@@ -769,13 +1066,19 @@ class ArrangementDB:
 
         input("Enter anything to run report ->")
 
+        # readability variable.
+        arrangements_name = self._arrangements_sql.table_name
+        profile_name = self._profile_sql.table_name
+
         conn = self.open_db()
 
         query = (
-            "SELECT * FROM PlayerProfile"
-            "\n    WHERE NOT EXISTS"
-            "\n    (SELECT ArrangementId FROM Arrangements"
-            "\n     WHERE Arrangements.ArrangementId == PlayerProfile.ArrangementId);"
+            f"SELECT * FROM {profile_name}"
+            f"\n  WHERE NOT EXISTS ("
+            f"\n    SELECT {ARRANGEMENT_ID.value} FROM {arrangements_name}"
+            f"\n      WHERE {arrangements_name}.{ARRANGEMENT_ID.value}"
+            f"\n        == {profile_name}.{ARRANGEMENT_ID.value}"
+            f"\n  );"
         )
 
         for row in conn.execute(query):
@@ -783,35 +1086,52 @@ class ArrangementDB:
 
         conn.close()
 
-    def list_validators(self, validator_report: FieldTypes = None):
-        """Creates dictionary of list list_validators for use in creating song lists/UI drop down lists.
-
-        If validator report is specified, prints a summary report on that validator to stdout."""
+    def list_validator(
+        self, validator_report: Optional[ListField] = None
+    ) -> ListValidator:
+        """Create dictionary of list field validators.
+        
+        Keyword Arguments:
+            validator_report {Optional[ListField]} -- If a list field is specified, the
+                method prints a summary report of unique values for that field to
+                stdout. If None, the method generates validator lists for 
+                all members of the ListField Enum without any reporting.
+                (default: {None})
+        
+        Returns:
+            Dict[ListField, List[str]] -- For each list field in the dictionary, 
+                a list of valid values for this field.
+        
+        The validator lists created by this method are intended for use in creating song
+        lists or UI drop down lists.
+        """
         if validator_report is None:
-            validators = LIST_FILTERS
+            # Create validators for ALL list fields.
+            validators = tuple(ListField)
         else:
+            # Create a validator for the single specfied field.
             validators = (validator_report,)
 
         ret_dict = dict()
 
         conn = self.open_db()
 
-        for f_type in validators:
-            # Note that I assume we will never be interested in records relating to Vocals.
+        for list_field in validators:
+            # I assume we will never be interested in records relating to Vocals.
             query = (
-                f"SELECT {f_type.value}, COUNT(*)"
-                f"\n    FROM Arrangements"
-                f'\n    WHERE ArrangementName != "Vocals"'
-                f"\n    GROUP BY {f_type.value}"
+                f"SELECT {list_field.value}, COUNT(*)"
+                f"\n  FROM {self._arrangements_sql.table_name}"
+                f'\n  WHERE {ARRANGEMENT_NAME.value} != "Vocals"'
+                f"\n  GROUP BY {list_field.value};"
             )
 
             result = conn.execute(query).fetchall()
-            v_list = [i[0] for i in result]
-            ret_dict[f_type] = v_list
+            value_list = [i[0] for i in result]
+            ret_dict[list_field] = value_list
 
             if validator_report is not None:
                 print()
-                print("  " + str(len(result)) + " unique records for " + f_type.value)
+                print(f"  {len(result)} unique records for {list_field.value}")
                 print("    Unique item: Count")
                 for i in result:
                     print(f"    {i[0]}: {i[1]}")
@@ -835,9 +1155,12 @@ class ArrangementDB:
 
         song_lists = list()
 
-        list_validators = self.list_validators()
+        # I could have created a list_validator member. However this would need to be
+        # refreshed after every routine that modified the SQL tables. It is easier to
+        # just create it on demand.
+        list_validator = self.list_validator()
         sql_queries = SongListSQLGenerator(
-            filter_set, filter_definitions, list_validators
+            filter_set, filter_definitions, list_validator
         )
 
         conn = self.open_db()
@@ -890,6 +1213,10 @@ class ArrangementDB:
             ("Albums.            Report unique album names.", FieldTypes.ALBUM),
             ("Titles.            Report unique song titles.", FieldTypes.TITLE),
             (
+                "Song Keys.         Report unique Rocksmith song keys.",
+                FieldTypes.RS_SONG_ID,
+            ),
+            (
                 "No player data. Diagnostic. Reports on song arrangements that have no data in the player profile.",
                 1,
             ),
@@ -911,7 +1238,7 @@ class ArrangementDB:
             elif choice == 2:
                 self._missing_song_data_report()
             elif choice in FieldTypes:
-                self.list_validators(choice)
+                self.list_validator(choice)
 
     def cl_update_player_data(self, working_dir):
         """Command line/interactive update of player data."""
@@ -968,6 +1295,7 @@ def main() -> None:
 
     if args.reports:
         db.run_cl_reports()
+
 
 if __name__ == "__main__":
     main()

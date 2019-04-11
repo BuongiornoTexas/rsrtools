@@ -90,7 +90,9 @@ class SongListCreator:
         """
         return cast(
             config.DBConfig,
-            self._cfg_dict.setdefault(config.DB_CONFIG, cast(config.DBConfig, dict())),
+            self._cfg_dict.setdefault(
+                config.DB_CONFIG_KEY, cast(config.DBConfig, dict())
+            ),
         )
 
     @property
@@ -107,7 +109,7 @@ class SongListCreator:
         return cast(
             config.FilterSetDict,
             self._cfg_dict.setdefault(
-                config.FILTER_SET_DICT, cast(config.FilterSetDict, dict())
+                config.FILTER_SET_DICT_KEY, cast(config.FilterSetDict, dict())
             ),
         )
 
@@ -126,7 +128,7 @@ class SongListCreator:
         return cast(
             config.FilterDict,
             self._cfg_dict.setdefault(
-                config.FILTER_DICT, cast(config.FilterDict, dict())
+                config.FILTER_DICT_KEY, cast(config.FilterDict, dict())
             ),
         )
 
@@ -142,12 +144,12 @@ class SongListCreator:
         but does not validate the file.
 
         """
-        ret_val = self._db_config.setdefault(config.CFSM_FILE, "")
+        ret_val = self._db_config.setdefault(config.CFSM_FILE_KEY, "")
 
         if ret_val and not Path(ret_val).is_file():
             # silently discard invalid path.
             ret_val = ""
-            self._db_config[config.CFSM_FILE] = ""
+            self._db_config[config.CFSM_FILE_KEY] = ""
 
         return ret_val
 
@@ -156,12 +158,10 @@ class SongListCreator:
         """Set path to CFSM arrangements file."""
         file_path = Path(value)
         if not file_path.is_file():
-            self._db_config[config.CFSM_FILE] = ""
-            raise FileNotFoundError(
-                f"CFSM arrangement file '{value}' does not exist"
-            )
+            self._db_config[config.CFSM_FILE_KEY] = ""
+            raise FileNotFoundError(f"CFSM arrangement file '{value}' does not exist")
 
-        self._db_config[config.CFSM_FILE] = fsdecode(file_path.resolve())
+        self._db_config[config.CFSM_FILE_KEY] = fsdecode(file_path.resolve())
 
     # ****************************************************
     # Steam user id, _profile_manager, player profile and player data in database are
@@ -192,13 +192,13 @@ class SongListCreator:
         # could do extensive validation here, but there is already error checking in the
         # profile manager, and any ui will need to find valid steam ids to load up.
         # So no error checking here.
-        return self._db_config.setdefault(config.STEAM_USER_ID, "")
+        return self._db_config.setdefault(config.STEAM_USER_ID_KEY, "")
 
     @steam_user_id.setter
     def steam_user_id(self, value: str) -> None:
         """Steam user id setter."""
         # reset shadow value to None in case of errors (correct at end of routine)
-        self._db_config[config.STEAM_USER_ID] = ""
+        self._db_config[config.STEAM_USER_ID_KEY] = ""
 
         # Changing steam user id, so clear profile manager and player profile (and
         # implicitly, flush db as well)
@@ -225,7 +225,7 @@ class SongListCreator:
             # RSProfileManager
             str_value = self._profile_manager.source_steam_uid
 
-        self._db_config[config.STEAM_USER_ID] = str_value
+        self._db_config[config.STEAM_USER_ID_KEY] = str_value
 
     @property
     def player_profile(self) -> str:
@@ -244,7 +244,7 @@ class SongListCreator:
         """
         # can't do any useful validation without loading profile, so similar to the
         # steam user id, push it down to the profile manager or up to the ui.
-        return self._db_config.setdefault(config.PLAYER_PROFILE, "")
+        return self._db_config.setdefault(config.PLAYER_PROFILE_KEY, "")
 
     @player_profile.setter
     def player_profile(self, value: str) -> None:
@@ -252,7 +252,7 @@ class SongListCreator:
         # new player profile, so ditch everything in player database
         self._arr_db.flush_player_profile()
         # reset to default in case of error in setter
-        self._db_config[config.PLAYER_PROFILE] = ""
+        self._db_config[config.PLAYER_PROFILE_KEY] = ""
 
         if value:
             if self._profile_manager is None:
@@ -271,7 +271,7 @@ class SongListCreator:
             self._arr_db.load_player_profile(self._profile_manager, value)
 
             # set this last in case of errors along the way.
-            self._db_config[config.PLAYER_PROFILE] = value
+            self._db_config[config.PLAYER_PROFILE_KEY] = value
 
     # End player steam_user_id, player_profile properties block
 
@@ -463,9 +463,7 @@ class SongListCreator:
         self._cli_song_list_action(ProfileKey.FAVORITES_LIST, None)
 
     def _cli_song_list_action(
-        self,
-        list_target: ProfileKey,
-        report_target: Optional[Union[Path, TextIO]],
+        self, list_target: ProfileKey, report_target: Optional[Union[Path, TextIO]]
     ) -> None:
         """Execute song list generation, report writing and save to profiles.
 
@@ -691,7 +689,7 @@ class SongListCreator:
 
         if list_target is ProfileKey.SONG_LISTS:
             if len(filter_set) > MAX_SONG_LIST_COUNT:
-                use_set: config.FilterSet = filter_set[0: MAX_SONG_LIST_COUNT - 1]
+                use_set: config.FilterSet = filter_set[0 : MAX_SONG_LIST_COUNT - 1]
             else:
                 use_set = filter_set[:]
         elif list_target is ProfileKey.FAVORITES_LIST:
@@ -725,8 +723,8 @@ class SongListCreator:
             # Song list update
             for idx, song_list in enumerate(song_lists):
                 if song_list is not None:
+                    # Index 0 for favorites will be cheerfully ignored.
                     self._profile_manager.replace_song_list(
-                        # Index 0 for favorites will be cheerfully ignored.
                         self.player_profile, list_target, song_list, idx
                     )
 

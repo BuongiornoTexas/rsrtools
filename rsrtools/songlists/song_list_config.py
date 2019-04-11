@@ -2,7 +2,8 @@
 
 """Provide type aliases, shared strings and JSON schemas used by song list creator."""
 
-from typing import Dict, List, Union
+from enum import Enum
+from typing import Dict, List, Optional, Union
 
 # type aliases
 DBConfig = Dict[str, str]
@@ -10,44 +11,54 @@ DBConfig = Dict[str, str]
 FilterSet = List[str]
 FilterSetDict = Dict[str, FilterSet]
 
-FilterField = str
+FilterFieldName = str
 FilterInclude = bool
-FilterValue = str
-FilterRange = List[List[Union[float, int]]]
-FilterQuery = Dict[str, Union[FilterField, FilterInclude, FilterValue, FilterRange]]
+FilterValues = List[str]
+FilterRanges = List[List[Union[float, int]]]
+FieldFilter = Dict[
+    str, Union[FilterFieldName, FilterInclude, FilterValues, FilterRanges]
+]
+FieldFilterList = List[FieldFilter]
 BaseFilter = str
-# Filters dict - can provide a base filter name or Filter definition.
-FilterDict = Dict[str, Union[BaseFilter, FilterQuery]]
+# Contains the definition for a single filter: FieldFilterList + Optional  BaseFilter
+NamedFilter = Dict[str, Union[BaseFilter, FieldFilterList]]
+# Filters dict: Collection of Named Filter Definitions
+FilterDict = Dict[str, NamedFilter]
 
 # The first Union describes the "db_config" entry
 JSONConfig = Dict[str, Union[DBConfig, FilterSetDict, FilterDict]]
 
-# Setup strings for config, should be consistent with type aliases and
+# Setup dictionary key strings for config, should be consistent with type aliases and
 # json schema where applicable (lists are anonymous in schema).
-DB_CONFIG = "db_config"
-CFSM_FILE = "CFSM_Arrangement_File"
-STEAM_USER_ID = "steam_user_id"
-PLAYER_PROFILE = "player_profile"
+DB_CONFIG_KEY = "DBConfig"
+CFSM_FILE_KEY = "CFSMArrangementFile"
+STEAM_USER_ID_KEY = "SteamUserID"
+PLAYER_PROFILE_KEY = "PlayerProfile"
 
-FILTER_SET_DICT = "FilterSetDict"
+FILTER_SET_DICT_KEY = "FilterSetDict"
 
-FILTER_DICT = "FilterDict"
+FIELD_NAME_KEY = "Field"
+INCLUDE_KEY = "Include"
+VALUES_KEY = "Values"
+RANGES_KEY = "Ranges"
+FIELD_FILTER_LIST_KEY= "FieldFilterList"
+FILTER_DICT_KEY = "FilterDict"
 
 # json schema for config file. Should have a one for one correspondence with
 # type aliases above.
 CONFIG_SCHEMA = {
     "type": "object",
     "properties": {
-        f"{DB_CONFIG}": {
+        DB_CONFIG_KEY: {
             "type": "object",
             "description": "Dictionary of configuration parameters",
             "properties": {
-                f"{CFSM_FILE}": {"type": "string"},
-                f"{STEAM_USER_ID}": {"type": "string"},
-                f"{PLAYER_PROFILE}": {"type": "string"},
+                CFSM_FILE_KEY: {"type": "string"},
+                STEAM_USER_ID_KEY: {"type": "string"},
+                PLAYER_PROFILE_KEY: {"type": "string"},
             },
         },
-        f"{FILTER_SET_DICT}": {
+        FILTER_SET_DICT_KEY: {
             "type": "object",
             "description": "Dictionary of filter sets.",
             "additionalProperties": {
@@ -58,7 +69,7 @@ CONFIG_SCHEMA = {
                 "maxItems": 6,
             },
         },
-        f"{FILTER_DICT}": {
+        FILTER_DICT_KEY: {
             "type": "object",
             "description": "Dictionary of filters.",
             "additionalProperties": {
@@ -66,23 +77,23 @@ CONFIG_SCHEMA = {
                 "description": "Dictionary for definition of a single filter",
                 "properties": {
                     "BaseFilter": {"type": "string"},
-                    "QueryFields": {
+                    FIELD_FILTER_LIST_KEY: {
                         "type": "array",
-                        "description": "List of query field dictionaries.",
+                        "description": "List of field filter dictionaries.",
                         "items": {
                             "type": "object",
-                            "description": "Single query field dictionary.",
+                            "description": "Single field filter dictionary.",
                             "minItems": 1,
                             "properties": {
-                                "Field": {"type": "string"},
-                                "Include": {"type": "boolean"},
-                                "Values": {
+                                FIELD_NAME_KEY: {"type": "string"},
+                                INCLUDE_KEY: {"type": "boolean"},
+                                VALUES_KEY: {
                                     "type": "array",
                                     "description": "List of string values.",
                                     "items": {"type": "string"},
                                     "minItems": 1,
                                 },
-                                "Ranges": {
+                                RANGES_KEY: {
                                     "type": "array",
                                     "description": "Array of pairs of low/high values.",
                                     "minItems": 1,
@@ -95,17 +106,78 @@ CONFIG_SCHEMA = {
                                     },
                                 },
                             },
-                            "required": ["Field", "Include"],
+                            "required": [FIELD_NAME_KEY, INCLUDE_KEY],
                             "oneOf": [
-                                {"required": ["Values"]},
-                                {"required": ["Ranges"]},
+                                {"required": [VALUES_KEY]},
+                                {"required": [RANGES_KEY]},
                             ],
                         },
                     },
                 },
-                "required": ["QueryFields"],
+                "required": [FIELD_FILTER_LIST_KEY],
             },
         },
     },
-    "required": [f"{FILTER_DICT}", f"{FILTER_SET_DICT}"],
+    "required": [FILTER_DICT_KEY, FILTER_SET_DICT_KEY],
 }
+
+# We use some SQL field information in constants, so declare these here (may move to a
+# config later if used by other modules as well).
+class SQLField(Enum):
+    """Provide for abuse of the Enum class to set standard field types."""
+
+    @classmethod
+    def getsubclass(cls, value: str) -> 'SQLField':
+        """Create a subclass Enum value from a string value.
+        
+        This assumes that a) all SQLField subclass constants are strings and b) there
+        are no repeated strings between the subclasses.""" 
+        ret_val: Optional[SQLField] = None
+        for field_class in cls.__subclasses__():
+            try:
+                ret_val = field_class(value)
+                # found it if we got here!
+                break
+            except ValueError:
+                # skip to the next subclass
+                pass
+
+        if ret_val is None:
+            raise ValueError(f"{value} is a not a valid subclass of SQLField")
+
+        return ret_val
+
+class ListField(SQLField):
+    """Provide Enum of list type SQL fields that can be used as filters."""
+
+    # list types. Automatically validated before use.
+    # RSSongId  was the name I came up with for rsrtools. May need to migrate to SongKey
+    RS_SONG_ID = "RSSongId"
+    TUNING = "Tuning"
+    ARRANGEMENT_NAME = "ArrangementName"
+    ARRANGEMENT_ID = "ArrangementId"
+    ARTIST = "Artist"
+    TITLE = "Title"
+    ALBUM = "Album"
+
+
+class RangeField(SQLField):
+    """Provide Enum of numerical type SQL fields names that can be used as filters."""
+
+    # list types. Automatically validated before use.
+    # numerical types. Range filters can be applied to these.
+    PITCH = "Pitch"
+    TEMPO = "Tempo"
+    NOTE_COUNT = "NoteCount"
+    YEAR = "Year"
+    PLAYED_COUNT = "PlayedCount"
+    MASTERY_PEAK = "MasteryPeak"
+    SA_EASY_COUNT = "SAEasyCount"
+    SA_MEDIUM_COUNT = "SAMediumCount"
+    SA_HARD_COUNT = "SAHardCount"
+    SA_MASTER_COUNT = "SAMasterCount"
+    SA_PLAYED_COUNT = "SAPlayedCount"
+    SA_EASY_BADGES = "SAEasyBadges"
+    SA_MEDIUM_BADGES = "SAMediumBadges"
+    SA_HARD_BADGES = "SAHardBadges"
+    SA_MASTER_BADGES = "SAMasterBadges"
