@@ -76,6 +76,8 @@ CONFIG_SCHEMA = {
                 "type": "object",
                 "description": "Dictionary for definition of a single filter",
                 "properties": {
+                    # Note: we only want one or zero basefilters, so keep this
+                    # separate from the repeatable subfilters
                     "BaseFilter": {"type": "string"},
                     FIELD_FILTER_LIST_KEY: {
                         "type": "array",

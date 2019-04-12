@@ -16,9 +16,10 @@ import argparse
 import xml.etree.ElementTree as eTree
 
 from pathlib import Path
-# I'd prefer to import OrderedDict from typing, but this isn't quite working as at 3.7.
+
+# I'd prefer to import OrderedDict from typing, but this isn't quite working as at 3.7.3
 from collections import OrderedDict
-from typing import cast, Dict, List, MutableMapping, Optional, TextIO, Tuple, Union
+from typing import Dict, List, MutableMapping, Optional, TextIO, Tuple, Union
 
 import rsrtools.songlists.song_list_config as config
 from rsrtools.songlists.song_list_config import ListField, RangeField, SQLField
@@ -30,8 +31,7 @@ from rsrtools.files.profilemanager import RSProfileManager
 ListValidator = Dict[ListField, List[str]]
 # SQL Clause - SQL text + Value tuple for substitution
 SQLClause = Tuple[Optional[str], Optional[Tuple[Union[str, int, float], ...]]]
-# Waiting on fix for OrderedDict in typing.py to change this OrderedDict[SQLField, str]
-SQLTableDict = MutableMapping[SQLField, str]
+SQLTableDict = OrderedDict[SQLField, str]
 
 # database file name
 DB_NAME = "RS_Arrangements.sqlite"
@@ -58,7 +58,7 @@ ARRANGEMENT_FIELDS: SQLTableDict = OrderedDict(
         (RangeField.PITCH, "real"),
         (RangeField.NOTE_COUNT, "integer"),
     ]
-) 
+)
 
 PROFILE_TABLE = "PlayerProfile"
 PROFILE_FIELDS: SQLTableDict = OrderedDict(
@@ -203,8 +203,8 @@ class SQLTable:
     def __init__(
         self,
         fields_dict: SQLTableDict,
-        table_name: str,
-        primary: Optional[SQLField],
+        table_name: str = "",
+        primary: Optional[SQLField] = None,
     ) -> None:
         """Provide SQL table constructor.
         
@@ -572,10 +572,7 @@ class SongListSQLGenerator:
 
         # work through each field filter in the list.
         for idx, field_filter in enumerate(
-            cast(
-                config.FieldFilterList,
-                self._filter_definitions[filter_name][config.FIELD_FILTER_LIST_KEY]
-            )
+            self._filter_definitions[filter_name][config.FIELD_FILTER_LIST_KEY],
         ):
             # do a whack of validation here to provide help debugging json. It would
             # have been better to learn how to use the json schema validator, but I
@@ -589,7 +586,6 @@ class SongListSQLGenerator:
                 )
 
             # Convert field name to enum.
-            field_name = cast(str, field_name)
             try:
                 field = SQLField.getsubclass(field_name)
             except ValueError:
@@ -1218,9 +1214,12 @@ class ArrangementDB:
             ),
             (
                 "No player data. Diagnostic. Reports on song arrangements that have no data in the player profile.",
-                1,
+                self._no_player_data_report,
             ),
-            ("Missing song data. Do not use. Under development.", 2),
+            (
+                "Missing song data. Do not use. Under development.",
+                self._missing_song_data_report,
+            ),
         ]
 
         while True:
@@ -1233,12 +1232,11 @@ class ArrangementDB:
             if choice is None:
                 return
 
-            if choice == 1:
-                self._no_player_data_report()
-            elif choice == 2:
-                self._missing_song_data_report()
-            elif choice in FieldTypes:
-                self.list_validator(choice)
+            actor = choice[0]
+            if isinstance(actor, ListField):
+                self.list_validator(actor)
+            if callable(actor):
+                actor()
 
     def cl_update_player_data(self, working_dir):
         """Command line/interactive update of player data."""

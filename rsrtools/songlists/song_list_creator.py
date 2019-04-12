@@ -9,7 +9,7 @@ import sys
 
 from pathlib import Path
 from os import fsdecode
-from typing import Callable, cast, Optional, TextIO, Union
+from typing import cast, Optional, TextIO, Union
 
 import rsrtools.utils as utils
 import rsrtools.songlists.song_list_config as config
@@ -88,12 +88,7 @@ class SongListCreator:
         Creates empty dictionary if required.
 
         """
-        return cast(
-            config.DBConfig,
-            self._cfg_dict.setdefault(
-                config.DB_CONFIG_KEY, cast(config.DBConfig, dict())
-            ),
-        )
+        return self._cfg_dict.setdefault(config.DB_CONFIG_KEY, dict())
 
     @property
     def _filter_set_dict(self) -> config.FilterSetDict:
@@ -106,12 +101,7 @@ class SongListCreator:
 
         Creates empty dictionary if required.
         """
-        return cast(
-            config.FilterSetDict,
-            self._cfg_dict.setdefault(
-                config.FILTER_SET_DICT_KEY, cast(config.FilterSetDict, dict())
-            ),
-        )
+        return self._cfg_dict.setdefault(config.FILTER_SET_DICT_KEY, dict())
 
     @property
     def _filter_dict(self) -> config.FilterDict:
@@ -125,12 +115,7 @@ class SongListCreator:
 
         Creates empty dictionary if required.
         """
-        return cast(
-            config.FilterDict,
-            self._cfg_dict.setdefault(
-                config.FILTER_DICT_KEY, cast(config.FilterDict, dict())
-            ),
-        )
+        return self._cfg_dict.setdefault(config.FILTER_DICT_KEY, dict())
 
     @property
     def cfsm_arrangement_file(self) -> str:
@@ -429,7 +414,13 @@ class SongListCreator:
         if choice is None:
             self.player_profile = ""
         else:
-            self.player_profile = cast(str, choice)
+            profile = choice[0]
+            if not isinstance(profile, str):
+                raise TypeError(
+                    f"Unexpected type from profile choice. Should be string, "
+                    f"got f{type(profile)}."
+                )
+            self.player_profile = profile
 
     def _cli_toggle_reporting(self) -> None:
         """Toggles reports between stdout and the working directory report file."""
@@ -517,16 +508,22 @@ class SongListCreator:
         if choice is None:
             return
 
-        choice = cast(str, choice)
+        key = choice[0]
+        if not isinstance(key, str):
+            raise TypeError(
+                f"Unexpected type from filter/filter set choice. Should be string, "
+                f"got f{type(key)}."
+            )
+
         if list_target is ProfileKey.FAVORITES_LIST:
             # Creating a favorites list or testing a single filter here.
             # Create a synthetic filter set for this case.
             # choice is the name of the filter we should use.
-            filter_set: config.FilterSet = [choice]
+            filter_set: config.FilterSet = [key]
         else:
             # Get the selected filter set from the dict. No need for extended else
             # clause, as we have checked previously for invalid list_target
-            filter_set = self._filter_set_dict[choice]
+            filter_set = self._filter_set_dict[key]
 
         confirmed = True
         if report_target is None:
@@ -618,18 +615,24 @@ class SongListCreator:
 
         while True:
             header = self._cli_menu_header()
-            action = utils.choose(
+            choice = utils.choose(
                 options=options,
                 header=header,
                 no_action="Exit program.",
                 help_text=help_text,
             )
 
-            if action is None:
+            if choice is None:
                 break
 
             # otherwise execute the action
-            action = cast(Callable, action)
+            action = choice[0]
+            if not callable(action):
+                raise TypeError(
+                    f"Unexpected type from song list action choice. Should be "
+                    f"callable, got f{type(action)}."
+                )
+
             action()
 
         if utils.yes_no_dialog(
@@ -700,9 +703,11 @@ class SongListCreator:
             )
 
         if isinstance(debug_target, Path):
-            with debug_target.open("wt") as fp:
+            # Using open rather than path.open() gives a TextIO type
+            # (Path.open() has type IO[Any], which is not what we want).
+            with open(debug_target, "wt") as fp:
                 song_lists = self._arr_db.generate_song_lists(
-                    use_set, self._filter_dict, cast(TextIO, fp)
+                    use_set, self._filter_dict, fp
                 )
 
         else:
@@ -735,7 +740,7 @@ class SongListCreator:
     def _cli_utilities(self) -> None:
         """Provide command line utilities menu."""
         while True:
-            action = utils.choose(
+            choice = utils.choose(
                 header="Utility menu",
                 no_action="Return to main menu.",
                 options=[
@@ -749,10 +754,17 @@ class SongListCreator:
                 ],
             )
 
-            if action is None:
+            if choice is None:
                 break
 
-            action = cast(Callable, action)
+            # otherwise execute the action
+            action = choice[0]
+            if not callable(action):
+                raise TypeError(
+                    f"Unexpected type from utilities choice. Should be "
+                    f"callable, got f{type(action)}."
+                )
+
             action()
 
     def _cli_clone_profile(self) -> None:
