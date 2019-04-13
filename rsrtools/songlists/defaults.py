@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Provides a default configuration set for the song list creator."""
 
-import rsrtools.songlists.song_list_config as config
-from rsrtools.songlists.song_list_config import ListField, RangeField
+import rsrtools.songlists.config as config
+from rsrtools.songlists.config import ListField, RangeField
 
 DEFAULT_SONG_LIST_CONFIG = f'''
 {{

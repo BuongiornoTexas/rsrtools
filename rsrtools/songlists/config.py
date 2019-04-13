@@ -25,7 +25,6 @@ NamedFilter = Dict[str, Union[BaseFilter, FieldFilterList]]
 # Filters dict: Collection of Named Filter Definitions
 FilterDict = Dict[str, NamedFilter]
 
-# The first Union describes the "db_config" entry
 JSONConfig = Dict[str, Union[DBConfig, FilterSetDict, FilterDict]]
 
 # Setup dictionary key strings for config, should be consistent with type aliases and
@@ -41,7 +40,7 @@ FIELD_NAME_KEY = "Field"
 INCLUDE_KEY = "Include"
 VALUES_KEY = "Values"
 RANGES_KEY = "Ranges"
-FIELD_FILTER_LIST_KEY= "FieldFilterList"
+FIELD_FILTER_LIST_KEY = "FieldFilterList"
 FILTER_DICT_KEY = "FilterDict"
 
 # json schema for config file. Should have a one for one correspondence with
@@ -57,6 +56,7 @@ CONFIG_SCHEMA = {
                 STEAM_USER_ID_KEY: {"type": "string"},
                 PLAYER_PROFILE_KEY: {"type": "string"},
             },
+            "additionalProperties": False,
         },
         FILTER_SET_DICT_KEY: {
             "type": "object",
@@ -123,6 +123,7 @@ CONFIG_SCHEMA = {
     "required": [FILTER_DICT_KEY, FILTER_SET_DICT_KEY],
 }
 
+
 # We use some SQL field information in constants, so declare these here (may move to a
 # config later if used by other modules as well).
 class SQLField(Enum):
@@ -131,9 +132,10 @@ class SQLField(Enum):
     @classmethod
     def getsubclass(cls, value: str) -> 'SQLField':
         """Create a subclass Enum value from a string value.
-        
+
         This assumes that a) all SQLField subclass constants are strings and b) there
-        are no repeated strings between the subclasses.""" 
+        are no repeated strings between the subclasses.
+        """
         ret_val: Optional[SQLField] = None
         for field_class in cls.__subclasses__():
             try:
@@ -148,6 +150,7 @@ class SQLField(Enum):
             raise ValueError(f"{value} is a not a valid subclass of SQLField")
 
         return ret_val
+
 
 class ListField(SQLField):
     """Provide Enum of list type SQL fields that can be used as filters."""

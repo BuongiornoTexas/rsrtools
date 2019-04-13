@@ -9,12 +9,14 @@ import sys
 
 from pathlib import Path
 from os import fsdecode
-from typing import cast, Optional, TextIO, Union
+from typing import Optional, TextIO, Union
 
 import rsrtools.utils as utils
-import rsrtools.songlists.song_list_config as config
-from rsrtools.songlists.arrangement_db import ArrangementDB, RSFilterError
-from rsrtools.files.fileconfig import ProfileKey, MAX_SONG_LIST_COUNT
+import rsrtools.songlists.config as config
+from rsrtools.songlists.defaults import DEFAULT_SONG_LIST_CONFIG
+
+from rsrtools.songlists.database import ArrangementDB, RSFilterError
+from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
 from rsrtools.files.profilemanager import RSProfileManager, RSFileSetError
 
 SONG_LIST_CONFIG = "song_list_config.json"
@@ -335,8 +337,6 @@ class SongListCreator:
                 self._cfg_dict = simplejson.load(fp)
         except FileNotFoundError:
             # no config found, load default
-            from rsrtools.songlists.default_config import DEFAULT_SONG_LIST_CONFIG
-
             self._cfg_dict = simplejson.loads(DEFAULT_SONG_LIST_CONFIG)
 
         # and finally try validating against the schema.
@@ -460,7 +460,7 @@ class SongListCreator:
 
         Arguments:
             list_target {ProfileKey} -- must be either ProfileKey.SONG_LISTS or
-                ProfileKey.FAVORITES_LIST (import from rsrtools.files.fileconfig).
+                ProfileKey.FAVORITES_LIST (import from rsrtools.files.config).
                 The target for the action.
             report_target {Optional[Union[Path, TextIO]]} -- The reporting target for
                 the method, which can be None, a file path or a text stream.
@@ -650,7 +650,7 @@ class SongListCreator:
 
         Arguments:
             list_target {ProfileKey} -- must be either ProfileKey.SONG_LISTS or
-                ProfileKey.FAVORITES_LIST (import from rsrtools.files.fileconfig).
+                ProfileKey.FAVORITES_LIST (import from rsrtools.files.config).
                 The song list target for creating/writing.
             filter_set {config.FilterSet} -- The list of filter names that will be
                 used to creat the song lists. The list should contain up to six

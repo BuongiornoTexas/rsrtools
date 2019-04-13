@@ -7,7 +7,7 @@ The core public class provided by this module is ArrangementDB, which uses
 SongListSQLGenerator as a helper class.
 
 TODO: fix/check this. For command line options (database setup, reporting), run 
-    'python arrangement_db.py -h'.
+    'python database.py -h'.
 """
 
 import sqlite3
@@ -21,10 +21,10 @@ from pathlib import Path
 from collections import OrderedDict
 from typing import Dict, List, MutableMapping, Optional, TextIO, Tuple, Union
 
-import rsrtools.songlists.song_list_config as config
-from rsrtools.songlists.song_list_config import ListField, RangeField, SQLField
+import rsrtools.songlists.config as config
+from rsrtools.songlists.config import ListField, RangeField, SQLField
 from rsrtools.utils import choose
-from rsrtools.files.fileconfig import MAX_SONG_LIST_COUNT
+from rsrtools.files.config import MAX_SONG_LIST_COUNT
 from rsrtools.files.profilemanager import RSProfileManager
 
 # type aliases
@@ -424,7 +424,7 @@ class SongListSQLGenerator:
                 names.
             filter_definitions {config.FilterDict} -- A dictionary of filter definitions
                 that will be used for SQL generation. Refer to the package
-                documentation, song_list_config and default_config for more details.
+                documentation, songlists.config and songlists.defaults for more details.
             list_validator {Dict[ListField, List[str]]} -- For each list field in the
                 dictionary, a list of valid values for this field.
             arrangements_name {str} -- Rocksmith arrangements table name.
@@ -806,7 +806,7 @@ class ArrangementDB:
         method:: generate_song_lists(filter_set, filter_definitions, debug_target=None)
             Generates up to 6 song lists based on the first six filters named in filter_set (list of strings).
             The song lists are returned as a list of (list of strings). The filter definitions are as described
-            in module song_list_creator.
+            in module songlists.
 
         method:: cl_update_player_data(working_dir)
             Runs a command line menu for the user to update player profile data in the database from a steam user

@@ -20,7 +20,7 @@ from pathlib import Path
 from os import fsdecode
 
 from rsrtools import utils
-from rsrtools.files.fileconfig import ProfileKey, MAX_SONG_LIST_COUNT
+from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
 from rsrtools.files.savefile import RSSaveFile, RSJsonRoot
 from rsrtools.files.steamcache import SteamMetadata, SteamMetadataError
 
@@ -592,9 +592,9 @@ class RSProfileDB(RSSaveWrapper):
 
         Arguments:
             target {ProfileKey} -- must be either ProfileKey.SONG_LISTS or
-                ProfileKey.FAVORITES_LIST (import from rsrtools.files.fileconfig).
+                ProfileKey.FAVORITES_LIST (import from rsrtools.files.config).
             new_song_list {List[str]} -- The list of new songs to be inserted into the
-                song list. Refer rsrtools.songlists.arrangement_db for details on song
+                song list. Refer rsrtools.songlists.database for details on song
                 list generation and structure. In summary, this is a list of the short
                 form song names: e.g. ["BlitzkriegBop", "CallMe"].
             list_index {int} -- If target is SONG_LISTS, the index of the song list to
@@ -1667,9 +1667,9 @@ class RSProfileManager:
         Arguments:
             profile_name {str} -- The target profile name or unique id.
             target {ProfileKey} -- must be either ProfileKey.SONG_LISTS or
-                ProfileKey.FAVORITES_LIST (import from rsrtools.files.fileconfig).
+                ProfileKey.FAVORITES_LIST (import from rsrtools.files.config).
             new_song_list {List[str]} -- The list of new songs to be inserted into the
-                song list. Refer rsrtools.songlists.arrangement_db for details on song
+                song list. Refer rsrtools.songlists.database for details on song
                 list generation and structure. In summary, this is a list of the short
                 form song names: e.g. ["BlitzkriegBop", "CallMe"].
             list_index {int} -- If target is SONG_LISTS, the index of the song list to
