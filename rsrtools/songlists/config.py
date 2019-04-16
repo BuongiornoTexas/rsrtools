@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Dict, List, Optional, Union
 
 # type aliases
-DBConfig = Dict[str, str]
+ConfigParameters = Dict[str, str]
 
 FilterSet = List[str]
 FilterSetDict = Dict[str, FilterSet]
@@ -25,30 +25,33 @@ NamedFilter = Dict[str, Union[BaseFilter, FieldFilterList]]
 # Filters dict: Collection of Named Filter Definitions
 FilterDict = Dict[str, NamedFilter]
 
-JSONConfig = Dict[str, Union[DBConfig, FilterSetDict, FilterDict]]
+ConfigDict = Dict[str, Union[ConfigParameters, FilterSetDict, FilterDict]]
 
 # Setup dictionary key strings for config, should be consistent with type aliases and
 # json schema where applicable (lists are anonymous in schema).
-DB_CONFIG_KEY = "DBConfig"
+PARAMETERS_KEY = "Parameters"
 CFSM_FILE_KEY = "CFSMArrangementFile"
 STEAM_USER_ID_KEY = "SteamUserID"
 PLAYER_PROFILE_KEY = "PlayerProfile"
 
-FILTER_SET_DICT_KEY = "FilterSetDict"
+FILTER_SET_DICT_KEY = "FilterSet"
 
 FIELD_NAME_KEY = "Field"
 INCLUDE_KEY = "Include"
 VALUES_KEY = "Values"
 RANGES_KEY = "Ranges"
 FIELD_FILTER_LIST_KEY = "FieldFilterList"
-FILTER_DICT_KEY = "FilterDict"
+FILTER_DICT_KEY = "Filters"
+
 
 # json schema for config file. Should have a one for one correspondence with
 # type aliases above.
 CONFIG_SCHEMA = {
+    "title": "Song List Configuration",
+    "description": "Song list creator configuration parameters.",
     "type": "object",
     "properties": {
-        DB_CONFIG_KEY: {
+        PARAMETERS_KEY: {
             "type": "object",
             "description": "Dictionary of configuration parameters",
             "properties": {
@@ -130,7 +133,7 @@ class SQLField(Enum):
     """Provide for abuse of the Enum class to set standard field types."""
 
     @classmethod
-    def getsubclass(cls, value: str) -> 'SQLField':
+    def getsubclass(cls, value: str) -> "SQLField":
         """Create a subclass Enum value from a string value.
 
         This assumes that a) all SQLField subclass constants are strings and b) there

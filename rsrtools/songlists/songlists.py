@@ -13,13 +13,13 @@ from typing import Optional, TextIO, Union
 
 import rsrtools.utils as utils
 import rsrtools.songlists.config as config
-from rsrtools.songlists.defaults import DEFAULT_SONG_LIST_CONFIG
+from rsrtools.songlists.configclasses import Configuration
 
 from rsrtools.songlists.database import ArrangementDB, RSFilterError
 from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
 from rsrtools.files.profilemanager import RSProfileManager, RSFileSetError
 
-SONG_LIST_CONFIG = "song_list_config.json"
+CONFIG_FILE = "config.toml"
 SONG_LIST_DEBUG_FILE = "RS_Song_Lists.txt"
 ARRANGEMENTS_GRID = "ArrangementsGrid.xml"
 
@@ -59,10 +59,8 @@ class SongListCreator:
     """
 
     # member annotations.
-    # TODO: conversion to toml may allow replacement of _cfg_dict with sub-dicts?
-    #   - Could still use json schema for validation of sub-dicts and a cleaner
-    #     implementation than one massive validation.
-    _cfg_dict: config.JSONConfig
+    # Single dictionary containing all configuration information.
+    _configuration: config.ConfigDict
 
     _arr_db: ArrangementDB
     _working_dir: Path
@@ -76,21 +74,21 @@ class SongListCreator:
     #   A path to a reporting file that will be overwritten
     _cli_report_target: Union[Path, TextIO]
 
-    # A lot of the properties in the following shadowing config file parameters
-    # Could have done a lot of this with setattr/getattr, but given
+    # A lot of the properties in the following shadow config file parameters.
+    # I could have done a lot of this with setattr/getattr, but given
     # the small number of properties, I've stuck with explicit definitions.
     # This also has the benefit of allowing validation along the way.
     @property
-    def _db_config(self) -> config.DBConfig:
-        """Get dictionary of database configuration parameters.
+    def _parameters(self) -> config.ConfigParameters:
+        """Get dictionary of general database configuration parameters.
 
         Gets:
-            rsrtools.songlists.sltypes.DBConfig
+            rsrtools.songlists.sltypes.ConfigParameters
 
         Creates empty dictionary if required.
 
         """
-        return self._cfg_dict.setdefault(config.DB_CONFIG_KEY, dict())
+        return self._configuration.setdefault(config.PARAMETERS_KEY, dict())
 
     @property
     def _filter_set_dict(self) -> config.FilterSetDict:
@@ -103,7 +101,7 @@ class SongListCreator:
 
         Creates empty dictionary if required.
         """
-        return self._cfg_dict.setdefault(config.FILTER_SET_DICT_KEY, dict())
+        return self._configuration.setdefault(config.FILTER_SET_DICT_KEY, dict())
 
     @property
     def _filter_dict(self) -> config.FilterDict:
@@ -117,7 +115,7 @@ class SongListCreator:
 
         Creates empty dictionary if required.
         """
-        return self._cfg_dict.setdefault(config.FILTER_DICT_KEY, dict())
+        return self._configuration.setdefault(config.FILTER_DICT_KEY, dict())
 
     @property
     def cfsm_arrangement_file(self) -> str:
@@ -131,12 +129,12 @@ class SongListCreator:
         but does not validate the file.
 
         """
-        ret_val = self._db_config.setdefault(config.CFSM_FILE_KEY, "")
+        ret_val = self._parameters.setdefault(config.CFSM_FILE_KEY, "")
 
         if ret_val and not Path(ret_val).is_file():
             # silently discard invalid path.
             ret_val = ""
-            self._db_config[config.CFSM_FILE_KEY] = ""
+            self._parameters[config.CFSM_FILE_KEY] = ""
 
         return ret_val
 
@@ -145,10 +143,10 @@ class SongListCreator:
         """Set path to CFSM arrangements file."""
         file_path = Path(value)
         if not file_path.is_file():
-            self._db_config[config.CFSM_FILE_KEY] = ""
+            self._parameters[config.CFSM_FILE_KEY] = ""
             raise FileNotFoundError(f"CFSM arrangement file '{value}' does not exist")
 
-        self._db_config[config.CFSM_FILE_KEY] = fsdecode(file_path.resolve())
+        self._parameters[config.CFSM_FILE_KEY] = fsdecode(file_path.resolve())
 
     # ****************************************************
     # Steam user id, _profile_manager, player profile and player data in database are
@@ -179,13 +177,13 @@ class SongListCreator:
         # could do extensive validation here, but there is already error checking in the
         # profile manager, and any ui will need to find valid steam ids to load up.
         # So no error checking here.
-        return self._db_config.setdefault(config.STEAM_USER_ID_KEY, "")
+        return self._parameters.setdefault(config.STEAM_USER_ID_KEY, "")
 
     @steam_user_id.setter
     def steam_user_id(self, value: str) -> None:
         """Steam user id setter."""
         # reset shadow value to None in case of errors (correct at end of routine)
-        self._db_config[config.STEAM_USER_ID_KEY] = ""
+        self._parameters[config.STEAM_USER_ID_KEY] = ""
 
         # Changing steam user id, so clear profile manager and player profile (and
         # implicitly, flush db as well)
@@ -212,7 +210,7 @@ class SongListCreator:
             # RSProfileManager
             str_value = self._profile_manager.source_steam_uid
 
-        self._db_config[config.STEAM_USER_ID_KEY] = str_value
+        self._parameters[config.STEAM_USER_ID_KEY] = str_value
 
     @property
     def player_profile(self) -> str:
@@ -231,7 +229,7 @@ class SongListCreator:
         """
         # can't do any useful validation without loading profile, so similar to the
         # steam user id, push it down to the profile manager or up to the ui.
-        return self._db_config.setdefault(config.PLAYER_PROFILE_KEY, "")
+        return self._parameters.setdefault(config.PLAYER_PROFILE_KEY, "")
 
     @player_profile.setter
     def player_profile(self, value: str) -> None:
@@ -239,7 +237,7 @@ class SongListCreator:
         # new player profile, so ditch everything in player database
         self._arr_db.flush_player_profile()
         # reset to default in case of error in setter
-        self._db_config[config.PLAYER_PROFILE_KEY] = ""
+        self._parameters[config.PLAYER_PROFILE_KEY] = ""
 
         if value:
             if self._profile_manager is None:
@@ -258,7 +256,7 @@ class SongListCreator:
             self._arr_db.load_player_profile(self._profile_manager, value)
 
             # set this last in case of errors along the way.
-            self._db_config[config.PLAYER_PROFILE_KEY] = value
+            self._parameters[config.PLAYER_PROFILE_KEY] = value
 
     # End player steam_user_id, player_profile properties block
 
@@ -282,8 +280,6 @@ class SongListCreator:
         Create working files and sub-folders in the working directory, and load the
         configuration file (if any) from the working folder.
         """
-        # Empty config dict, should be replaced in _load_config()
-        self._cfg_dict = dict()
         self._profile_manager = None
 
         # Default to console for reporting.
@@ -296,7 +292,8 @@ class SongListCreator:
             )
         self._working_dir = working_dir.resolve()
 
-        self._load_config()
+        self._cfg_path = self._working_dir.joinpath(CONFIG_FILE)
+        self._configuration = self._load_config()
 
         self._arr_db = ArrangementDB(self._working_dir)
         # The next block is a slightly clumsy way of avoiding separate auto load code
@@ -326,31 +323,21 @@ class SongListCreator:
             pass
         # end auto load from json.
 
-    def _load_config(self) -> None:
-        """Load the configuration file from the working directory.
+    def _load_config(self) -> Configuration:
+        """Load the TOML configuration file from the working directory.
 
         Create a default configuration if no file is found.
         """
-        self._cfg_path = self._working_dir.joinpath(SONG_LIST_CONFIG)
-        try:
-            with self._cfg_path.open("rt") as fp:
-                self._cfg_dict = simplejson.load(fp)
-        except FileNotFoundError:
-            # no config found, load default
-            self._cfg_dict = simplejson.loads(DEFAULT_SONG_LIST_CONFIG)
-
-        # and finally try validating against the schema.
-        jsonschema.validate(self._cfg_dict, config.CONFIG_SCHEMA)
+        return Configuration.load_toml(self._cfg_path)
 
     # end initialisation block
 
     def save_config(self) -> None:
         """Save configuration file to working directory.
 
-        This method dumps the self._cf_dict JSON object to file.
+        This method dumps the self._configuration object to a TOML file.
         """
-        with self._cfg_path.open("wt") as fp:
-            simplejson.dump(self._cfg_dict, fp, indent=2 * " ")
+        self._configuration.save_toml(self._cfg_path)
 
     # # *******************************************************************
 

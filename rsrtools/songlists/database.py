@@ -31,7 +31,9 @@ from rsrtools.files.profilemanager import RSProfileManager
 ListValidator = Dict[ListField, List[str]]
 # SQL Clause - SQL text + Value tuple for substitution
 SQLClause = Tuple[Optional[str], Optional[Tuple[Union[str, int, float], ...]]]
-SQLTableDict = OrderedDict[SQLField, str]
+# This gets around problem with declaring OrderedDicts in 3.7.3. This will hopefully be
+# sorted in the next release.
+SQLTableDict = MutableMapping[SQLField, str]
 
 # database file name
 DB_NAME = "RS_Arrangements.sqlite"
