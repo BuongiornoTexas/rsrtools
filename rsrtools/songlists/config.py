@@ -3,128 +3,7 @@
 """Provide type aliases, shared strings and JSON schemas used by song list creator."""
 
 from enum import Enum
-from typing import Dict, List, Optional, Union
-
-# type aliases
-ConfigParameters = Dict[str, str]
-
-FilterSet = List[str]
-FilterSetDict = Dict[str, FilterSet]
-
-FilterFieldName = str
-FilterInclude = bool
-FilterValues = List[str]
-FilterRanges = List[List[Union[float, int]]]
-FieldFilter = Dict[
-    str, Union[FilterFieldName, FilterInclude, FilterValues, FilterRanges]
-]
-FieldFilterList = List[FieldFilter]
-BaseFilter = str
-# Contains the definition for a single filter: FieldFilterList + Optional  BaseFilter
-NamedFilter = Dict[str, Union[BaseFilter, FieldFilterList]]
-# Filters dict: Collection of Named Filter Definitions
-FilterDict = Dict[str, NamedFilter]
-
-ConfigDict = Dict[str, Union[ConfigParameters, FilterSetDict, FilterDict]]
-
-# Setup dictionary key strings for config, should be consistent with type aliases and
-# json schema where applicable (lists are anonymous in schema).
-PARAMETERS_KEY = "Parameters"
-CFSM_FILE_KEY = "CFSMArrangementFile"
-STEAM_USER_ID_KEY = "SteamUserID"
-PLAYER_PROFILE_KEY = "PlayerProfile"
-
-FILTER_SET_DICT_KEY = "FilterSet"
-
-FIELD_NAME_KEY = "Field"
-INCLUDE_KEY = "Include"
-VALUES_KEY = "Values"
-RANGES_KEY = "Ranges"
-FIELD_FILTER_LIST_KEY = "FieldFilterList"
-FILTER_DICT_KEY = "Filters"
-
-
-# json schema for config file. Should have a one for one correspondence with
-# type aliases above.
-CONFIG_SCHEMA = {
-    "title": "Song List Configuration",
-    "description": "Song list creator configuration parameters.",
-    "type": "object",
-    "properties": {
-        PARAMETERS_KEY: {
-            "type": "object",
-            "description": "Dictionary of configuration parameters",
-            "properties": {
-                CFSM_FILE_KEY: {"type": "string"},
-                STEAM_USER_ID_KEY: {"type": "string"},
-                PLAYER_PROFILE_KEY: {"type": "string"},
-            },
-            "additionalProperties": False,
-        },
-        FILTER_SET_DICT_KEY: {
-            "type": "object",
-            "description": "Dictionary of filter sets.",
-            "additionalProperties": {
-                "type": "array",
-                "description": "List of song list filters (empty string skips a list).",
-                "items": {"type": "string"},
-                "minItems": 1,
-                "maxItems": 6,
-            },
-        },
-        FILTER_DICT_KEY: {
-            "type": "object",
-            "description": "Dictionary of filters.",
-            "additionalProperties": {
-                "type": "object",
-                "description": "Dictionary for definition of a single filter",
-                "properties": {
-                    # Note: we only want one or zero basefilters, so keep this
-                    # separate from the repeatable subfilters
-                    "BaseFilter": {"type": "string"},
-                    FIELD_FILTER_LIST_KEY: {
-                        "type": "array",
-                        "description": "List of field filter dictionaries.",
-                        "items": {
-                            "type": "object",
-                            "description": "Single field filter dictionary.",
-                            "minItems": 1,
-                            "properties": {
-                                FIELD_NAME_KEY: {"type": "string"},
-                                INCLUDE_KEY: {"type": "boolean"},
-                                VALUES_KEY: {
-                                    "type": "array",
-                                    "description": "List of string values.",
-                                    "items": {"type": "string"},
-                                    "minItems": 1,
-                                },
-                                RANGES_KEY: {
-                                    "type": "array",
-                                    "description": "Array of pairs of low/high values.",
-                                    "minItems": 1,
-                                    "items": {
-                                        "description": "Array of low high/values.",
-                                        "type": "array",
-                                        "items": {"type": "number", "minimum": 0},
-                                        "minItems": 2,
-                                        "maxItems": 2,
-                                    },
-                                },
-                            },
-                            "required": [FIELD_NAME_KEY, INCLUDE_KEY],
-                            "oneOf": [
-                                {"required": [VALUES_KEY]},
-                                {"required": [RANGES_KEY]},
-                            ],
-                        },
-                    },
-                },
-                "required": [FIELD_FILTER_LIST_KEY],
-            },
-        },
-    },
-    "required": [FILTER_DICT_KEY, FILTER_SET_DICT_KEY],
-}
+from typing import Optional
 
 
 # We use some SQL field information in constants, so declare these here (may move to a
@@ -160,7 +39,7 @@ class ListField(SQLField):
 
     # list types. Automatically validated before use.
     # RSSongId  was the name I came up with for rsrtools. May need to migrate to SongKey
-    RS_SONG_ID = "RSSongId"
+    SONG_KEY = "SongKey"
     TUNING = "Tuning"
     ARRANGEMENT_NAME = "ArrangementName"
     ARRANGEMENT_ID = "ArrangementId"

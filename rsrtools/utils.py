@@ -193,7 +193,7 @@ def choose(
                 return values
 
             if len(values) == 1:
-                return values[0:0]
+                return values[0:1]
 
         except (ValueError, IndexError):
             if help_text is not None and values == "h":
