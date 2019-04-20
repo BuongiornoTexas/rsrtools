@@ -8,8 +8,8 @@ by the SongListCreator class.
 The core public class provided by this module is ArrangementDB, which uses
 SongListSQLGenerator as a helper class.
 
-TODO: fix/check this. For command line options (database setup, reporting), run
-    'python database.py -h'.
+For command line options (database setup, reporting), run
+    'python rsrtools.songlists.database.py -h'.
 """
 
 import sqlite3
@@ -1167,13 +1167,13 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    db = ArrangementDB(args.db_directory)
+    db = ArrangementDB(Path(args.db_directory))
 
     if args.CFSMxml:
         db.load_cfsm_arrangements(Path(args.CFSMxml))
 
     if args.update_player_data:
-        db.cl_update_player_data(args.db_directory)
+        db.cl_update_player_data(Path(args.db_directory))
 
     if args.reports:
         db.run_cl_reports()

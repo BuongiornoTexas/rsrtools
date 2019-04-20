@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 
-"""Provide SongListCreator, which is the main class of the rsrtools package."""
+"""Provide SongListCreator, which is the main class of the rsrtools package.
+
+For command line options (database setup, reporting), run:
+    'python -m rsrtools.songlists.songlists -h'
+"""
 
 import argparse
 import sys

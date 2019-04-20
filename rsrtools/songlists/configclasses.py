@@ -40,7 +40,7 @@ DEFAULT_TOML = f"""\
   "E Std High Plays",
   "E Std Non Concert",
   "",
-  "Easy E Plat Badge in progress",
+  "Easy E Std Plat Badge in progress",
 ]
 
 "Non E Std Tunings" = [
@@ -61,14 +61,50 @@ Testing = [
 
 "Recurse_3_test" = ["Recurse1A"]
 
-[{CONFIG_FILTERS}."Easy E Plat Badge in progress"]
+[{CONFIG_FILTERS}."Easy Plat Badge in progress"]
 {CONFIG_BASE} = ""
 {CONFIG_MODE} = "AND"
 
-[{CONFIG_FILTERS}."Easy E Plat Badge in progress".{CONFIG_SUB_FILTERS}\
+[{CONFIG_FILTERS}."Easy Plat Badge in progress".{CONFIG_SUB_FILTERS}\
 .{RangeField.SA_EASY_BADGES.value}]
 {CONFIG_INCLUDE} = true
-{CONFIG_RANGES} =  [ [ 0.9, 4.1] ]
+{CONFIG_RANGES} =  [ [ 1, 4] ]
+
+[{CONFIG_FILTERS}."Easy E Std Plat Badge in progress"]
+{CONFIG_BASE} = "Easy Plat Badge in progress"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Easy E Std Plat Badge in progress".{CONFIG_SUB_FILTERS}\
+.{ListField.TUNING.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_VALUES} =  [ "E Standard" ]
+
+[{CONFIG_FILTERS}."Med Plat Badge in progress"]
+{CONFIG_BASE} = ""
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Med Plat Badge in progress".{CONFIG_SUB_FILTERS}\
+.{RangeField.SA_MEDIUM_BADGES.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} =  [ [ 1, 4] ]
+
+[{CONFIG_FILTERS}."Easy Plat Badges"]
+{CONFIG_BASE} = ""
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Easy Plat Badges".{CONFIG_SUB_FILTERS}\
+.{RangeField.SA_EASY_BADGES.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} =  [ [ 5, 50] ]
+
+[{CONFIG_FILTERS}."Hard Plat Badges"]
+{CONFIG_BASE} = ""
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Hard Plat Badges".{CONFIG_SUB_FILTERS}\
+.{RangeField.SA_HARD_BADGES.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} =  [ [ 5, 50] ]
 
 [{CONFIG_FILTERS}."E Standard"]
 {CONFIG_BASE} = "Not Bass, Rhythm"
@@ -92,7 +128,7 @@ Testing = [
 
 [{CONFIG_FILTERS}."E Std Low Plays".{CONFIG_SUB_FILTERS}.{RangeField.PLAYED_COUNT.value}]
 {CONFIG_INCLUDE} = true
-{CONFIG_RANGES} = [[0.9, 12.1]]
+{CONFIG_RANGES} = [[1, 12]]
 
 [{CONFIG_FILTERS}."E Std Mid Plays"]
 {CONFIG_BASE} = "E Standard 440"
@@ -100,7 +136,7 @@ Testing = [
 
 [{CONFIG_FILTERS}."E Std Mid Plays".{CONFIG_SUB_FILTERS}.{RangeField.PLAYED_COUNT.value}]
 {CONFIG_INCLUDE} = true
-{CONFIG_RANGES} = [[12.9,27.1]]
+{CONFIG_RANGES} = [[13,27]]
 
 [{CONFIG_FILTERS}."E Std High Plays"]
 {CONFIG_BASE} = "E Standard 440"
@@ -108,7 +144,7 @@ Testing = [
 
 [{CONFIG_FILTERS}."E Std High Plays".{CONFIG_SUB_FILTERS}.{RangeField.PLAYED_COUNT.value}]
 {CONFIG_INCLUDE} = true
-{CONFIG_RANGES} = [[27.9, 5000]]
+{CONFIG_RANGES} = [[28, 5000]]
 
 [{CONFIG_FILTERS}."E Std Non Concert"]
 {CONFIG_BASE} = "E Standard"
@@ -121,7 +157,7 @@ Testing = [
 [{CONFIG_FILTERS}."E Std Non Concert".{CONFIG_SUB_FILTERS}\
 .{RangeField.PLAYED_COUNT.value}]
 {CONFIG_INCLUDE} = true
-{CONFIG_RANGES} = [[0.9,5000]]
+{CONFIG_RANGES} = [[1,5000]]
 
 [{CONFIG_FILTERS}."Drop D"]
 {CONFIG_BASE} = "Not Bass, Rhythm"
@@ -180,7 +216,7 @@ Testing = [
 [{CONFIG_FILTERS}."Played Count of 1 to 15".{CONFIG_SUB_FILTERS}\
 .{RangeField.PLAYED_COUNT.value}]
 {CONFIG_INCLUDE} = true
-{CONFIG_RANGES} = [[0.9, 15.1]]
+{CONFIG_RANGES} = [[1, 15]]
 
 [{CONFIG_FILTERS}."Artist test"]
 {CONFIG_BASE} = ""
@@ -311,16 +347,22 @@ class SubFilter:
 class RangeSubFilter(SubFilter):
     """Range list for a range subfilter.
 
-    Public attributes:
-        ranges {List[Union[int, float]]} -- A list of low/high value range pairs of the
-            form:
-                [[low1, high1], [low2, high2], ...]
+    Public attributes/methods:
+        ranges {List[List[float]]} -- A list of low/high value range pairs of the form:
+            [[low1, high1], [low2, high2], ...]
+        range_clause: returns the range clause and values tuple for the filter.
 
-    The low/high pairs are used to build SQL IN BETWEEN queries. Note that ints will
-    tend to be promoted to floats by one of the serialisation or validation libraries
-    (outside rsrtools control), so allow a small margin if you want to insure integer
-    values are captured correctly. e.g. [0.99, 2.01] to capture integer values in the
-    range 1 to 2 inclusive.
+    The low/high pairs are used to build SQL IN BETWEEN queries.
+    
+    Implementation note: Pydantic will convert integer values to floats as part of
+    constructor input validation. The range_clause method will try to convert integer
+    values back to integer form before generating the range clause. However, if you
+    are getting odd results from integer range queries, you may want to switch to
+    floating values with appropriate small margins to insure integer values are 
+    captured correctly. For example [0.99, 2.01] to capture integer values in the
+    range 1 to 2 inclusive. A future update may address this issues (requires
+    pydantic to support dataclasses validators (0.24+?), converting the type of ranges
+    to List[List[Union[int, float]]] and adding the appropriate validator).
 
     include implementation -- If True if the filter will return records where the
         field value lies int the specified ranges. If False, it will return records
@@ -329,7 +371,9 @@ class RangeSubFilter(SubFilter):
     Note: changes in attribute names should be reflected in default TOML.
     """
 
-    ranges: List[List[Union[int, float]]]
+    # When pydantic supports dataclass validators, change this to
+    # ranges: List[List[Union[int, float]]]
+    ranges: List[List[float]]
 
     def range_clause(
         self, field_name: RangeField
@@ -404,6 +448,11 @@ class RangeSubFilter(SubFilter):
             low_val = min(value_pair)
             high_val = max(value_pair)
 
+            # temporary fix until I can validate and assign Union[int, float] correctly
+            if low_val.is_integer() and high_val.is_integer():
+                low_val = int(low_val)
+                high_val = int(high_val)
+
             # and finally the SQL
             text_list.append(f"{field_type.value} {not_text}BETWEEN ? AND ?")
             ret_values.append(low_val)
@@ -419,9 +468,10 @@ class RangeSubFilter(SubFilter):
 class ListSubFilter(SubFilter):
     """Value list for a value subfilter.
 
-    Public attributes:
+    Public attributes/methods:
         values {List[str} -- A list of string values that will be used to build the
             filter.
+        list_clause: returns the list clause and values tuple for the filter.
 
     The values are used to build SQL IN queries.
 

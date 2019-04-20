@@ -5,7 +5,7 @@ The primary public class is RSProfileManager. The other classes are helpers that
 the operation of the profile manager class.
 
 For command line options (database setup, reporting), run:
-    'python -m rsrtools.files.profile_manager -h'
+    'python -m rsrtools.files.profilemanager -h'
 """
 
 import argparse
