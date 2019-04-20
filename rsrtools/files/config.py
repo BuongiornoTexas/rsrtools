@@ -5,6 +5,7 @@ from enum import Enum
 
 MAX_SONG_LIST_COUNT = 6
 
+
 class ProfileKey(Enum):
     """Provides a list of Rocksmith profile key strings."""
 

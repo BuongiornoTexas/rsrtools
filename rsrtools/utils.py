@@ -124,7 +124,7 @@ def choose(
     allow_multi: bool = False,
     no_action: Optional[str] = None,
     help_text: Optional[str] = None,
-) -> Optional[Union[Any, List[Any]]]:
+) -> Optional[List[Any]]:
     """Return user selection or multi-selection from a list of options.
 
     Arguments:
@@ -143,8 +143,9 @@ def choose(
         help_text {str} -- Detailed help text. (default: {None})
 
     Returns:
-        Optional[Union[Any, List[Any]]] -- Return value/list of return values, per
-            options, or if the user has selected no_action, None.
+        Optional[List[Any]] -- List of return values. If the allow_multi is False, the
+        list will contain only one element. If the user has selected no_action, the
+        return value is None.
 
     To select multiple options, enter a comma separated list of values.
 
@@ -192,7 +193,7 @@ def choose(
                 return values
 
             if len(values) == 1:
-                return values[0]
+                return values[0:1]
 
         except (ValueError, IndexError):
             if help_text is not None and values == "h":

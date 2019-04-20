@@ -19,7 +19,7 @@ Implements:
 Calling this module as a script runs the self test (__name__=="__main__"). This can be
 run from the command line by:
 
-    py -m rsrtools.files.savefile <test_dir>
+    python -m rsrtools.files.savefile <test_dir>
 
 Where test_dir is the name of a directory containing one or more files that can be used
 for testing (I wouldn't run this on any files in the steam directory though ...)
@@ -479,7 +479,7 @@ def self_test() -> None:
 
     if keep_save_file is not None:
         test_path = keep_save_file._file_path
-        test_path = test_path.with_suffix(test_path.suffix + "test.tmp")
+        test_path = test_path.with_suffix(test_path.suffix + ".test.tmp")
 
         if test_path.exists():
             print(

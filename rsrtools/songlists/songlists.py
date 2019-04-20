@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
 
-"""Provide SongListCreator, which is the main class of the rsrtools package."""
+"""Provide SongListCreator, which is the main class of the rsrtools package.
+
+For command line options (database setup, reporting), run:
+    'python -m rsrtools.songlists.songlists -h'
+"""
 
 import argparse
-import simplejson
-import jsonschema  # type:ignore
 import sys
 
 from pathlib import Path
 from os import fsdecode
-from typing import Callable, cast, Optional, TextIO, Union
+from typing import Dict, List, Optional, TextIO, Union
 
 import rsrtools.utils as utils
-import rsrtools.songlists.song_list_config as config
-from rsrtools.songlists.arrangement_db import ArrangementDB, RSFilterError
-from rsrtools.files.fileconfig import ProfileKey, MAX_SONG_LIST_COUNT
+
+from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
+from rsrtools.songlists.configclasses import Configuration, Settings, Filter, \
+    RSFilterError
+from rsrtools.songlists.database import ArrangementDB
 from rsrtools.files.profilemanager import RSProfileManager, RSFileSetError
 
-SONG_LIST_CONFIG = "song_list_config.json"
+CONFIG_FILE = "config.toml"
 SONG_LIST_DEBUG_FILE = "RS_Song_Lists.txt"
 ARRANGEMENTS_GRID = "ArrangementsGrid.xml"
 
@@ -57,10 +61,7 @@ class SongListCreator:
     """
 
     # member annotations.
-    # TODO: conversion to toml may allow replacement of _cfg_dict with sub-dicts?
-    #   - Could still use json schema for validation of sub-dicts and a cleaner
-    #     implementation than one massive validation.
-    _cfg_dict: config.JSONConfig
+    _configuration: Configuration
 
     _arr_db: ArrangementDB
     _working_dir: Path
@@ -74,61 +75,50 @@ class SongListCreator:
     #   A path to a reporting file that will be overwritten
     _cli_report_target: Union[Path, TextIO]
 
-    # A lot of the properties in the following shadowing config file parameters
-    # Could have done a lot of this with setattr/getattr, but given
+    # A lot of the properties in the following shadow config file parameters.
+    # I could have done a lot of this with setattr/getattr, but given
     # the small number of properties, I've stuck with explicit definitions.
     # This also has the benefit of allowing validation along the way.
     @property
-    def _db_config(self) -> config.DBConfig:
-        """Get dictionary of database configuration parameters.
+    def _settings(self) -> Settings:
+        """Get general settings.
 
         Gets:
-            rsrtools.songlists.sltypes.DBConfig
+            rsrtools.songlists.configclasses.Settings
 
-        Creates empty dictionary if required.
+        Provide default (typically empty) settings if required.
 
         """
-        return cast(
-            config.DBConfig,
-            self._cfg_dict.setdefault(config.DB_CONFIG, cast(config.DBConfig, dict())),
-        )
+        return self._configuration.settings
 
     @property
-    def _filter_set_dict(self) -> config.FilterSetDict:
-        """Get dictionary of filter sets.
+    def _song_list_sets(self) -> Dict[str, List[str]]:
+        """Get definitions for song list sets.
 
         Gets:
-            rsrtools.songlists.sltypes.FilterSetDict
+            Dict[str, List[str]] -- Each key is the name for a set of song lists, and
+                the list values for that key are the filter names for generating the
+                song lists in the named set (up to six names per set). Excess values in
+                the list will be ignored. That is:
 
-        Each filter set contains a list of filter names for generating song lists.
+            {'Set name 1': ['Filter 1', 'Filter 2', 'Filter 3'],
+             'Set name 2': ['Filter 2', 'Filter 3', 'Filter 4'],}
 
-        Creates empty dictionary if required.
         """
-        return cast(
-            config.FilterSetDict,
-            self._cfg_dict.setdefault(
-                config.FILTER_SET_DICT, cast(config.FilterSetDict, dict())
-            ),
-        )
+        return self._configuration.song_list_sets
 
     @property
-    def _filter_dict(self) -> config.FilterDict:
-        """Get dictionary of filters.
+    def _filter_dict(self) -> Dict[str, Filter]:
+        """Get dictionary of filter definitions.
 
         Gets:
-            rsrtools.songlists.sltypes.FilterDict
+            Dict[str, Filter] -- Each key is the name of a filter, and Filter is the
+                corresponding defintion.
 
         Each filter can be used to generate a song list or as a base filter for building
         other filters.
-
-        Creates empty dictionary if required.
         """
-        return cast(
-            config.FilterDict,
-            self._cfg_dict.setdefault(
-                config.FILTER_DICT, cast(config.FilterDict, dict())
-            ),
-        )
+        return self._configuration.filters
 
     @property
     def cfsm_arrangement_file(self) -> str:
@@ -142,26 +132,22 @@ class SongListCreator:
         but does not validate the file.
 
         """
-        ret_val = self._db_config.setdefault(config.CFSM_FILE, "")
-
-        if ret_val and not Path(ret_val).is_file():
+        check_path = self._settings.CFSM_file_path
+        if check_path and not Path(check_path).is_file():
             # silently discard invalid path.
-            ret_val = ""
-            self._db_config[config.CFSM_FILE] = ""
+            self._settings.CFSM_file_path = ""
 
-        return ret_val
+        return self._settings.CFSM_file_path
 
     @cfsm_arrangement_file.setter
     def cfsm_arrangement_file(self, value: str) -> None:
         """Set path to CFSM arrangements file."""
         file_path = Path(value)
         if not file_path.is_file():
-            self._db_config[config.CFSM_FILE] = ""
-            raise FileNotFoundError(
-                f"CFSM arrangement file '{value}' does not exist"
-            )
+            self._settings.CFSM_file_path = ""
+            raise FileNotFoundError(f"CFSM arrangement file '{value}' does not exist")
 
-        self._db_config[config.CFSM_FILE] = fsdecode(file_path.resolve())
+        self._settings.CFSM_file_path = fsdecode(file_path.resolve())
 
     # ****************************************************
     # Steam user id, _profile_manager, player profile and player data in database are
@@ -192,13 +178,13 @@ class SongListCreator:
         # could do extensive validation here, but there is already error checking in the
         # profile manager, and any ui will need to find valid steam ids to load up.
         # So no error checking here.
-        return self._db_config.setdefault(config.STEAM_USER_ID, "")
+        return self._settings.steam_user_id
 
     @steam_user_id.setter
     def steam_user_id(self, value: str) -> None:
         """Steam user id setter."""
-        # reset shadow value to None in case of errors (correct at end of routine)
-        self._db_config[config.STEAM_USER_ID] = ""
+        # reset configuration value to "" in case of errors (correct at end of routine)
+        self._settings.steam_user_id = ""
 
         # Changing steam user id, so clear profile manager and player profile (and
         # implicitly, flush db as well)
@@ -208,7 +194,7 @@ class SongListCreator:
         self._profile_manager = None
 
         # Create profile manager.
-        # This will trigger an interactive file set selection if steam user id is None
+        # This will trigger an interactive file set selection if value is ""
         # (for command line use). I'm also disabling use of existing working set files
         # for the song list creator.
         # (Working set files are really only intended for debugging).
@@ -219,21 +205,21 @@ class SongListCreator:
             flush_working_set=True,
         )
 
-        str_value = value
-        if not str_value:
+        final_uid = value
+        if not final_uid:
             # Get the steam user id resulting from an interactive call to
             # RSProfileManager
-            str_value = self._profile_manager.source_steam_uid
+            final_uid = self._profile_manager.source_steam_uid
 
-        self._db_config[config.STEAM_USER_ID] = str_value
+        self._settings.steam_user_id = final_uid
 
     @property
     def player_profile(self) -> str:
         """Get/set the Rocksmith player profile name to use for song list generation.
 
         Gets/sets:
-            str -- The player profile name. Get returns the empty string if the player
-                profile it has not been set yet. Setting to the empty string clears the
+            str -- The player profile name. Gets the empty string if the player profile
+                has not been set yet. Setting to the empty string clears the
                 current profile data.
 
         Setting the player name also deletes all profile data from the database and
@@ -244,7 +230,7 @@ class SongListCreator:
         """
         # can't do any useful validation without loading profile, so similar to the
         # steam user id, push it down to the profile manager or up to the ui.
-        return self._db_config.setdefault(config.PLAYER_PROFILE, "")
+        return self._settings.player_profile
 
     @player_profile.setter
     def player_profile(self, value: str) -> None:
@@ -252,7 +238,7 @@ class SongListCreator:
         # new player profile, so ditch everything in player database
         self._arr_db.flush_player_profile()
         # reset to default in case of error in setter
-        self._db_config[config.PLAYER_PROFILE] = ""
+        self._settings.player_profile = ""
 
         if value:
             if self._profile_manager is None:
@@ -271,7 +257,7 @@ class SongListCreator:
             self._arr_db.load_player_profile(self._profile_manager, value)
 
             # set this last in case of errors along the way.
-            self._db_config[config.PLAYER_PROFILE] = value
+            self._settings.player_profile = value
 
     # End player steam_user_id, player_profile properties block
 
@@ -295,8 +281,6 @@ class SongListCreator:
         Create working files and sub-folders in the working directory, and load the
         configuration file (if any) from the working folder.
         """
-        # Empty config dict, should be replaced in _load_config()
-        self._cfg_dict = dict()
         self._profile_manager = None
 
         # Default to console for reporting.
@@ -309,9 +293,15 @@ class SongListCreator:
             )
         self._working_dir = working_dir.resolve()
 
-        self._load_config()
+        self._cfg_path = self._working_dir.joinpath(CONFIG_FILE)
+        self._configuration = self._load_config()
+
+        # Save the default config if we don't have one.
+        if not self._cfg_path.exists():
+            self.save_config()
 
         self._arr_db = ArrangementDB(self._working_dir)
+
         # The next block is a slightly clumsy way of avoiding separate auto load code
         # for setting up profile manager and player database from json parameters for
         # steam id and player profile name
@@ -326,7 +316,7 @@ class SongListCreator:
                 # profile manager for the steam user id.
                 self.steam_user_id = self.steam_user_id
             except RSFileSetError:
-                # invalid steam id, steam id will have been reset to None.
+                # invalid steam id, steam id will have been reset to "".
                 # discard player profile as well (meaningless without steam id)
                 tmp_profile = ""
 
@@ -339,33 +329,21 @@ class SongListCreator:
             pass
         # end auto load from json.
 
-    def _load_config(self) -> None:
-        """Load the configuration file from the working directory.
+    def _load_config(self) -> Configuration:
+        """Load the TOML configuration file from the working directory.
 
         Create a default configuration if no file is found.
         """
-        self._cfg_path = self._working_dir.joinpath(SONG_LIST_CONFIG)
-        try:
-            with self._cfg_path.open("rt") as fp:
-                self._cfg_dict = simplejson.load(fp)
-        except FileNotFoundError:
-            # no config found, load default
-            from rsrtools.songlists.default_config import DEFAULT_SONG_LIST_CONFIG
-
-            self._cfg_dict = simplejson.loads(DEFAULT_SONG_LIST_CONFIG)
-
-        # and finally try validating against the schema.
-        jsonschema.validate(self._cfg_dict, config.CONFIG_SCHEMA)
+        return Configuration.load_toml(self._cfg_path)
 
     # end initialisation block
 
     def save_config(self) -> None:
         """Save configuration file to working directory.
 
-        This method dumps the self._cf_dict JSON object to file.
+        This method dumps the self._configuration object to a TOML file.
         """
-        with self._cfg_path.open("wt") as fp:
-            simplejson.dump(self._cfg_dict, fp, indent=2 * " ")
+        self._configuration.save_toml(self._cfg_path)
 
     # # *******************************************************************
 
@@ -429,7 +407,13 @@ class SongListCreator:
         if choice is None:
             self.player_profile = ""
         else:
-            self.player_profile = cast(str, choice)
+            profile = choice[0]
+            if not isinstance(profile, str):
+                raise TypeError(
+                    f"Unexpected type from profile choice. Should be string, "
+                    f"got f{type(profile)}."
+                )
+            self.player_profile = profile
 
     def _cli_toggle_reporting(self) -> None:
         """Toggles reports between stdout and the working directory report file."""
@@ -442,12 +426,12 @@ class SongListCreator:
         """Select and run a report on a single filter from a command line interface."""
         self._cli_song_list_action(ProfileKey.FAVORITES_LIST, self._cli_report_target)
 
-    def _cli_filter_set_report(self) -> None:
-        """Select and run a filter set report  from a command line interface."""
+    def _cli_song_list_report(self) -> None:
+        """Select and run a song list report  from a command line interface."""
         self._cli_song_list_action(ProfileKey.SONG_LISTS, self._cli_report_target)
 
     def _cli_write_song_lists(self) -> None:
-        """Select a filter set and write the resulting song lists to the profile.
+        """Select a song list set and write the resulting song lists to the profile.
 
         Song list selection is by command line interface, and the method will write the
         song lists to the currently selected Rocksmith profile.
@@ -463,15 +447,13 @@ class SongListCreator:
         self._cli_song_list_action(ProfileKey.FAVORITES_LIST, None)
 
     def _cli_song_list_action(
-        self,
-        list_target: ProfileKey,
-        report_target: Optional[Union[Path, TextIO]],
+        self, list_target: ProfileKey, report_target: Optional[Union[Path, TextIO]]
     ) -> None:
         """Execute song list generation, report writing and save to profiles.
 
         Arguments:
             list_target {ProfileKey} -- must be either ProfileKey.SONG_LISTS or
-                ProfileKey.FAVORITES_LIST (import from rsrtools.files.fileconfig).
+                ProfileKey.FAVORITES_LIST (import from rsrtools.files.config).
                 The target for the action.
             report_target {Optional[Union[Path, TextIO]]} -- The reporting target for
                 the method, which can be None, a file path or a text stream.
@@ -497,10 +479,14 @@ class SongListCreator:
         if list_target is ProfileKey.FAVORITES_LIST:
             # Running favorites or testing a filter, so need to select a single filter
             # from the dictionary of filters
-            option_list = tuple(self._filter_dict.keys())
+            # pylint doesn't grok dataclasses propertly yet.
+            option_list = tuple(self._filter_dict.keys())  # pylint: disable=no-member
         elif list_target is ProfileKey.SONG_LISTS:
-            # Running song lists, so need to select from available filter sets
-            option_list = tuple(self._filter_set_dict.keys())
+            # Running song lists, so need to select from available song list sets
+            # pylint doesn't grok dataclasses propertly yet.
+            option_list = tuple(
+                self._song_list_sets.keys()  # pylint: disable=no-member
+            )
         else:
             raise RSFilterError(
                 f"_cli_song_list_action called with invalid list target {list_target}."
@@ -509,26 +495,36 @@ class SongListCreator:
         # a valid player profile will automatically refresh player database as well.
         choice = utils.choose(
             options=option_list,
-            header="Select filter or filter set.",
+            header="Select filter or song list set.",
             no_action=(
                 "No selection (warning - you can't create song lists without choosing "
-                "a filter/filter set)."
+                "a filter/song list set)."
             ),
         )
 
         if choice is None:
             return
 
-        choice = cast(str, choice)
+        key = choice[0]
+        if not isinstance(key, str):
+            raise TypeError(
+                f"Unexpected type from filter/song list set choice. Should be string, "
+                f"got f{type(key)}."
+            )
+
         if list_target is ProfileKey.FAVORITES_LIST:
             # Creating a favorites list or testing a single filter here.
-            # Create a synthetic filter set for this case.
+            # Create a synthetic song list set for this case.
             # choice is the name of the filter we should use.
-            filter_set: config.FilterSet = [choice]
+            song_list_set = [key]
         else:
-            # Get the selected filter set from the dict. No need for extended else
-            # clause, as we have checked previously for invalid list_target
-            filter_set = self._filter_set_dict[choice]
+            # Get the selected song list set from the song_list_sets dict. No need for
+            # extended else clause, as we have checked previously for invalid
+            # list_target
+            # pylint doesn't grok dataclasses propertly yet.
+            song_list_set = self._song_list_sets[  # pylint: disable=unsubscriptable-object
+                key
+            ]
 
         confirmed = True
         if report_target is None:
@@ -541,7 +537,7 @@ class SongListCreator:
             )
 
         if confirmed:
-            self.create_song_lists(list_target, filter_set, report_target)
+            self.create_song_lists(list_target, song_list_set, report_target)
 
     def song_list_cli(self) -> None:
         """Provide a command line menu for the song list generator routines."""
@@ -577,20 +573,20 @@ class SongListCreator:
         )
         options.append(
             (
-                "Choose a filter set and create a song list report.",
-                self._cli_filter_set_report,
+                "Choose a song list set and create a song list report.",
+                self._cli_song_list_report,
             )
         )
         options.append(
             (
-                "Choose a filter set and write the list(s) to Song Lists in the "
+                "Choose a song list set and write the list(s) to Song Lists in the "
                 "Rocksmith profile.",
                 self._cli_write_song_lists,
             )
         )
         options.append(
             (
-                "Choose a filter and write the list to Favorites in the "
+                "Choose a filter and write the resulting song list to Favorites in the "
                 "Rocksmith profile.",
                 self._cli_write_favorites,
             )
@@ -604,7 +600,7 @@ class SongListCreator:
             "\n    - The steam user id owns the Rocksmith profile."
             "\n    - A steam user id must be selected before a Rocksmith profile can "
             "be selected."
-            "\n    - Song lists are saved to Rocksmith profile. Player data is "
+            "\n    - Song lists are saved to a Rocksmith profile. Player data is "
             "extracted from this"
             "\n      profile."
             "\n    - You can view/test/debug song lists by printing to the console or "
@@ -613,25 +609,30 @@ class SongListCreator:
             "lists actually saved"
             "\n      into the Rocksmith profile."
             "\n    - You can view/test song lists for a single filter or a complete "
-            "filter set (the latter"
-            "\n      can be very long - consider saving filter set reports to file)."
-            "\n    - You can only save filter set song lists to Rocksmith."
+            "song list set (the latter"
+            "\n      can be very long - consider saving song list set reports to file)."
         )
 
         while True:
             header = self._cli_menu_header()
-            action = utils.choose(
+            choice = utils.choose(
                 options=options,
                 header=header,
                 no_action="Exit program.",
                 help_text=help_text,
             )
 
-            if action is None:
+            if choice is None:
                 break
 
             # otherwise execute the action
-            action = cast(Callable, action)
+            action = choice[0]
+            if not callable(action):
+                raise TypeError(
+                    f"Unexpected type from song list action choice. Should be "
+                    f"callable, got f{type(action)}."
+                )
+
             action()
 
         if utils.yes_no_dialog(
@@ -642,19 +643,19 @@ class SongListCreator:
     def create_song_lists(
         self,
         list_target: ProfileKey,
-        filter_set: config.FilterSet,
+        song_list_set: List[str],
         debug_target: Optional[Union[Path, TextIO]] = None,
     ) -> None:
         """Create song lists and write them to a Steam Rocksmith profile.
 
         Arguments:
             list_target {ProfileKey} -- must be either ProfileKey.SONG_LISTS or
-                ProfileKey.FAVORITES_LIST (import from rsrtools.files.fileconfig).
+                ProfileKey.FAVORITES_LIST (import from rsrtools.files.config).
                 The song list target for creating/writing.
-            filter_set {config.FilterSet} -- The list of filter names that will be
-                used to creat the song lists. The list should contain up to six
-                elements for Song Lists (empty string entry to skip a song list),
-                or one element for Favorites. Any excess elements will be ignored.
+            song_list_set {List[str]} -- The list of filter names that will be used to
+                create the song lists. The list should contain up to six elements for
+                Song Lists (an empty string entry will skip a song list), or one element
+                for Favorites. Any excess elements will be ignored.
 
         Keyword Arguments:
             debug_target {Optional[Union[Path, TextIO]]} -- If set to None, the song
@@ -690,21 +691,23 @@ class SongListCreator:
             )
 
         if list_target is ProfileKey.SONG_LISTS:
-            if len(filter_set) > MAX_SONG_LIST_COUNT:
-                use_set: config.FilterSet = filter_set[0: MAX_SONG_LIST_COUNT - 1]
+            if len(song_list_set) > MAX_SONG_LIST_COUNT:
+                use_set = song_list_set[0 : MAX_SONG_LIST_COUNT]
             else:
-                use_set = filter_set[:]
+                use_set = song_list_set[:]
         elif list_target is ProfileKey.FAVORITES_LIST:
-            use_set = filter_set[0:0]
+            use_set = song_list_set[0:1]
         else:
             raise RSFilterError(
                 f"Create song lists called with an invalid list target {list_target}."
             )
 
         if isinstance(debug_target, Path):
-            with debug_target.open("wt") as fp:
+            # Using open rather than path.open() gives a TextIO type
+            # (Path.open() has type IO[Any], which is not what we want).
+            with open(debug_target, "wt") as fp:
                 song_lists = self._arr_db.generate_song_lists(
-                    use_set, self._filter_dict, cast(TextIO, fp)
+                    use_set, self._filter_dict, fp
                 )
 
         else:
@@ -712,9 +715,10 @@ class SongListCreator:
                 use_set, self._filter_dict, debug_target
             )
 
-        if debug_target is None:
+        if debug_target is None and song_lists:
             # not debugging/reporting, so write song lists to profile, and move
-            # updates to Steam
+            # updates to Steam.
+            # Fail silently if song_lists is empty (nothing to do).
             if self._profile_manager is None:
                 # shouldn't happen, but just in case
                 raise RSFilterError(
@@ -723,10 +727,13 @@ class SongListCreator:
                 )
 
             # Song list update
+            # Note that an empy list will flush the existing song list!
+            # If this is a problem for people, we can add a check for an empty list
+            # at the same place we do a None check and skip.
             for idx, song_list in enumerate(song_lists):
                 if song_list is not None:
+                    # Index 0 for favorites will be cheerfully ignored.
                     self._profile_manager.replace_song_list(
-                        # Index 0 for favorites will be cheerfully ignored.
                         self.player_profile, list_target, song_list, idx
                     )
 
@@ -737,7 +744,7 @@ class SongListCreator:
     def _cli_utilities(self) -> None:
         """Provide command line utilities menu."""
         while True:
-            action = utils.choose(
+            choice = utils.choose(
                 header="Utility menu",
                 no_action="Return to main menu.",
                 options=[
@@ -751,10 +758,17 @@ class SongListCreator:
                 ],
             )
 
-            if action is None:
+            if choice is None:
                 break
 
-            action = cast(Callable, action)
+            # otherwise execute the action
+            action = choice[0]
+            if not callable(action):
+                raise TypeError(
+                    f"Unexpected type from utilities choice. Should be "
+                    f"callable, got f{type(action)}."
+                )
+
             action()
 
     def _cli_clone_profile(self) -> None:

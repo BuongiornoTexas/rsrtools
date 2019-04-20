@@ -5,7 +5,7 @@ The primary public class is RSProfileManager. The other classes are helpers that
 the operation of the profile manager class.
 
 For command line options (database setup, reporting), run:
-    'python -m rsrtools.files.profile_manager -h'
+    'python -m rsrtools.files.profilemanager -h'
 """
 
 import argparse
@@ -16,12 +16,11 @@ import shutil
 from decimal import Decimal
 from zipfile import ZipFile
 from typing import Dict, Sequence, Union, Tuple, Optional, Any, Iterator, Set, List
-from typing import cast
 from pathlib import Path
 from os import fsdecode
 
 from rsrtools import utils
-from rsrtools.files.fileconfig import ProfileKey, MAX_SONG_LIST_COUNT
+from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
 from rsrtools.files.savefile import RSSaveFile, RSJsonRoot
 from rsrtools.files.steamcache import SteamMetadata, SteamMetadataError
 
@@ -593,9 +592,9 @@ class RSProfileDB(RSSaveWrapper):
 
         Arguments:
             target {ProfileKey} -- must be either ProfileKey.SONG_LISTS or
-                ProfileKey.FAVORITES_LIST (import from rsrtools.files.fileconfig).
+                ProfileKey.FAVORITES_LIST (import from rsrtools.files.config).
             new_song_list {List[str]} -- The list of new songs to be inserted into the
-                song list. Refer rsrtools.songlists.arrangement_db for details on song
+                song list. Refer rsrtools.songlists.database for details on song
                 list generation and structure. In summary, this is a list of the short
                 form song names: e.g. ["BlitzkriegBop", "CallMe"].
             list_index {int} -- If target is SONG_LISTS, the index of the song list to
@@ -1181,11 +1180,21 @@ class RSProfileManager:
             # re-read working directory to load updated file set.
             chosen_file_set = RSFileSet(self._working_save_path)
 
-        # as we *should* have a consistent fileset, cast away the
-        # None values.
         self._profiles = chosen_file_set.profiles
-        self._local_profiles = cast(RSLocalProfiles, chosen_file_set.local_profiles)
-        self._steam_metadata = cast(SteamMetadata, chosen_file_set.steam_metadata)
+
+        if chosen_file_set.local_profiles is None:
+            # Really shouldn't be possible.
+            raise RSFileSetError(
+                f"Very unexpected: undefined {LOCAL_PROFILES} for chosen fileset."
+            )
+        self._local_profiles = chosen_file_set.local_profiles
+
+        if chosen_file_set.steam_metadata is None:
+            # Really shouldn't be possible.
+            raise RSFileSetError(
+                f"Very unexpected: undefined steam metadata for chosen fileset."
+            )
+        self._steam_metadata = chosen_file_set.steam_metadata
 
     @property
     def source_steam_uid(self) -> str:
@@ -1282,7 +1291,13 @@ class RSProfileManager:
                 "User exit: User did not select a valid Rocksmith file set for use."
             )
 
-        steam_uid = cast(str, choice)
+        steam_uid = choice[0]
+        if not isinstance(steam_uid, str):
+            raise TypeError(
+                f"Unexpected type from file set choice. Should be string, "
+                f"got f{type(steam_uid)}."
+            )
+
         if steam_uid == MINUS_ONE:
             file_set = working_file_set
         else:
@@ -1374,21 +1389,20 @@ class RSProfileManager:
             RSProfileError: If the users rejects setup of the workspace.
 
         """
-        perform_setup = utils.choose(
-            [
-                (
-                    "Create directories and/or delete file sets from update directory.",
-                    True,
-                )
-            ],
-            header="Some required working directories are missing and/or the update "
-            "directory contains an old set of Rocksmith saves. \nDo you want to "
-            "either: have the directories created and the files deleted; or do nothing "
-            "and raise an error?",
-            no_action="Do nothing and raise an error.",
+        perform_setup = utils.yes_no_dialog(
+            "Some required working directories are missing and/or the update directory "
+            "contains"
+            "\nan old set of Rocksmith saves."
+            "\nYou can either: have the directories created and the files deleted; or "
+            "do nothing "
+            "\nand raise an error."
+            "\n"
+            "\nWould you like to create the directories and/or delete the file sets "
+            "from the"
+            "\nupdate directory?"
         )
 
-        if perform_setup is None:
+        if perform_setup is False:
             raise RSProfileError(
                 "User exit: Rocksmith profile manager requires working directories and "
                 " a clean"
@@ -1396,7 +1410,7 @@ class RSProfileManager:
                 "\nEither perform this set up or allow the profile manager to do so."
             )
 
-        return cast(bool, perform_setup)
+        return perform_setup
 
     def _setup_workspace(self, base_dir: Path, auto_setup: bool = False) -> None:
         """Check and create working directory structure and state.
@@ -1653,9 +1667,9 @@ class RSProfileManager:
         Arguments:
             profile_name {str} -- The target profile name or unique id.
             target {ProfileKey} -- must be either ProfileKey.SONG_LISTS or
-                ProfileKey.FAVORITES_LIST (import from rsrtools.files.fileconfig).
+                ProfileKey.FAVORITES_LIST (import from rsrtools.files.config).
             new_song_list {List[str]} -- The list of new songs to be inserted into the
-                song list. Refer rsrtools.songlists.arrangement_db for details on song
+                song list. Refer rsrtools.songlists.database for details on song
                 list generation and structure. In summary, this is a list of the short
                 form song names: e.g. ["BlitzkriegBop", "CallMe"].
             list_index {int} -- If target is SONG_LISTS, the index of the song list to
@@ -1719,9 +1733,17 @@ class RSProfileManager:
         )
 
         if choice is None:
-            choice = ""
+            ret_val = ""
 
-        return cast(str, choice)
+        else:
+            ret_val = choice[0]
+            if not isinstance(ret_val, str):
+                raise TypeError(
+                    f"Unexpected type from profile choice. Should be string, "
+                    f"got f{type(ret_val)}."
+                )
+
+        return ret_val
 
     def cl_clone_profile(self) -> None:
         """Provide a command line interface for profile cloning."""
@@ -1821,7 +1843,7 @@ class RSProfileManager:
                     count = count.strip()
                     print(arr_id, count)
                     self.set_arrangement_play_count(
-                        target, arr_id, int(cast(int, count))
+                        target, arr_id, int(count)
                     )
 
             self.write_files()
