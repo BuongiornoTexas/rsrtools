@@ -5,13 +5,846 @@ Rocksmith save files (profiles). Incidentally, it also provides tools for managi
 Rocksmith profiles.
 
 Acknowledgements
-----------------
+================
 
 **@0x0L** for rs-utils and rocksmith Rocksmith tools. All of the save file and data file 
 handling routines are based on this code.
 
 **@sandiz** for rs-manager, which is an awesome set listing tool. This package also 
 gave me a deeper understanding of the Rocksmith PSARC structure.
+
+Warnings
+========
+
+As this package is all about editing game saves, here are a couple of warnings.
+
+1. This package edits Rocksmith profiles. Use at your own risk and with the 
+   understanding that this package carries the risk of corrupting your save files
+   (to date it has worked fine for me - YMMV, and it will definitely stop working if
+   Ubisoft make any changes to the Rocksmith save file format).
+
+2. This package is (obviously) not endorsed by Ubisoft - if you use this package and run
+   into problems with your save files, Ubisoft will not be very interested in helping
+   you. If this happens, I will try to help, but will be limited by my available time
+   and the complexity of your problem. So, in effect repeating the first warning: use
+   this package at your own risk.
+
+3. **Don't run this package at the same time as  Rocksmith is running.** You'll end up 
+   crossing the save files and nobody will be happy (mostly you though).
+
+4. This package will only work on windows at the moment. It will require some 
+   customisation/testing for Mac OS X, and I have no idea what would be needed for 
+   Linux/PS4/XBox song lists. (The Mac OS X version should be out shortly.)
+
+
+TL:DNR
+======
+
+If you know what you are doing with python and know your way around the Customs Forge
+Song Manager, here are the recommended quick start steps.
+
+0. The package only works on Windows for now (macos support coming soon).
+
+1. **READ** the section on setting up a test profile. Until you are familiar with the
+   package, this will be your best safeguard against damaging your precious save
+   game(s).
+
+2. **SET UP** a Rocksmith test profile.
+
+3. Install python 3.7.x (I'm on 3.7.3, and you will need some 3.7 features).
+
+4. Create a virtual environment. 
+
+5. Install rsrtools into your virtual environment with::
+
+    pip install rsrtools
+
+6. Create a working folder/directory.
+
+7. Create an ArrangementsGrid.xml file from Customs Forge Song Manger and copy or move
+   it into the working directory (hopefully this step will become optional with the
+   implementation of a PSARC scanner).
+
+8. Start your virtual environment and run the package with::
+
+    python -m rsrtools.songlists.songlists <path to working directory>
+
+    # If you start python in the working directory, you could use:
+    python -m rsrtools.songlists.songlists .
+
+9. **Clone your save game into the test profile** and do all of your testing on this
+   test proile until you are comfortable that the package is working and doing what you
+   want it to do.
+
+Motivation
+==========
+
+Hopefully this section doesn't read too much like a food blog.
+
+I've implemented this package because, while I really enjoy Rocksmith 2014 Remastered as
+a learning tool, I've had ongoing frustration with creating custom play lists. I 
+thought there had to be a better way (and I also wanted a project I could use to learn
+python). My initial goal for this package was to be able to easily create song lists for
+a specific tuning and play counts - I break my practice sessions up into new stuff,
+moderately new and old - and it's a real pain in the backside scrolling through 500 
+odd tracks. And it's also a pain in the backside setting up custom song lists in
+Rocksmith. So that's the motivation for this project. During implementation, I realised
+it would be possible to create much more varied song lists (not so useful for me, but
+maybe so for others).
+
+Introduction
+============
+
+The purpose of this package is to provide an improved song list creator for Rocksmith.
+This package allows creation of song lists based on a variety of criteria, and allows
+the criteria to be built up hierarchically. Here is an incomplete list of the type of 
+song lists you can create with this package. If you want a particular type of song list
+and can't see how to build it from the help, ask me and I'll see if I can either come up
+with a solution or add the needed functionality.
+
+- All arrangements with E Standard tunings (not very exciting).
+- All songs with E Standard tunings at 440 pitch (still not exciting).
+- All D standard 440 songs with a played count between 12 and 18 (getting somewhere
+  now).
+- All Eb standard 440 songs with a mastery between 40 and 65%.
+- All E standard songs that I have played at least once on score attack, but haven't got
+  a platinum badge (yet).
+- All easy E Standard songs that I haven't yet got a platinum badge for (OK. So it's a
+  long list for me, but something to work on).
+
+I'm simplifying a bit here, but it gives an idea of the type of thing that this
+package is intended to do. Extending the above examples, the song lists could be created
+for songs or a specific arrangment type (Bass, Lead, Rhythm).
+
+Criteria that can be used for song list creation include:
+
+* List criteria:
+
+  - Tuning
+
+  - ArrangementName (Bass, Lead, Lead1, Lead2, Lead3, Rhythm, Rhythm1, Rhythm2, Combo,
+    Combo1, Combo2, Combo3)
+
+  - Song key (typically the unique part of DLC/song file names)
+
+  - ArrangementId (expert functionality)
+
+  - Artist Name
+
+  - Track Title
+
+  - Album Name
+
+* Range criteria:
+
+  - Album Year
+
+  - Pitch (A440 or otherwise)
+
+  - Tempo
+
+  - Note Count
+
+  - Played Count
+
+  - Mastery Peak
+
+  - SA Easy Badges
+
+  - SA Medium Badges
+
+  - SA Hard Badges
+
+  - SA Master Badges
+
+  - and a few more.
+
+Filtering can be by inclusion or exclusion. A more complicated example would be: all 
+E Standard, D Standard and C Standard lead tracks, but nothing by the Foo Fighters or
+Green Day and nothing in the decade 2000-2010, only tracks I haven't completed a hard
+platinum score attack, and only tracks I've played at least 4 times. (I can't imagine
+using this filter myself, but somebody with a grudge against Dave Grohl might care).
+
+Alternatives
+============
+
+1. The Customs Forge Song Manager (CFSM) provides a different and better supported
+   mechanism for creating song lists based on moving files in and out of directories.
+   My approach provides some of the same functionality, with the following variations:
+
+   - I don't move song files, but rather edit the song lists directly in the Rocksmith
+     profiles/save files.
+
+   - I support building song lists based on data in save files (played counts, score 
+     attack performance, mastery, etc.). 
+     
+   The CFSM approach is very actively supported, 
+   so if you aren't interested in the specific functionality my approach provides, I'd
+   go with their tool, which is available from: http://customsforge.com/.
+
+2. rs-manager (https://github.com/sandiz/rs-manager) is GUI application that can 
+   create setlists manually or from procedural filtering similar to rsrtools. It is a
+   much friendlier way to generate song/set lists than rsrtools. The rs-manager setlists
+   are for reference only (i.e. rs-manager does not support loading setlists into
+   Rocksmith save files).
+   
+   *However*, @sandiz, the rs-manager developer, has implemented functionality to export 
+   rs-mananger setlists in a format that can be used by rsrtools. A near term update of
+   rsrtools will allow loading of these setlists into Rocksmith save files. Once this is
+   done, we will have a workflow where setlists can be generated using the
+   rs-manager GUI and then exported for loading into Rocksmith by a simple 
+   rsrtools command (bypassing the joys of setting up text filters for rsrtools).
+
+That's the Long Intro over. 
+
+Documentation and Tutorial
+==========================
+
+The documentation provided here is fairly detailed. I've done this on the basis that
+a significant portion of users will be interested in using the system, but not 
+interested in the details of the python. Consequently, there is a lot of step by step
+detail included. If you know your way around python, programming and CFSM, you should
+be able to skim through a lot of the content very quickly (and you can modify the set up
+to match your own environment).
+
+This package provides:
+
+- A command line tool for creating Rocksmith song lists from a series of filters, and
+  writing the resulting song lists into a Rocksmith profile. The command line workflow
+  is described below.
+- A set of routines that can be used to implement a GUI version of the command line
+  tools (I have not implemented a GUI, as the command line is sufficient for my
+  requirements - see the section on Alternatives for more GUI oriented solutions).
+
+Repeating warning #4, this package is currently only supported on Windows (and only
+tested on Windows 10). 
+
+Pre-requisites
+--------------
+
+* Download and install Python 3.7+ from www.python.org. (I'd recommend 3.7.3, which is 
+  what I'm using).
+
+* Create a folder/directory for running rsrtools. For this tutorial, I'm assuming this 
+  is: ``D:\RS Stuff``, and create an enviroment sub-directory ``Env`` and a working 
+  sub-directory ``Working`` in the rsrtools directory. At the end of this step, my 
+  folders are::
+
+       D:\RS Stuff
+       D:\RS Stuff\Env
+       D:\RS Stuff\Working
+
+* Set up a python virtual environment for rsrtools and install the package via pip. If
+  you are unfamiliar with python, follow these steps:
+  
+  1. Open a command window (cmd.exe).
+
+  2. Type the following commands. The hashed lines are comments that explain what each
+     command does and can be ignored::
+        
+        # Change paths as required to match your rsrtools directory
+        # Create the environment in D:\RS Stuff\Env
+        python -m venv "d:\RS Stuff\Env"
+
+        # Activate the python environment
+        "d:\RS Stuff\Env\Scripts\activate.bat"
+
+        # install rsrtools and supporting libraries
+        pip install rsrtools
+
+  3. Exit the command window.
+
+Set up a Testing Profile!
+-------------------------
+
+Until you are confident that this package is working properly, I **strongly** suggest
+you do some testing on a temporary Rockcmsith profile. I'd also suggest testing all new
+song list filters on the temporary profile before applying them to your main profile.
+
+The process I follow for testing changes before applying them to my main profile is:
+
+- Create the Testing profile (described in this section).
+
+- Clone my profile into the Testing profile. This is very useful if you want to test 
+  song lists based on played counts, score attack, mastery, etc. The command line
+  workflow in the following section explains how to clone your profile.
+
+- Try out the song filters on the Testing profile.
+
+The process for setting up a temporary profile is as easy as it sounds:
+
+a. Start Rocksmith.
+
+b. At the Select Profile Menu, click New Profile, name the profile and go through setup
+   (the setup step can't be avoided unfortunately).
+
+Command line workflow summary
+=============================
+
+Repeating an important warning: **Don't run this package at the same time as  Rocksmith 
+is running.** You'll end up crossing the save files and obody will be happy (mostly you
+though).
+
+Preliminaries
+-------------
+
+1. Create a working directory that will contain working copies of Rocksmith files, the 
+   arrangement database, and the song list configuration file. For this tutorial I will 
+   use the folder/directory set up in the previous section::
+
+       D:\RS Stuff\Working
+
+2. Download and install the Customs Forge Song Manager from: http://customsforge.com/
+
+   The rsrtools song list creator needs information about song arrangements. I plan to
+   add a song library scanner in the future, but in the interim, the easiest way to get
+   this information is from a CFSM report. The steps required are:
+
+   * Run CFSM.
+
+   * Go to Arrangement Analyzer.
+
+   * Go to Settings (check that the setting are for Arrangement Analyzer).
+      
+     - Tick 'Include RS2014 Base Songs'
+      
+     - Tick 'Include RS1 Compatibility Packs'
+
+   * Go Back to Arrangement Analyzer.
+
+   * Click the 'Rescan' button (this will take a while).
+
+   * Export to XML. This should create the ArrangementsGrid.xml file needed by rsrtools.
+
+   * Put the xml file somewhere easy to find.
+
+   I normally drop the xml file into my working directory - this allows automatic 
+   loading of the arrangement data into the database.
+
+3. Optional, but strongly recommended: Create a temporary/testing profile so that you 
+   can get comfortable with how this package works on Rocksmith save files (I use this
+   approach any time I'm experimenting with major changes). See the previous section for
+   a description of this process.
+
+   For this tutorial, I'll assume the test profile is called 'Testing'. I'll go through
+   the steps to clone data from your normal profile into the test profile later on.
+
+4. Because I'm lazy, at this point I put together a batch file in the working 
+   directory. Let's call it 'song_lists.bat' and put the following lines in it::
+
+        echo on
+        Call "D:\RS Stuff\Env\Scripts\Activate.bat"
+        python -m rsrtools.songlists.songlists "D:\RS Stuff\Working"
+        Deactivate.bat
+
+   You will need to edit your paths to match where you have put your python environment
+   and your working directory.
+
+   When I say run the batch file below, I suggest that you do this initially from a 
+   command shell (cmd.exe). This will allow you to see any errors (otherwise if you 
+   double click on the batch file, the screen will flash up and close before you have a 
+   chance to read anything). Once you are confident everything is working, you can run
+   it with a double click.
+
+5. Skip this step if you have put the ArrangementsGrid.xml file in the working 
+   directory.
+
+   Otherwise you need to set up the core arrangement table in the database with the 
+   following commands in command shell, substituting in the path to your arrangements 
+   file::
+
+        Call "D:\Python Env\Rocksmith\Scripts\Activate.bat"
+        python -m rsrtools.songlists.songlists "D:\RS Stuff\Working" --CFSMxml <path_to_xml_file>
+
+   When the menu comes up, choose 0 to exit the package, and then choose y to save the
+   configuration. (hit enter after making a choice). Then exit the command shell.
+
+6. Run the batch file to set up the default configuration. This should result in text 
+   menu something like the following::
+
+      Rocksmith song list generator main menu.
+
+          Steam user id:       'not set'
+          Rocksmith profile:   'not set'
+          Reporting to:        Standard output/console
+          Working directory:   D:\RS Stuff\Working
+
+      Please choose from the following options:
+
+        1) Change/select steam user id. This also clears the profile selection.
+        2) Change/select Rocksmith player profile.
+        3) Toggle the report destination.
+        4) Choose a single filter and create a song list report.
+        5) Choose a song list set and create a song list report.
+        6) Choose a song list set and write the list(s) to Song Lists in the Rocksmith profile.
+        7) Choose a filter and write the resulting song list to Favorites in the Rocksmith profile.
+        8) Utilities (database reports, profile management.)
+        0) Exit program.
+        h) Help.
+
+      Choose>
+
+   All of the text menus and text prompts will ask you to either select a number or 
+   select y/n (followed by enter to action).
+
+7. At this menu, you first need to select a steam user id, so choose 1 to start a text 
+   menu for selecting from the available steam user ids. For this tutorial, our 
+   selection options look like this::
+
+      Please select a steam user id/Rocksmith file set from the following options.
+
+      1) Steam user '12345678'. This is the user logged into steam now. (Sat Sep  1 16:47:25 2018).
+      0) Do nothing and raise error.
+
+   We get a bit of help here - only one steam id is available, and it is the user logged
+   into steam now. So we choose 1 to select user ``12345678``.
+
+   Most people will only have one user id available - if you have more than one, you may
+   need a bit of trial and error to work out which one in is yours. The easiest way to
+   do this is select an id and then check if the Testing profile can be selected (next
+   step). If not, you have the wrong steam id and need to try another one.
+
+8. After selecting a steam id, you need to select a user profile for song list creation.
+   Choose 2 to start this process, and then choose a profile ('Testing' for this
+   tutorial). After completing this process, the first two information lines of the 
+   song list menu should be similar to::
+
+            Steam user id:       '12345678'
+            Rocksmith profile:   'Testing'
+
+9. At this point, it's worth saving the changes you have made.
+
+   Select 0 to exit the program.
+
+   You will then be offered the option to save changes to the configuration file. Choose y.
+
+   After this, your working directory should contain the following files and 
+   sub-directories::
+
+     ArrangementsGrid.xml    - If you put this file in the working directory.
+     RS_Arrangements.sqlite  - The song list arrangements database.
+     config.toml             - The default configuration file. Heart and brains of the 
+                               system. More on this below.
+     song_lists.bat          - If you created it.
+     \-- RS_backup           - Backups of Rocksmith save files will be stored here.
+     \-- RS_update           - Changed save files will be stored here before copying
+                               back to steam.
+     \-- RS_working          - Save files will be copied from steam to this folder 
+                               before working on them.
+
+   If your working directory doesn't match this, try this step again.
+
+Clone Profile
+-------------
+
+**Optional, but recommended**. Clone data into the Testing profile. If you clone data
+from your main profile, you can test out the song list filters before overwriting
+the song list in your main profile.
+
+I'll assume we are cloning data from the profile 'Eric the Half a Bee' into 
+'Testing'. This will replace all data in the Testing profile.
+
+Run the batch file.
+
+Select the utilities submenu, and then select Clone profile.
+
+Make sure you get the next two right. Cloning destroys data in the profile you are
+copying to (the target).
+
+Select the source profile for cloning. For the tutorial, I'm copying **FROM** 
+'Eric the Half a Bee'.
+
+Select the target profile for cloning. For the tutorial, I'm copying **TO** 
+'Testing'.
+
+A yes/non confirmation message will pop up. Check that the cloning operation is
+doing what you expect, and if so choose y.
+
+Return to the main menu and exit the program. No need to save config changes this
+time.
+
+Now is a good time to start up Rocksmith and check the Testing profile:
+
+* To see that it still works after cloning.
+
+* To check that the data from your main profile has been copied in correctly.
+
+Song List Testing
+------------------
+
+The package is now set up with a default configuration, which you can use for some
+basic testing before creating your own song list filters - or you can skip this step
+and go straight to making your own.
+
+Run the batch file and check that the steam user id and profile are as expected::
+
+        Steam user id:       '12345678'
+        Rocksmith profile:   'Testing'
+
+Experiment with the reporting options:
+
+- Toggle between reporting to file and console (File reports are saved in the 
+  working directory).
+
+- Test out reports on a single filter and on a filter set.
+
+If you are reporting to the console, you will almost certainly need to scroll up to 
+see the report output, as the song list menu takes up most of the normal console 
+window.
+
+Also experiment with the reporting options in the utility sub-menu. These reports 
+may be useful when developing your own filters.
+
+If you are happy with the reporting, you can try writing the default E Standard song
+lists to the Testing profile. This will create the following song lists in the 
+Testing profile:
+
+- E Standard 440 leads that have been played 1-12 times in learn a song.
+
+- E Standard 440 leads that have been played 13-27 times in learn a song.
+
+- E Standard 400 leads that have been played 27 or more times in learn a song.
+
+- E Standard song with an off concert pitch (i.e. not A440).
+
+- Will not be changed.
+
+- All E Standard songs that you have played in easy score attack, but haven't 
+  yet got a platinum pick.
+  
+Open up Rocksmith and check the song lists to see if they match expectation (song
+lists 1, 2 or 3 may be empty you if haven't played any songs that match the filter
+criteria.
+
+If you are happy with all of this, the next step is to edit ``config.toml`` to 
+create your own song list filters.
+
+The Configuration File
+======================
+
+All song lists are driven by the ``config.toml`` file in the working directory. This 
+section describes the tructure of this file. If you end up with major problems with this
+file, I suggest renaming the problem file and creating a new config file by following 
+the setup steps in the tutorial (you can also try contacting me for help).
+
+TOML is somewhat similar to windows .ini files. I've used it because it is a human 
+readable/editable text form that "just works" and because python appears to be leaning 
+towards it as a standard for configuration files. It's a bit fiddly to edit 
+for the data structures used in rsrtools, but it's nowhere near as bad as JSON (which
+was the likely alternative).
+
+Unfortunately, if any of the the TOML is malformed, the song list creator will throw an
+error and exit.  However, when this happens, you will (hopefully) get an informative 
+error message that will help you track the problem down. And a gotcha - the input is 
+validated in two stages - some checking when loading, and some checking values when 
+creating the song lists. So your debugging may need to be two stage as well. I'd also
+suggesting setting up one song list at a time to minimise your pain.
+
+TODO I'm planning to put together some form of primitive filter builder as part of the 
+next round of updates
+
+I suggest that you open and look at ```config.toml``` while reading the rest of this
+section.
+
+The configuration file is broken into three sections::
+
+      [settings]
+      ...
+      
+      [filters]
+      ...
+
+      [song_list_sets]
+      ...
+
+Note that correct parenthesis type and double quoting is vital, and ``...`` shows 
+something I will fill in more detail on later.
+
+Settings
+--------
+
+The settings section is the simplest of the three, describing the location of the CFSM 
+xml file, the default steam user id, and the default profile name::
+
+      [settings]
+      CFSM_file_path: "D:\\RS Stuff\\Working\\ArrangementsGrid.xml"
+      steam_user_id": "12345678"
+      player_profile": "Testing"
+      version = "x.x.x"
+
+Version is for future functionality.
+
+Song List Sets
+---------------
+
+The song list sets section is just about this simple as the settings - each song list 
+set is a named list containing up to six filter names that will be used to create the 
+song lists in the Rocksmith profile (the next part of this section describes
+filter definitions). The following example shows the structure::
+
+    [song_list_sets]
+    "E Standard" = [ "E Std Low Plays", "E Std Mid Plays", "E Std High Plays", 
+        "E Std Non Concert", "", "Easy E Std Plat Badge in progress",]
+    "Non E Std Tunings" = [ "Drop D", "Eb Standard", "Eb Drop Db", "D Standard", 
+        "D Drop C", "Other Tunings",]
+    Testing = [ "Artist test", "Played Count of 1 to 15",]
+
+The song list set names are "E Standard", "Non E Std Tunings", and "Testing". You can
+choose your own unique names for filter sets when you add them. The "E Standard" song 
+list set consists of five unique filters - three filters for E 440 with differing play
+counts, an E standard non 440, and an easy platinum score attack in progress filter. It
+also includes "" for the fifth filter - this tells the song list creator to leave the 
+fifth song list in the profile unchanged.
+
+In summary, the format of a song list set is::
+
+    "<set name>" = [ "<filter 1>", "<filter 2>", "<filter 3>", ... "<filter 6>"]
+
+where the values in <> are the song list set names, the filter names or empty to skip
+a song list.
+
+The song list creator will only modify as many song lists as there are filters defined
+(up to six), and will not change any list with "" specified for the filter. 
+So the "Testing" filter set will only modify song list one and two and will leave lists
+3-6 unchanged.
+
+Filters
+--------
+
+The filters section consists of a list of named filters, where each named filter is made
+up of the following elements:
+
+- A basic filter definition (one only).
+- One or more sub-filters, which in turn may be either list type or range type.
+
+The following sections detail these elements.
+
+Basic Filter Definition
+-----------------------
+
+A basic filter definition has the form::
+
+      [filters."<filter name>"]
+      base = "<base filter name>"
+      mode = "<mode value>"
+
+The filter can either have a base filter, in which case the filter criteria will be
+applied to records generated from the base filter, or if base filter is "" the filter  
+will be applied to all records in the arrangments database. That is, the base filter is
+an optional field that allows building of nested or hierarchical filters. 
+
+Mode must be either "AND" or "OR", and specifies the way that sub-filters will be
+combined. For "AND", the filter will only return the records that match all of the
+sub-filters, while for "OR", the filter will return all records that match at least one 
+of the sub-filters (i.e. AND narrows, while OR is inclusive).
+
+List Type Sub-filter
+--------------------
+
+The list type sub-filter is of the form::
+
+        [filters."<filter name>".sub_filters.<list field name>]
+        include = <true or false>
+        values = [ "value 1", "value 2", ... , "<value N>",]
+
+``<list field name>`` must be one of the list type field names::
+
+          SongKey
+          Tuning
+          ArrangementName
+          ArrangementId
+          Artist
+          Title
+          Album
+   
+ArrangementId may be useful for building song lists of alternative/bonus arrangements.
+     
+Include must be ``true`` or ``false``. If ``true``, the filter will return the records
+for song arrangements whose field values match the values in the list. If ``false``, the 
+filter will return the records for song arrangements whose field values that do
+not match the values in the list. E.g. if the field name is Artist and the values
+are Queen and Roxette, then an include value of true will return only song 
+arrangements by Queen and Roxette. If include is false, then all arrangements
+except songs by Queen and Roxette will be returned.
+
+The list values must match values in the arrangements data and must be double quoted - 
+the easiest way to check on validity is to run the relevant reports in the utilities
+menu of the song list creator (e.g. Tunings, Arrangement Types, Artists, Album Names
+and Track Titles).
+
+**GOTCHA**: Values must be exact matches on content and case. So "E Standard" works,
+but "e standard" doesn't, likewise it must be "Foo Fighters", and not "Foo f" or 
+"foo fighters". I may add wildcard support at some point in the future if there is
+strong support for it.
+
+Range Type Sub-filter
+---------------------
+
+The range type sub-filter is of the form::
+
+        [filters."<filter name>".sub_filters.<range field name>]
+        include = <true or false>
+        ranges  = [ [<low1>, <high1>], [<low2>, <high2>] ]
+
+``<range field name>`` must be one of the range type field names::
+
+        Pitch"
+        Tempo"
+        NoteCount"
+        Year"
+        PlayedCount"
+        MasteryPeak"
+        SAEasyCount"
+        SAMediumCount"
+        SAHardCount"
+        SAMasterCount"
+        SAPlayedCount"
+        SAEasyBadges"
+        SAMediumBadges"
+        SAHardBadges"
+        SAMasterBadges"
+
+SA stands for score attack, SA*Count is the score attack play account at the level, and
+SAPlayedCount is the total score attack play count. 
+
+The SA_*_BADGES values have the following meanings:
+
+- 0 no badge/not played yet. 
+- 1 strike out/three red crosses.
+- 2 bronze/two red crosses
+- 3 silver/one red cross
+- 4 Gold
+- 5 Platinum
+
+When I set up a badge filter, I'm normally only interested in songs I have played and 
+haven't yet got a a platinum badge for, so I use a range value of  [[1, 4]]. I generally
+filter zero out, as otherwise the filter returns all un-played arrangements.
+
+        "Lead arrangements": {
+            "QueryFields": {... definitions ...}
+        },
+        "E Standard Leads": {
+            "BaseFilter": "Lead arrangements",
+            "QueryFields": {... definitions ...}
+        },
+        "E Standard low play count": {
+            "BaseFilter": "E Standard Leads",
+            "QueryFields": {... definitions ...}
+        }
+    }
+
+    QueryFields provide most of the filter logic and are described below. If a filter 
+    does not have a BaseFilter field, then the query logic will apply to total song list data set. However, if a BaseFilter is provided, then the query logic applies to
+    output from that base filter. The example above demonstrates this nested filtering: The Lead arrangements filter
+    will generate a list of all lead arrangements. The E Standard leads filter will take this list and remove all non
+    E standard arrangements, and finally, the low play count list removes all high play count tracks.
+
+    This nesting function improves re-usability of filter logic and makes assembling complex filters quite a lot
+    simpler. (This mechanism could definitely be improved further, but hey, it's only a simple playlist creator.)
+
+    The QueryFields are the final element of the filter definitions. These are a list of query definitions that will
+    be used to create the filtered song list, and have the following structure:
+
+    "QueryFields": [
+        {... definition 1 ...},
+        {... definition 1 ...},
+        {... definition 1 ...}
+    }
+
+    A quick note - you can build up a complex query by using multiple definitions in the QueryFields. For example, the
+    nested filters shown above could have been built in a single filter as follows:
+
+    "QueryFields": [
+        {... include only lead arrangements ...},
+        {... and include only E standard arrangements ...},
+        {... and cull high play counts ...}
+    }
+
+    However, to date I have always found the most effective way to build the filters is to use a single QueryField
+    definition per filter, and then build complexity by nesting. (Either way is fine, so go with whatever works best
+    for you).
+
+    There are two possible types of QueryField definitions: a string value list, and a range list. The structure a for
+    a value list is:
+
+        "Other Value List": {
+          "BaseFilter": "Not Bass, Rhythm",
+          "QueryFields": [
+            {
+              "Field": "TUNING",
+              "Include": true,
+              "Values": [
+                "C Standard",
+                "Open A",
+                "Open D",
+                "Open Dm7",
+                "Open E",
+                "Open G",
+                "Other"
+              ]
+            }
+          ]
+        }
+
+
+
+
+    The second type of QueryField is a range list, which has the structure:
+
+        "Play count Range List": {
+          "BaseFilter": "Not Bass, Rhythm",
+          "QueryFields": [
+            {
+              "Field": "PLAYED_COUNT",
+              "Include": true,
+              "Ranges": [
+                [
+                  1,
+                  12
+                ],
+                [
+                  18,
+                  24
+                ]
+              ]
+            }
+          ]
+        }
+
+
+
+    Include must be true or false. If true, the filter will only include arrangements with values in the ranges
+    specified in the ranges list. If false, the filter will exclude values in the specified ranges.
+
+    Ranges is a list of low/high value pairs - i.e:
+
+        [
+            [low_1, high_1],
+            [low_2, high_2],
+            ...
+        ]
+
+    The only constraint on the values is that they must be greater than or equal to zero. Note that the number values
+    are not double quoted. Something to be aware of: if you enter a low value that is greater than the high value, the
+    package will assume you have your numbers backward and will swap them silently.
+
+Package Caveats
+===============
+
+Be aware that the package currently has a couple of irritating quirks:
+
+- It can't distinguish between the representative (default) arrangement on a path and 
+  the alternative/bonus arrangements on that path (i.e. it can't tell which of the leads
+  is the default).
+
+- A related issue. It can't tell which path Rocksmith (OG) combo tracks should be
+  allocated to.
+
+I know how to resolve the issue, but it is waiting on the song scanner implementation. 
+The way I work around this is to play all of the tracks that I want to show up in a 
+filter at least once, and then apply a minimum play count criteria. For my use case, 
+this is mainly an issue for E standard arrangements - I don't tend to worry about this
+for the alternate tunings.
 
 TODO
 ----
@@ -20,9 +853,16 @@ TODO
     integration option. 
   - Complete PSARC scanner (welder.py)
   - Convert song list configuration file from JSON to much more readable TOML.
+  - Setup.cfg checks before 0.1 releas:
+        - version
+        - add changelog to long-description
+        - license file
+        - Classifiers
+        - need to do a check that all of the setup.cfg is actually transferring to 
+          metadata (- vs _)
 
 Development notes
------------------
+=================
 
 20190420 The song list manager and database modules are functional and in beta testing.
 Pending documentation update for 0.1 release.
