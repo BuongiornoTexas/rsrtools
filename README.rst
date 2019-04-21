@@ -4,6 +4,9 @@
 Rocksmith save files (profiles). Incidentally, it also provides tools for managing
 Rocksmith profiles.
 
+
+.. contents::
+
 Acknowledgements
 ================
 
@@ -107,17 +110,20 @@ Introduction
 The purpose of this package is to provide an improved song list creator for Rocksmith.
 This package allows creation of song lists based on a variety of criteria, and allows
 the criteria to be built up hierarchically. Here is an incomplete list of the type of 
-song lists you can create with this package. If you want a particular type of song list
-and can't see how to build it from the help, ask me and I'll see if I can either come up
-with a solution or add the needed functionality.
+song lists you can create with this package.
 
 - All arrangements with E Standard tunings (not very exciting).
+
 - All songs with E Standard tunings at 440 pitch (still not exciting).
+
 - All D standard 440 songs with a played count between 12 and 18 (getting somewhere
   now).
+
 - All Eb standard 440 songs with a mastery between 40 and 65%.
+
 - All E standard songs that I have played at least once on score attack, but haven't got
   a platinum badge (yet).
+
 - All easy E Standard songs that I haven't yet got a platinum badge for (OK. So it's a
   long list for me, but something to work on).
 
@@ -174,6 +180,10 @@ Green Day and nothing in the decade 2000-2010, only tracks I haven't completed a
 platinum score attack, and only tracks I've played at least 4 times. (I can't imagine
 using this filter myself, but somebody with a grudge against Dave Grohl might care).
 
+If you want a particular type of song list and can't see how to build it from the help, 
+ask me and I'll see if I can either come up with a solution or add the needed 
+functionality.
+
 Alternatives
 ============
 
@@ -191,7 +201,7 @@ Alternatives
    so if you aren't interested in the specific functionality my approach provides, I'd
    go with their tool, which is available from: http://customsforge.com/.
 
-2. rs-manager (https://github.com/sandiz/rs-manager) is GUI application that can 
+2. rs-manager (https://github.com/sandiz/rs-manager) is a GUI application that can 
    create set lists manually or from procedural filtering similar to rsrtools. It is a
    much friendlier way to generate song/set lists than rsrtools. The rs-manager 
    set lists are for reference only (i.e. rs-manager does not support loading set
@@ -288,7 +298,7 @@ b. At the Select Profile Menu, click New Profile, name the profile and go throug
    (the set up step can't be avoided unfortunately).
 
 Command line work flow summary
-=============================
+===============================
 
 Repeating an important warning: **Don't run this package at the same time as  Rocksmith 
 is running.** You'll end up crossing the save files and nobody will be happy (mostly you
@@ -512,9 +522,9 @@ Testing profile:
 
 - E Standard 440 leads that have been played 13-27 times in learn a song.
 
-- E Standard 400 leads that have been played 27 or more times in learn a song.
+- E Standard 440 leads that have been played 27 or more times in learn a song.
 
-- E Standard song with an off concert pitch (i.e. not A440).
+- E Standard songs with an off concert pitch (i.e. not A440) that have been played once.
 
 - Will not be changed.
 
@@ -523,7 +533,9 @@ Testing profile:
   
 Open up Rocksmith and check the song lists to see if they match expectation (song
 lists 1, 2 or 3 may be empty you if haven't played any songs that match the filter
-criteria.
+criteria. If you are bass or rhythm player, you'll almost certainly need to do some
+config editing before you see anything useful (I'll aim to add some more useful
+defaults for you with the next release).
 
 If you are happy with all of this, the next step is to edit ``config.toml`` to 
 create your own song list filters.
@@ -587,7 +599,7 @@ Settings
 --------
 
 The settings section is the simplest of the three, describing the location of the CFSM 
-xml file, the default steam user id, and the default profile name::
+xml file (optional), the default steam user id, and the default profile name::
 
       [settings]
       CFSM_file_path: "D:\\RS Stuff\\Working\\ArrangementsGrid.xml"
@@ -643,7 +655,7 @@ up of the following elements:
 The following sections detail these elements.
 
 Basic Filter Definition
------------------------
+++++++++++++++++++++++++
 
 A basic filter definition has the form::
 
@@ -663,7 +675,7 @@ sub-filters, while for ``"OR"``, the filter will return all records that match a
 one of the sub-filters (i.e. AND narrows, while OR is inclusive).
 
 List Type Sub-filter
---------------------
++++++++++++++++++++++
 
 The list type sub-filter is of the form::
 
@@ -704,7 +716,7 @@ but "e standard" doesn't, likewise it must be "Foo Fighters", and not "Foo f" or
 strong support for it.
 
 Range Type Sub-filter
----------------------
+++++++++++++++++++++++
 
 The range type sub-filter is of the form::
 
@@ -751,7 +763,7 @@ filter zero out, as otherwise the filter returns all un-played arrangements.
 ``include`` must be ``true`` or ``false``. If ``true``, the filter will return only
 those song arrangement records that have field values in the ranges specified in the 
 ``ranges`` list. If false, the filter will return those song arrangement records that
-have field values that do no appear in any of ranges in the ``ranges`` list.
+have field values that do not appear in any of ranges in the ``ranges`` list.
 
 ``ranges`` is a list of numeric low/high value pairs. The only constraint on the values 
 is that they must be greater than or equal to zero. Note that the number values are not
@@ -901,13 +913,15 @@ this is mainly an issue for E standard arrangements - I don't tend to worry abou
 for the alternate tunings.
 
 TODO
-----
+=====
 - Convert major TODO items to issues.
 
 - Add whatever functionality is needed for rs-manager to use rsrtools as an
   integration option. 
 
 - Complete PSARC scanner (welder.py)
+
+- Add some defaults for bass and rhythm players.
 
 Development notes
 =================
