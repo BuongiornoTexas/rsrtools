@@ -18,10 +18,17 @@ Warnings
 
 As this package is all about editing game saves, here are a couple of warnings.
 
+0. This package is late Alpha/early Beta. I've been using it for about a year, and
+   it has been robust for my application. However, until this warning disappears,
+   please assume that you are the second ever user and that you will find bugs.   
+   Please report these to me via github issues so I can implement fixes.
+
 1. This package edits Rocksmith profiles. Use at your own risk and with the 
    understanding that this package carries the risk of corrupting your save files
    (to date it has worked fine for me - YMMV, and it will definitely stop working if
-   Ubisoft make any changes to the Rocksmith save file format).
+   Ubisoft make any changes to the Rocksmith save file format). However, the package
+   includes many self checks and tries to make backups of profiles before making
+   changes, so (hopefully) the risk of profile loss or corruption should be low.
 
 2. This package is (obviously) not endorsed by Ubisoft - if you use this package and run
    into problems with your save files, Ubisoft will not be very interested in helping
@@ -43,7 +50,7 @@ TL:DNR
 If you know what you are doing with python and know your way around the Customs Forge
 Song Manager, here are the recommended quick start steps.
 
-0. The package only works on Windows for now (macos support coming soon).
+0. The package only works on Windows for now (Mac OX X support coming soon).
 
 1. **READ** the section on setting up a test profile. Until you are familiar with the
    package, this will be your best safeguard against damaging your precious save
@@ -65,15 +72,17 @@ Song Manager, here are the recommended quick start steps.
    it into the working directory (hopefully this step will become optional with the
    implementation of a PSARC scanner).
 
-8. Start your virtual environment and run the package with::
+8. Start your virtual environment and run the package (with appropriate substitution for
+   ``<path_to_your_working_directory>``)::
 
-    python -m rsrtools.songlists.songlists <path to working directory>
+    python -m rsrtools.songlists.songlists <path_to_your_working_directory>
 
-    # If you start python in the working directory, you could use:
+   If you start python in the working directory, you could use::
+
     python -m rsrtools.songlists.songlists .
 
 9. **Clone your save game into the test profile** and do all of your testing on this
-   test proile until you are comfortable that the package is working and doing what you
+   test profile until you are comfortable that the package is working and doing what you
    want it to do.
 
 Motivation
@@ -114,7 +123,7 @@ with a solution or add the needed functionality.
 
 I'm simplifying a bit here, but it gives an idea of the type of thing that this
 package is intended to do. Extending the above examples, the song lists could be created
-for songs or a specific arrangment type (Bass, Lead, Rhythm).
+for songs or a specific arrangement type (Bass, Lead, Rhythm).
 
 Criteria that can be used for song list creation include:
 
@@ -183,15 +192,15 @@ Alternatives
    go with their tool, which is available from: http://customsforge.com/.
 
 2. rs-manager (https://github.com/sandiz/rs-manager) is GUI application that can 
-   create setlists manually or from procedural filtering similar to rsrtools. It is a
-   much friendlier way to generate song/set lists than rsrtools. The rs-manager setlists
-   are for reference only (i.e. rs-manager does not support loading setlists into
-   Rocksmith save files).
+   create set lists manually or from procedural filtering similar to rsrtools. It is a
+   much friendlier way to generate song/set lists than rsrtools. The rs-manager 
+   set lists are for reference only (i.e. rs-manager does not support loading set
+   lists into Rocksmith save files).
    
    *However*, @sandiz, the rs-manager developer, has implemented functionality to export 
-   rs-mananger setlists in a format that can be used by rsrtools. A near term update of
-   rsrtools will allow loading of these setlists into Rocksmith save files. Once this is
-   done, we will have a workflow where setlists can be generated using the
+   rs-manager set lists in a format that can be used by rsrtools. A near term update of
+   rsrtools will allow loading of these set lists into Rocksmith save files. Once this is
+   done, we will have a work flow where set lists can be generated using the
    rs-manager GUI and then exported for loading into Rocksmith by a simple 
    rsrtools command (bypassing the joys of setting up text filters for rsrtools).
 
@@ -210,7 +219,7 @@ to match your own environment).
 This package provides:
 
 - A command line tool for creating Rocksmith song lists from a series of filters, and
-  writing the resulting song lists into a Rocksmith profile. The command line workflow
+  writing the resulting song lists into a Rocksmith profile. The command line work flow
   is described below.
 - A set of routines that can be used to implement a GUI version of the command line
   tools (I have not implemented a GUI, as the command line is sufficient for my
@@ -226,7 +235,7 @@ Pre-requisites
   what I'm using).
 
 * Create a folder/directory for running rsrtools. For this tutorial, I'm assuming this 
-  is: ``D:\RS Stuff``, and create an enviroment sub-directory ``Env`` and a working 
+  is: ``D:\RS Stuff``, and create an environment sub-directory ``Env`` and a working 
   sub-directory ``Working`` in the rsrtools directory. At the end of this step, my 
   folders are::
 
@@ -258,7 +267,7 @@ Set up a Testing Profile!
 -------------------------
 
 Until you are confident that this package is working properly, I **strongly** suggest
-you do some testing on a temporary Rockcmsith profile. I'd also suggest testing all new
+you do some testing on a temporary Rocksmith profile. I'd also suggest testing all new
 song list filters on the temporary profile before applying them to your main profile.
 
 The process I follow for testing changes before applying them to my main profile is:
@@ -267,7 +276,7 @@ The process I follow for testing changes before applying them to my main profile
 
 - Clone my profile into the Testing profile. This is very useful if you want to test 
   song lists based on played counts, score attack, mastery, etc. The command line
-  workflow in the following section explains how to clone your profile.
+  work flow in the following section explains how to clone your profile.
 
 - Try out the song filters on the Testing profile.
 
@@ -275,14 +284,14 @@ The process for setting up a temporary profile is as easy as it sounds:
 
 a. Start Rocksmith.
 
-b. At the Select Profile Menu, click New Profile, name the profile and go through setup
-   (the setup step can't be avoided unfortunately).
+b. At the Select Profile Menu, click New Profile, name the profile and go through set up
+   (the set up step can't be avoided unfortunately).
 
-Command line workflow summary
+Command line work flow summary
 =============================
 
 Repeating an important warning: **Don't run this package at the same time as  Rocksmith 
-is running.** You'll end up crossing the save files and obody will be happy (mostly you
+is running.** You'll end up crossing the save files and nobody will be happy (mostly you
 though).
 
 Preliminaries
@@ -304,7 +313,7 @@ Preliminaries
 
    * Go to Arrangement Analyzer.
 
-   * Go to Settings (check that the setting are for Arrangement Analyzer).
+   * Go to Settings (check that the settings are for Arrangement Analyzer).
       
      - Tick 'Include RS2014 Base Songs'
       
@@ -350,10 +359,10 @@ Preliminaries
    directory.
 
    Otherwise you need to set up the core arrangement table in the database with the 
-   following commands in command shell, substituting in the path to your arrangements 
-   file::
+   following commands in command shell, substituting in the path to your working 
+   folder and the path to the arrangements file (``<path_to_xml_file>``)::
 
-        Call "D:\Python Env\Rocksmith\Scripts\Activate.bat"
+        Call "D:\RS Stuff\Env\Scripts\Activate.bat"
         python -m rsrtools.songlists.songlists "D:\RS Stuff\Working" --CFSMxml <path_to_xml_file>
 
    When the menu comes up, choose 0 to exit the package, and then choose y to save the
@@ -426,10 +435,10 @@ Preliminaries
      config.toml             - The default configuration file. Heart and brains of the 
                                system. More on this below.
      song_lists.bat          - If you created it.
-     \-- RS_backup           - Backups of Rocksmith save files will be stored here.
-     \-- RS_update           - Changed save files will be stored here before copying
+     .\RS_backup             - Backups of Rocksmith save files will be stored here.
+     .\RS_update             - Changed save files will be stored here before copying
                                back to steam.
-     \-- RS_working          - Save files will be copied from steam to this folder 
+     .\RS_working            - Save files will be copied from steam to this folder 
                                before working on them.
 
    If your working directory doesn't match this, try this step again.
@@ -446,7 +455,7 @@ I'll assume we are cloning data from the profile 'Eric the Half a Bee' into
 
 Run the batch file.
 
-Select the utilities submenu, and then select Clone profile.
+Select the utilities sub-menu, and then select Clone profile.
 
 Make sure you get the next two right. Cloning destroys data in the profile you are
 copying to (the target).
@@ -523,9 +532,9 @@ The Configuration File
 ======================
 
 All song lists are driven by the ``config.toml`` file in the working directory. This 
-section describes the tructure of this file. If you end up with major problems with this
-file, I suggest renaming the problem file and creating a new config file by following 
-the setup steps in the tutorial (you can also try contacting me for help).
+section describes the structure of this file. If you end up with major problems with
+this file, I suggest renaming the problem file and creating a new config file by
+following the set up steps in the tutorial (you can also try contacting me for help).
 
 TOML is somewhat similar to windows .ini files. I've used it because it is a human 
 readable/editable text form that "just works" and because python appears to be leaning 
@@ -558,7 +567,21 @@ The configuration file is broken into three sections::
       ...
 
 Note that correct parenthesis type and double quoting is vital, and ``...`` shows 
-something I will fill in more detail on later.
+something I will fill in more detail on later. For this section, text should be typed
+as shown with the exception of text in angle brackets ``<>``, which represents user
+defined names and input. You should replace both the angle brackets and the guide text 
+with your own text. For example:
+
+- ``"<filter name>"`` would become ``"E Standard"``.
+- ``"<value 1>"`` would become ``"David Bowie"``.
+- ``<list field name>`` would become ``Tuning``.
+
+Note that double quoting is typically required where shown -- this provides protection
+for fields with spaces and non-standard characters. The only fields that do not need
+double quoting are ``<list field name>`` and ``<range field name>``
+as these have a limited set of valid values, and none of them contain spaces or special
+characters. The values for ``include`` (true or false) and ``ranges`` (numbers) must not
+be quoted, and the values for ``mode`` (``"AND"``, ``"OR"``) should be quoted.
 
 Settings
 --------
@@ -601,7 +624,7 @@ In summary, the format of a song list set is::
     "<set name>" = [ "<filter 1>", "<filter 2>", "<filter 3>", ... "<filter 6>"]
 
 where the values in <> are the song list set names, the filter names or empty to skip
-a song list.
+a song list (``""``).
 
 The song list creator will only modify as many song lists as there are filters defined
 (up to six), and will not change any list with "" specified for the filter. 
@@ -614,7 +637,7 @@ Filters
 The filters section consists of a list of named filters, where each named filter is made
 up of the following elements:
 
-- A basic filter definition (one only).
+- The basic filter definition (one only per filter).
 - One or more sub-filters, which in turn may be either list type or range type.
 
 The following sections detail these elements.
@@ -629,14 +652,15 @@ A basic filter definition has the form::
       mode = "<mode value>"
 
 The filter can either have a base filter, in which case the filter criteria will be
-applied to records generated from the base filter, or if base filter is "" the filter  
-will be applied to all records in the arrangments database. That is, the base filter is
-an optional field that allows building of nested or hierarchical filters. 
+applied to records generated from the base filter, or if base filter is the empty string
+(``""``) the filter will be applied to all records in the arrangements database. 
+That is, the base filter is an optional field that allows building of nested or
+hierarchical filters. 
 
-Mode must be either "AND" or "OR", and specifies the way that sub-filters will be
-combined. For "AND", the filter will only return the records that match all of the
-sub-filters, while for "OR", the filter will return all records that match at least one 
-of the sub-filters (i.e. AND narrows, while OR is inclusive).
+Mode must be either ``"AND"`` or ``"OR"``, and specifies the way that sub-filters will
+be combined. For ``"AND"``, the filter will only return the records that match all of the
+sub-filters, while for ``"OR"``, the filter will return all records that match at least
+one of the sub-filters (i.e. AND narrows, while OR is inclusive).
 
 List Type Sub-filter
 --------------------
@@ -645,7 +669,7 @@ The list type sub-filter is of the form::
 
         [filters."<filter name>".sub_filters.<list field name>]
         include = <true or false>
-        values = [ "value 1", "value 2", ... , "<value N>",]
+        values = [ "<value 1>", "<value 2>", ... , "<value N>",]
 
 ``<list field name>`` must be one of the list type field names::
 
@@ -658,13 +682,15 @@ The list type sub-filter is of the form::
           Album
    
 ArrangementId may be useful for building song lists of alternative/bonus arrangements.
-     
-Include must be ``true`` or ``false``. If ``true``, the filter will return the records
-for song arrangements whose field values match the values in the list. If ``false``, the 
-filter will return the records for song arrangements whose field values that do
-not match the values in the list. E.g. if the field name is Artist and the values
-are Queen and Roxette, then an include value of true will return only song 
-arrangements by Queen and Roxette. If include is false, then all arrangements
+
+In future, the utilities menu will provide a list of these field names.
+
+``include`` must be ``true`` or ``false``. If ``true``, the filter will return the
+records for song arrangements whose field value matches any of the values in the list. If 
+``false``, the filter will return the records for song arrangements whose field value 
+does not match any of the values in the list. E.g. if the field name is Artist and 
+the values are "Queen" and "Roxette", then an include value of true will return only 
+song arrangements by Queen and Roxette. If include is false, then all arrangements
 except songs by Queen and Roxette will be returned.
 
 The list values must match values in the arrangements data and must be double quoted - 
@@ -674,7 +700,7 @@ and Track Titles).
 
 **GOTCHA**: Values must be exact matches on content and case. So "E Standard" works,
 but "e standard" doesn't, likewise it must be "Foo Fighters", and not "Foo f" or 
-"foo fighters". I may add wildcard support at some point in the future if there is
+"foo fighters". I may add wild card support at some point in the future if there is
 strong support for it.
 
 Range Type Sub-filter
@@ -688,31 +714,33 @@ The range type sub-filter is of the form::
 
 ``<range field name>`` must be one of the range type field names::
 
-        Pitch"
-        Tempo"
-        NoteCount"
-        Year"
-        PlayedCount"
-        MasteryPeak"
-        SAEasyCount"
-        SAMediumCount"
-        SAHardCount"
-        SAMasterCount"
-        SAPlayedCount"
-        SAEasyBadges"
-        SAMediumBadges"
-        SAHardBadges"
-        SAMasterBadges"
+        Pitch
+        Tempo
+        NoteCount
+        Year
+        PlayedCount
+        MasteryPeak
+        SAEasyCount
+        SAMediumCount
+        SAHardCount
+        SAMasterCount
+        SAPlayedCount
+        SAEasyBadges
+        SAMediumBadges
+        SAHardBadges
+        SAMasterBadges
+
+In future, the utilities menu will provide a list of these field names.
 
 SA stands for score attack, SA*Count is the score attack play account at the level, and
 SAPlayedCount is the total score attack play count. 
 
-The SA_*_BADGES values have the following meanings:
+The SA*Badges values have the following meanings:
 
-- 0 no badge/not played yet. 
-- 1 strike out/three red crosses.
-- 2 bronze/two red crosses
-- 3 silver/one red cross
+- 0 No badge/not played yet. 
+- 1 Strike out/three red crosses.
+- 2 Bronze/two red crosses
+- 3 Silver/one red cross
 - 4 Gold
 - 5 Platinum
 
@@ -720,113 +748,139 @@ When I set up a badge filter, I'm normally only interested in songs I have playe
 haven't yet got a a platinum badge for, so I use a range value of  [[1, 4]]. I generally
 filter zero out, as otherwise the filter returns all un-played arrangements.
 
-        "Lead arrangements": {
-            "QueryFields": {... definitions ...}
-        },
-        "E Standard Leads": {
-            "BaseFilter": "Lead arrangements",
-            "QueryFields": {... definitions ...}
-        },
-        "E Standard low play count": {
-            "BaseFilter": "E Standard Leads",
-            "QueryFields": {... definitions ...}
-        }
-    }
+``include`` must be ``true`` or ``false``. If ``true``, the filter will return only
+those song arrangement records that have field values in the ranges specified in the 
+``ranges`` list. If false, the filter will return those song arrangement records that
+have field values that do no appear in any of ranges in the ``ranges`` list.
 
-    QueryFields provide most of the filter logic and are described below. If a filter 
-    does not have a BaseFilter field, then the query logic will apply to total song list data set. However, if a BaseFilter is provided, then the query logic applies to
-    output from that base filter. The example above demonstrates this nested filtering: The Lead arrangements filter
-    will generate a list of all lead arrangements. The E Standard leads filter will take this list and remove all non
-    E standard arrangements, and finally, the low play count list removes all high play count tracks.
+``ranges`` is a list of numeric low/high value pairs. The only constraint on the values 
+is that they must be greater than or equal to zero. Note that the number values are not
+double quoted. If you enter a low value that is greater than the high value, the
+package will assume you have your numbers backward and will swap them silently.
 
-    This nesting function improves re-usability of filter logic and makes assembling complex filters quite a lot
-    simpler. (This mechanism could definitely be improved further, but hey, it's only a simple playlist creator.)
+For example, for a field name of ``PlayedCount`` and ``ranges = [[1,10],[18,19]]`` and
+``include = true``, the filter will return all arrangements with Learn a Song play count
+in the range 1 to 10 or 18 to 19. If ``include`` is ``false``, the filter will
+return all arrangements that have a play count that is either: 0, in the range 11 to 17,
+or greater than or equal to 20.
 
-    The QueryFields are the final element of the filter definitions. These are a list of query definitions that will
-    be used to create the filtered song list, and have the following structure:
+Filter Examples
+---------------
 
-    "QueryFields": [
-        {... definition 1 ...},
-        {... definition 1 ...},
-        {... definition 1 ...}
-    }
+The following examples taken from the default set of filters illustrate most of the
+filter features.
 
-    A quick note - you can build up a complex query by using multiple definitions in the QueryFields. For example, the
-    nested filters shown above could have been built in a single filter as follows:
+First up, a filter for songs with (mostly) lead arrangements::
 
-    "QueryFields": [
-        {... include only lead arrangements ...},
-        {... and include only E standard arrangements ...},
-        {... and cull high play counts ...}
-    }
+        [filters."Not Bass, Rhythm"]
+        base = ""
+        mode = "OR"
 
-    However, to date I have always found the most effective way to build the filters is to use a single QueryField
-    definition per filter, and then build complexity by nesting. (Either way is fine, so go with whatever works best
-    for you).
+        [filters."Not Bass, Rhythm".sub_filters.ArrangementName]
+        include = false
+        values = [ "Bass", "Bass2", "Rhythm", "Rhythm1", "Rhythm2",]
 
-    There are two possible types of QueryField definitions: a string value list, and a range list. The structure a for
-    a value list is:
+        [filters."Not Bass, Rhythm".sub_filters.Title]
+        include = true
+        values = [ "Cissy Strut",]
 
-        "Other Value List": {
-          "BaseFilter": "Not Bass, Rhythm",
-          "QueryFields": [
-            {
-              "Field": "TUNING",
-              "Include": true,
-              "Values": [
-                "C Standard",
-                "Open A",
-                "Open D",
-                "Open Dm7",
-                "Open E",
-                "Open G",
-                "Other"
-              ]
-            }
-          ]
-        }
+This filter is interpreted as follows:
+
+- The filter is named "Not Bass, Rhythm".
+
+- It does not have a base filter, so it will apply the filter to the entire record set
+  in the arrangement database.
+
+- There are two sub-filters. The first filter excludes all arrangements with bass or
+  rhythm types (this could have as easily been an include on all lead and combo types).
+  The second filter includes the arrangements for one song: Cissy Strut by The Meters.
+
+- The ``"OR"`` mode combines the results of the sub-filters. 
+
+In effect, this filter results in the records for all arrangements that are lead type
+along with the arrangements for Cissy Strut. This filter ensures that I can see all lead
+tracks and Cissy Strut, which only has bass and rhythm arrangements, but I still want it
+to appear in my song lists.
+
+The following filter narrows the lead-ish filter to E Standard tunings::
+
+    [filters."E Standard"]
+    base = "Not Bass, Rhythm"
+    mode = "AND"
+
+    [filters."E Standard".sub_filters.Tuning]
+    include = true
+    values = [ "E Standard",]
+
+This nested filter is interpreted as taking the records generated by the 
+"Not Bass, Rhythm" filter and keeping only those arrangements with an E Standard tuning.
+
+The final filter generates a list of E Standard tunings which are off concert pitch 
+(i.e. not A440 tunings)::
+
+        [filters."E Std Non Concert"]
+        base = "E Standard"
+        mode = "AND"
+
+        [filters."E Std Non Concert".sub_filters.Pitch]
+        include = false
+        ranges = [ [ 439.5, 440.5,],]
+
+        [filters."E Std Non Concert".sub_filters.PlayedCount]
+        include = true
+        ranges = [ [ 1.0, 5000.0,],]
+
+This filter builds on the results of the "E Standard filter" by keeping only records
+which:
+
+- Have a pitch outside the range 439.5 to 440.5 Hz (``include = false``). That is, this 
+  removes all A440 tunings, 
+- **AND** (mode = ``"AND"``) have a play count between 1 and 5000 (i.e. this removes
+  tracks with a play count of zero - at least if like me, none of your play counts are
+  within any sort of distance of 5000).
+
+Nested vs. Flat Filters
+-----------------------
+
+The examples in the previous section demonstrate how to build up filters using a nested
+or hierarchical approach. 
+
+This nesting capability improves re-usability of filter logic and makes assembling 
+complex filters quite a lot simpler. (This mechanism could definitely be improved 
+further still, but hey, it's only a simple play list creator.)
+
+You can build also build up a complex filters by using multiple sub-filters in a single
+filter. For example, something close to the nested filters for the off concert pitch 
+E Standard arrangements could have been built in with a single filter applying the
+following sub-filters::
+
+        [filters."One Step E Std Non Concert"]
+        base = ""
+        mode = "AND"
+
+        [filters."One Step E Std Non Concert".sub_filters.ArrangementName]
+        include = false
+        values = [ "Bass", "Bass2", "Rhythm", "Rhythm1", "Rhythm2",]
+
+        [filters."One Step E Std Non Concert".sub_filters.Tuning]
+        include = true
+        values = [ "E Standard",]        
+
+        [filters."One Step E Std Non Concert".sub_filters.Pitch]
+        include = false
+        ranges = [ [ 439.5, 440.5,],]
+
+        [filters."One Step E Std Non Concert".sub_filters.PlayedCount]
+        include = true
+        ranges = [ [ 1.0, 5000.0,],]
+
+(This is something close, because it's not possible to build a one shot filter like this
+that also capture the Cissy Strut arrangements).
 
 
-
-
-    The second type of QueryField is a range list, which has the structure:
-
-        "Play count Range List": {
-          "BaseFilter": "Not Bass, Rhythm",
-          "QueryFields": [
-            {
-              "Field": "PLAYED_COUNT",
-              "Include": true,
-              "Ranges": [
-                [
-                  1,
-                  12
-                ],
-                [
-                  18,
-                  24
-                ]
-              ]
-            }
-          ]
-        }
-
-
-
-    Include must be true or false. If true, the filter will only include arrangements with values in the ranges
-    specified in the ranges list. If false, the filter will exclude values in the specified ranges.
-
-    Ranges is a list of low/high value pairs - i.e:
-
-        [
-            [low_1, high_1],
-            [low_2, high_2],
-            ...
-        ]
-
-    The only constraint on the values is that they must be greater than or equal to zero. Note that the number values
-    are not double quoted. Something to be aware of: if you enter a low value that is greater than the high value, the
-    package will assume you have your numbers backward and will swap them silently.
+To date I have always found the most effective way to build the filters is to 
+use simpler filters based on one or two sub-filters, and then build complexity by 
+nesting. (Either way is fine of course, so go with whatever works best for you.)
 
 Package Caveats
 ===============
@@ -848,24 +902,15 @@ for the alternate tunings.
 
 TODO
 ----
-  - Convert major TODOs to issues.
-  - Add whatever functionality is needed for rs-manager to use rsrtools as an
-    integration option. 
-  - Complete PSARC scanner (welder.py)
-  - Convert song list configuration file from JSON to much more readable TOML.
-  - Setup.cfg checks before 0.1 releas:
-        - version
-        - add changelog to long-description
-        - license file
-        - Classifiers
-        - need to do a check that all of the setup.cfg is actually transferring to 
-          metadata (- vs _)
+- Convert major TODO items to issues.
+
+- Add whatever functionality is needed for rs-manager to use rsrtools as an
+  integration option. 
+
+- Complete PSARC scanner (welder.py)
 
 Development notes
 =================
 
-20190420 The song list manager and database modules are functional and in beta testing.
-Pending documentation update for 0.1 release.
-
-20190328 The file managers and utilities are functional with the exception of the PSARC
-scanner, which will be be added later. 
+20190421 Song list creator and database modules functional, first draft of documentation
+complete. 0.1 release imminent.
