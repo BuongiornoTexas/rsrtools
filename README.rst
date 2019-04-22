@@ -10,11 +10,13 @@ Rocksmith profiles.
 Acknowledgements
 ================
 
-**@0x0L** for rs-utils and rocksmith Rocksmith tools. All of the save file and data file 
-handling routines are based on this code.
+**@0x0L** for `rs-utils <https://github.com/0x0L/rs-utils>`_ and 
+`rocksmith <https://github.com/0x0L/rocksmith>`_ Rocksmith 
+tools. All of the save file and data file handling routines are based on this code.
 
-**@sandiz** for rs-manager, which is an awesome set listing tool. This package also 
-gave me a deeper understanding of the Rocksmith PSARC structure.
+**@sandiz** for `rs-manager <https://github.com/sandiz/rs-manager>`_, which is an 
+awesome set listing tool. This package also gave me a deeper understanding of the 
+Rocksmith PSARC structure.
 
 Warnings
 ========
@@ -55,7 +57,8 @@ Song Manager, here are the recommended quick start steps.
 
 0. The package only works on Windows for now (Mac OX X support coming soon).
 
-1. **READ** the section on setting up a test profile. Until you are familiar with the
+1. **READ** the section on setting up a test profile (`Set up a Testing Profile!`_). 
+   Until you are familiar with the
    package, this will be your best safeguard against damaging your precious save
    game(s).
 
@@ -233,7 +236,7 @@ This package provides:
   is described below.
 - A set of routines that can be used to implement a GUI version of the command line
   tools (I have not implemented a GUI, as the command line is sufficient for my
-  requirements - see the section on Alternatives for more GUI oriented solutions).
+  requirements - see the section on `Alternatives`_ for more GUI oriented solutions).
 
 Repeating warning #4, this package is currently only supported on Windows (and only
 tested on Windows 10). 
@@ -514,28 +517,35 @@ window.
 Also experiment with the reporting options in the utility sub-menu. These reports 
 may be useful when developing your own filters.
 
-If you are happy with the reporting, you can try writing the default E Standard song
-lists to the Testing profile. This will create the following song lists in the 
-Testing profile:
+If you are happy with the reporting, you can try writing one of the default song list 
+sets to Rocksmith - either ``"E Standard"`` for lead players or ``"Bass or Rhythm"``
+for bass and rhythm players. Before you do this, I would recommend doing a text report
+for the song list set and checking it looks sensible. And finally, before writing
+to Rocksmith, please remember that this is going to **replace** existing song lists
+in the profile (use a test profile for testing!).
 
-- E Standard 440 leads that have been played 1-12 times in learn a song.
+The default E Standard song list for lead players will create the following song lists:
 
-- E Standard 440 leads that have been played 13-27 times in learn a song.
+1. E Standard 440 leads that have been played 1-12 times in Learn a song.
 
-- E Standard 440 leads that have been played 27 or more times in learn a song.
+2. E Standard 440 leads that have been played 13-27 times in Learn a song.
 
-- E Standard songs with an off concert pitch (i.e. not A440) that have been played once.
+3. E Standard 440 leads that have been played 27 or more times in Learn a song.
 
-- Will not be changed.
+4. E Standard songs with an off concert pitch (i.e. not A440) that have been played 
+   once.
 
-- All E Standard songs that you have played in easy score attack, but haven't 
-  yet got a platinum pick.
+5. Will not be changed.
+
+6. All E Standard songs that you have played in easy score attack, but haven't 
+   yet got a platinum pick.
   
-Open up Rocksmith and check the song lists to see if they match expectation (song
+The bass or rhythm song list set generates a similar set of song lists.
+
+Once you have written a song list set to Rocksmith, exit the package, open up Rocksmith,
+load the test profile and check the song lists to see if they match expectation (song
 lists 1, 2 or 3 may be empty you if haven't played any songs that match the filter
-criteria. If you are bass or rhythm player, you'll almost certainly need to do some
-config editing before you see anything useful (I'll aim to add some more useful
-defaults for you with the next release).
+criteria. 
 
 If you are happy with all of this, the next step is to edit ``config.toml`` to 
 create your own song list filters.
@@ -744,6 +754,11 @@ The range type sub-filter is of the form::
 
 In future, the utilities menu will provide a list of these field names.
 
+A note of caution: I'm pretty sure the MasteryPeak values are *not quite right*. At the
+moment, I'm calculating these by multiplying the raw mastery peak value from the player
+profile by 100. However, this value doesn't quite match the reported value in Rocksmith.
+I can fix this quickly if anybody knows the correct calculation.
+
 SA stands for score attack, SA*Count is the score attack play account at the level, and
 SAPlayedCount is the total score attack play count. 
 
@@ -893,6 +908,36 @@ that also capture the Cissy Strut arrangements).
 To date I have always found the most effective way to build the filters is to 
 use simpler filters based on one or two sub-filters, and then build complexity by 
 nesting. (Either way is fine of course, so go with whatever works best for you.)
+
+Something Went Wrong!
+======================
+
+Something unexpected has happened with loading a profile in Rocksmith? All is (probably)
+not lost. Before rsrtools writes files to the Rocksmith Steam folders, it creates a 
+zip archive of **all** of the key files associated with the steam user id. These backups
+are kept in the working directory under ``RS_backup``.
+
+To restore a backup, extract the contents of the zip file and copy the contents into
+your Steam Rocksmith save folder. For most people, this should be in your Steam
+install directory under::
+
+    <Steam directory>\userdata\<steam_user_id>\221680
+
+``<steam_user_id>`` is the same steam user id used in the rsrtools songlists menu.
+
+As a check, this folder should contain a ``remotecache.vdf`` file and a ``remote``
+sub-directory. The ``remote`` subdirectory should contain a file named 
+``LocalProfiles.json`` and one or or more files with names ending in ``_PRFLDB``.
+
+Database Structure
+===================
+
+For those who are interested, the database is structured as two tables, which contain
+song arrangement data and player performance data. The filters are executed on a join
+of these two tables.
+
+The string fields are the same fields defined in the `List Type Sub-filter`_ section, 
+and the numeric fields are those defined in the `Range Type Sub-filter`_ section.
 
 Package Caveats
 ===============

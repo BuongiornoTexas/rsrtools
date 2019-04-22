@@ -52,6 +52,15 @@ DEFAULT_TOML = f"""\
   "Other Tunings",
 ]
 
+"Bass or Rhythm" = [
+  "B or R E Low Plays",
+  "B or R E Mid Plays",
+  "B or R E High Plays",
+  "",
+  "",
+  "Easy Plat Badge in progress",
+]
+
 Testing = [
   "Artist test",
   "Played Count of 1 to 15",
@@ -126,7 +135,8 @@ Testing = [
 {CONFIG_BASE} = "E Standard 440"
 {CONFIG_MODE} = "AND"
 
-[{CONFIG_FILTERS}."E Std Low Plays".{CONFIG_SUB_FILTERS}.{RangeField.PLAYED_COUNT.value}]
+[{CONFIG_FILTERS}."E Std Low Plays".{CONFIG_SUB_FILTERS}\
+.{RangeField.PLAYED_COUNT.value}]
 {CONFIG_INCLUDE} = true
 {CONFIG_RANGES} = [[1, 12]]
 
@@ -134,7 +144,8 @@ Testing = [
 {CONFIG_BASE} = "E Standard 440"
 {CONFIG_MODE} = "AND"
 
-[{CONFIG_FILTERS}."E Std Mid Plays".{CONFIG_SUB_FILTERS}.{RangeField.PLAYED_COUNT.value}]
+[{CONFIG_FILTERS}."E Std Mid Plays".{CONFIG_SUB_FILTERS}\
+.{RangeField.PLAYED_COUNT.value}]
 {CONFIG_INCLUDE} = true
 {CONFIG_RANGES} = [[13,27]]
 
@@ -142,7 +153,8 @@ Testing = [
 {CONFIG_BASE} = "E Standard 440"
 {CONFIG_MODE} = "AND"
 
-[{CONFIG_FILTERS}."E Std High Plays".{CONFIG_SUB_FILTERS}.{RangeField.PLAYED_COUNT.value}]
+[{CONFIG_FILTERS}."E Std High Plays".{CONFIG_SUB_FILTERS}\
+.{RangeField.PLAYED_COUNT.value}]
 {CONFIG_INCLUDE} = true
 {CONFIG_RANGES} = [[28, 5000]]
 
@@ -241,6 +253,56 @@ Testing = [
 {CONFIG_INCLUDE} = true
 {CONFIG_VALUES} = ["Cissy Strut"]
 
+# basic test filters for Bass, Rhythm.
+[{CONFIG_FILTERS}."Bass or Rhythm"]
+{CONFIG_BASE} = ""
+{CONFIG_MODE} = "OR"
+
+[{CONFIG_FILTERS}."Bass or Rhythm".{CONFIG_SUB_FILTERS}\
+.{ListField.ARRANGEMENT_NAME.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_VALUES} = ["Bass", "Bass2", "Rhythm", "Rhythm1", "Rhythm2"]
+
+[{CONFIG_FILTERS}."B or R E 440"]
+{CONFIG_BASE} = "Bass or Rhythm"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."B or R E 440".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_VALUES} = ["E Standard"]
+
+[{CONFIG_FILTERS}."B or R E 440".{CONFIG_SUB_FILTERS}.{RangeField.PITCH.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} = [ [439.5, 440.5 ] ]
+
+[{CONFIG_FILTERS}."B or R E Low Plays"]
+{CONFIG_BASE} = "B or R E 440"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."B or R E Low Plays".{CONFIG_SUB_FILTERS}\
+.{RangeField.PLAYED_COUNT.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} = [[1, 12]]
+
+[{CONFIG_FILTERS}."B or R E Mid Plays"]
+{CONFIG_BASE} = "B or R E 440"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."B or R E Mid Plays".{CONFIG_SUB_FILTERS}\
+.{RangeField.PLAYED_COUNT.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} = [[13,27]]
+
+[{CONFIG_FILTERS}."B or R E High Plays"]
+{CONFIG_BASE} = "B or R E 440"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."B or R E High Plays".{CONFIG_SUB_FILTERS}\
+.{RangeField.PLAYED_COUNT.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} = [[28, 5000]]
+
+# recursion testing
 [{CONFIG_FILTERS}."Recurse1A"]
 {CONFIG_BASE} = "Recurse1B"
 {CONFIG_MODE} = "AND"
