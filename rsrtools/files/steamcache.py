@@ -4,6 +4,8 @@
 Refer to class SteamMetadata for further detail/definitions.
 """
 
+# cSpell:ignore platformstosync
+
 from os import fsdecode
 from pathlib import Path
 from hashlib import sha1
@@ -62,7 +64,7 @@ class SteamMetadata:
         Steam cloud file: A file automatically backed up by Steam to a remote server.
             A Steam cloud file has both a path and an associated app_id. The path is
             typically of the form:
-                <Steam path>\<user_id>\<app_id>\remote\<cloud file name>.
+                <Steam path>\<user_account_id>\<app_id>\remote\<cloud file name>.
         app_id: A Steam game or application identifier.
         Steam cloud file metadata set or cloud file metadata set: Metadata describing a
             single Steam cloud file, such as modification time, hashes, etc.
@@ -86,7 +88,7 @@ class SteamMetadata:
                 "platformstosync2"		"-1"
             }
 
-    Warning: The class does not validate the steam cloud files and does not validate
+    Warning: The class does not validate the Steam cloud files and does not validate
     the file locations. These are caller responsibilities.
 
     Implementation notes for the Steam metadata dictionary (self._steam_metadata):
@@ -103,7 +105,7 @@ class SteamMetadata:
     # lazy annotation here.
     # Path to Steam metadata file.
     _metadata_path: Path
-    # Instance version of the steam metadata
+    # Instance version of the Steam metadata
     _steam_metadata: Dict[str, Dict[str, Dict[str, str]]]
     _is_dirty: bool
 
@@ -152,7 +154,7 @@ class SteamMetadata:
                 (see _cloud_file_metadata_set).
             key {SteamMetadataKey} -- Key to update in the metadata set. Must be a
                 member of SteamMetadataKey enum. The key must already exist in the
-                metatdata dict (no creating new keys).
+                metadata dict (no creating new keys).
             value {str} -- New value to be assigned to the key. The caller is
                 responsible for value formatting per Steam standards.
 
@@ -188,7 +190,7 @@ class SteamMetadata:
             file_path {pathlib.Path} -- Path to the Steam cloud file. Warning: this
                 method extracts the filename from the path and ignores all other path
                 information. It is the caller responsibility to ensure the path points
-                to the correct steam cloud file.
+                to the correct Steam cloud file.
 
         Raises:
             KeyError -- Raised if the Steam metadata does not contain an entry for the
@@ -205,7 +207,7 @@ class SteamMetadata:
         file_metadata = None
         # This will throw a key error if the metadata dictionary doesn't contain
         # entries for app_id. Otherwiser returns a dictionary of dicts containing
-        # metadata for *ALL* of the steam cloud files associated with the app_id. Need
+        # metadata for *ALL* of the Steam cloud files associated with the app_id. Need
         # to search this dict to find the sub-dictionary for the target file.
         file_dict = self._steam_metadata[double_quote(app_id)]
 
@@ -233,7 +235,7 @@ class SteamMetadata:
             file_path {pathlib.Path} -- Path to the Steam cloud file. Warning: this
                 method extracts the filename from the path and ignores all other path
                 information. It is the caller responsibility to ensure the path points
-                to the correct steam cloud file.
+                to the correct Steam cloud file.
 
         """
         ret_val = True
@@ -255,9 +257,9 @@ class SteamMetadata:
             file_path {pathlib.Path} -- Path to the Steam cloud file. Warning: this
                 method extracts the filename from the path to identify the metadata set
                 and updates metadata based on the file properties. It is the caller
-                responsibility to ensure the path points to the correct steam cloud
+                responsibility to ensure the path points to the correct Steam cloud
                 file (i.e. this method does not validate that the file is valid
-                steam cloud file in a valid location).
+                Steam cloud file in a valid location).
 
         Keyword Arguments:
             data {bytes} -- Binary Steam cloud file held in memory
@@ -265,7 +267,7 @@ class SteamMetadata:
 
         By default, this method will determine the writeable Steam cloud metadata
         values (hash, size and modification times) directly from the file on  disk.
-        However, if the otional data argument is supplied, the hash and size values
+        However, if the optional data argument is supplied, the hash and size values
         will be calculated from the contents of data.
 
         This method does nothing if the metadata set for the Steam cloud file does not
@@ -287,7 +289,7 @@ class SteamMetadata:
                     buffer = fh.read(BLOCK_SIZE)
 
             # st_size works on windows
-            file_size = file_path.stat().st_size
+            file_size = file_path.stat().st_size  # cSpell:disable-line
         else:
             hasher.update(data)
             file_size = len(data)
@@ -303,10 +305,14 @@ class SteamMetadata:
         # st_mtime appears gives the right (UTC since jan 1 1970) values on Windows,
         # probably also OK on OSX, Linux?
         self._update_metadata_key_value(
-            cache_dict, SteamMetadataKey.LOCALTIME, str(int(file_path.stat().st_mtime))
+            cache_dict,
+            SteamMetadataKey.LOCALTIME,
+            str(int(file_path.stat().st_mtime)),  # cSpell:disable-line
         )
         self._update_metadata_key_value(
-            cache_dict, SteamMetadataKey.TIME, str(int(file_path.stat().st_mtime))
+            cache_dict,
+            SteamMetadataKey.TIME,
+            str(int(file_path.stat().st_mtime)),  # cSpell:disable-line
         )
 
         # instance contents out of sync with metadata file.
@@ -334,10 +340,10 @@ class SteamMetadata:
         """Write Steam metadata file if instance data differs from the original file.
 
         Arguments:
-            save_dir {Optional[pathlib.Path]} -- Save directory for the steam metadata
+            save_dir {Optional[pathlib.Path]} -- Save directory for the Steam metadata
                 file or None.
 
-        If save_dir is specified as None, the original steam metadata file will be
+        If save_dir is specified as None, the original Steam metadata file will be
         overwritten.
 
         Otherwise the updated file is written to save_dir with the original file name.

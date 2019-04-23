@@ -15,7 +15,7 @@ For command line options (database setup, reporting), run
 import sqlite3
 import argparse
 
-import xml.etree.ElementTree as eTree
+import xml.etree.ElementTree as eTree  # cSpell: disable-line
 
 from pathlib import Path
 
@@ -50,7 +50,8 @@ DB_NAME = "RS_Arrangements.sqlite"
 # base table name for all filter queries.
 TEMP_TABLE_BASE = "RSRTempTable"
 
-# We use these two field constants an awful lot, so define module level shortener here.
+# We use these two field constants an awful lot, so define module level
+# abbreviation here.
 ARRANGEMENT_NAME = ListField.ARRANGEMENT_NAME
 ARRANGEMENT_ID = ListField.ARRANGEMENT_ID
 
@@ -132,7 +133,7 @@ CFSM_MAP = {
 
 # Useful block on Rocksmith player profile json structure.
 # Key data in profiles for setting up song lists:
-# json_tree['Stats']['Songs'][SongArrangementId]
+# json_tree['Stats']['Songs'][SongArrangementId]  # cSpell: disable-line
 #     ['PlayedCount'] - on the box Decimal 6
 #     ['MasteryPeak'] - Fractional Mastery (0-1) Decimal 6
 #     ['SAWinCount'] - I can't work out what this is. Not captured.
@@ -144,7 +145,7 @@ CFSM_MAP = {
 #         [3]['V'] - Master play count
 #     ['SAPlatinumPointAwarded'] - Flag for platinum badges
 #     ['SAGeneralPointAwarded'] - Flag for songs passed
-#         - PointAwarded are hex char '0' to 'F' used for gathering stats
+#         - PointAwarded are hex char '0' to 'F' used for gathering statistics
 #             1 = easy song pass/easy plat
 #             2 = medium/medium
 #             3 = hard/hard
@@ -153,7 +154,7 @@ CFSM_MAP = {
 #         shifting.
 #
 #     json_tree['SongsSA'][SongArrangementId]
-#         ['Badges']['Easy'] to ['Master'] - more useful than stat point awarded flags
+#         ['Badges']['Easy'] to ['Master'] - more useful than the point awarded flags
 #             Decimal 6
 #             0 no badge
 #             1 strike out
@@ -174,25 +175,33 @@ CFSM_MAP = {
 PLAYER_PROFILE_MAP: Dict[
     SQLField, Tuple[JSON_path_type, Union[int, float], Callable]
 ] = {
-    RangeField.PLAYED_COUNT: (("Stats", "Songs", ":a_id", "PlayedCount"), 0, int),
-    RangeField.MASTERY_PEAK: (("Stats", "Songs", ":a_id", "MasteryPeak"), 0.0, float),
+    RangeField.PLAYED_COUNT: (
+        ("Stats", "Songs", ":a_id", "PlayedCount"),  # cSpell: disable-line
+        0,
+        int,
+    ),
+    RangeField.MASTERY_PEAK: (
+        ("Stats", "Songs", ":a_id", "MasteryPeak"),  # cSpell: disable-line
+        0.0,
+        float,
+    ),
     RangeField.SA_EASY_COUNT: (
-        ("Stats", "Songs", ":a_id", "SAPlayCount", 0, "V"),
+        ("Stats", "Songs", ":a_id", "SAPlayCount", 0, "V"),  # cSpell: disable-line
         0,
         int,
     ),
     RangeField.SA_MEDIUM_COUNT: (
-        ("Stats", "Songs", ":a_id", "SAPlayCount", 1, "V"),
+        ("Stats", "Songs", ":a_id", "SAPlayCount", 1, "V"),  # cSpell: disable-line
         0,
         int,
     ),
     RangeField.SA_HARD_COUNT: (
-        ("Stats", "Songs", ":a_id", "SAPlayCount", 2, "V"),
+        ("Stats", "Songs", ":a_id", "SAPlayCount", 2, "V"),  # cSpell: disable-line
         0,
         int,
     ),
     RangeField.SA_MASTER_COUNT: (
-        ("Stats", "Songs", ":a_id", "SAPlayCount", 3, "V"),
+        ("Stats", "Songs", ":a_id", "SAPlayCount", 3, "V"),  # cSpell: disable-line
         0,
         int,
     ),
@@ -642,7 +651,7 @@ class ArrangementDB:
             described in module songlists.
 
         cl_update_player_data -- Runs a command line menu for the user to update
-            player profile data in the database from a steam user profile.
+            player profile data in the database from a Steam user profile.
 
         run_cl_reports -- Provides command line menu to a set of utility reports on the
             database.
@@ -751,7 +760,7 @@ class ArrangementDB:
         """
         self._arrangements_sql.rebuild_table(self.open_db())
         # create file object from path to keep mypy happy
-        # (etree seems to grok pathlikes, but annotations don't reflect this)
+        # (e-tree seems to grok pathlikes, but annotations don't reflect this)
         with cfsm_xml_file.open("rt") as fp:
             tree = eTree.parse(fp)
 
@@ -971,7 +980,7 @@ class ArrangementDB:
             # Create validators for ALL list fields.
             validators = tuple(ListField)
         else:
-            # Create a validator for the single specfied field.
+            # Create a validator for the single specified field.
             validators = (validator_report,)
 
         ret_dict = dict()
@@ -1124,7 +1133,7 @@ class ArrangementDB:
     def cl_update_player_data(self, working_dir: Path) -> None:
         """Command line/interactive update of player data."""
         # Calling profile manager without arguments will result in CLI calls to select
-        # steam user id, copying of file set to working directory, and loading of
+        # Steam account id, copying of file set to working directory, and loading of
         # working set.
         p_manager = RSProfileManager(working_dir)
         profile_name = p_manager.cl_choose_profile(

@@ -1,4 +1,4 @@
-
+.. cSpell:ignore venv, Analyzer, userdata, remotecache, PRFLDB
 
 **rsrtools** is a package for creating and saving Rocksmith 2014 songlists **to** 
 Rocksmith save files (profiles). Incidentally, it also provides tools for managing
@@ -17,6 +17,13 @@ tools. All of the save file and data file handling routines are based on this co
 **@sandiz** for `rs-manager <https://github.com/sandiz/rs-manager>`_, which is an 
 awesome set listing tool. This package also gave me a deeper understanding of the 
 Rocksmith PSARC structure.
+
+Breaking Changes
+=================
+
+0.1.1+ Terminology correction from Steam user id to Steam account id. probably
+the only effect for most people is to edit 'config.toml' and replace steam_user_id with
+steam_account_id.
 
 Warnings
 ========
@@ -386,14 +393,14 @@ Preliminaries
 
       Rocksmith song list generator main menu.
 
-          Steam user id:       'not set'
+          Steam account id:    'not set'
           Rocksmith profile:   'not set'
           Reporting to:        Standard output/console
           Working directory:   D:\RS Stuff\Working
 
       Please choose from the following options:
 
-        1) Change/select steam user id. This also clears the profile selection.
+        1) Change/select Steam account id. This also clears the profile selection.
         2) Change/select Rocksmith player profile.
         3) Toggle the report destination.
         4) Choose a single filter and create a song list report.
@@ -409,29 +416,29 @@ Preliminaries
    All of the text menus and text prompts will ask you to either select a number or 
    select y/n (followed by enter to action).
 
-7. At this menu, you first need to select a steam user id, so choose 1 to start a text 
-   menu for selecting from the available steam user ids. For this tutorial, our 
+7. At this menu, you first need to select a Steam account id, so choose 1 to start a
+   text menu for selecting from the available Steam account ids. For this tutorial, our 
    selection options look like this::
 
-      Please select a steam user id/Rocksmith file set from the following options.
+      Please select a Steam account id/Rocksmith file set from the following options.
 
-      1) Steam user '12345678'. This is the user logged into steam now. (Sat Sep  1 16:47:25 2018).
+      1) Steam user '12345678'. This is the user logged into Steam now. (Sat Sep  1 16:47:25 2018).
       0) Do nothing and raise error.
 
-   We get a bit of help here - only one steam id is available, and it is the user logged
-   into steam now. So we choose 1 to select user ``12345678``.
+   We get a bit of help here - only one Steam id is available, and it is the user logged
+   into Steam now. So we choose 1 to select user ``12345678``.
 
-   Most people will only have one user id available - if you have more than one, you may
-   need a bit of trial and error to work out which one in is yours. The easiest way to
-   do this is select an id and then check if the Testing profile can be selected (next
-   step). If not, you have the wrong steam id and need to try another one.
+   Most people will only have one account id available - if you have more than one, you 
+   may need a bit of trial and error to work out which one in is yours. The easiest way
+   to do this is select an id and then check if the Testing profile can be selected
+   (next step). If not, you have the wrong Steam id and need to try another one.
 
-8. After selecting a steam id, you need to select a user profile for song list creation.
+8. After selecting a Steam id, you need to select a user profile for song list creation.
    Choose 2 to start this process, and then choose a profile ('Testing' for this
    tutorial). After completing this process, the first two information lines of the 
    song list menu should be similar to::
 
-            Steam user id:       '12345678'
+            Steam account id:    '12345678'
             Rocksmith profile:   'Testing'
 
 9. At this point, it's worth saving the changes you have made.
@@ -450,8 +457,8 @@ Preliminaries
      song_lists.bat          - If you created it.
      .\RS_backup             - Backups of Rocksmith save files will be stored here.
      .\RS_update             - Changed save files will be stored here before copying
-                               back to steam.
-     .\RS_working            - Save files will be copied from steam to this folder 
+                               back to Steam.
+     .\RS_working            - Save files will be copied from Steam to this folder 
                                before working on them.
 
    If your working directory doesn't match this, try this step again.
@@ -498,9 +505,9 @@ The package is now set up with a default configuration, which you can use for so
 basic testing before creating your own song list filters - or you can skip this step
 and go straight to making your own.
 
-Run the batch file and check that the steam user id and profile are as expected::
+Run the batch file and check that the Steam account id and profile are as expected::
 
-        Steam user id:       '12345678'
+        Steam account id:     '12345678'
         Rocksmith profile:   'Testing'
 
 Experiment with the reporting options:
@@ -609,11 +616,11 @@ Settings
 --------
 
 The settings section is the simplest of the three, describing the location of the CFSM 
-xml file (optional), the default steam user id, and the default profile name::
+xml file (optional), the default Steam account id, and the default profile name::
 
       [settings]
       CFSM_file_path: "D:\\RS Stuff\\Working\\ArrangementsGrid.xml"
-      steam_user_id": "12345678"
+      steam_account_id": "12345678"
       player_profile": "Testing"
       version = "x.x.x"
 
@@ -914,16 +921,16 @@ Something Went Wrong!
 
 Something unexpected has happened with loading a profile in Rocksmith? All is (probably)
 not lost. Before rsrtools writes files to the Rocksmith Steam folders, it creates a 
-zip archive of **all** of the key files associated with the steam user id. These backups
-are kept in the working directory under ``RS_backup``.
+zip archive of **all** of the key files associated with the Steam account id. These
+backups are kept in the working directory under ``RS_backup``.
 
 To restore a backup, extract the contents of the zip file and copy the contents into
 your Steam Rocksmith save folder. For most people, this should be in your Steam
 install directory under::
 
-    <Steam directory>\userdata\<steam_user_id>\221680
+    <Steam directory>\userdata\<steam_account_id>\221680
 
-``<steam_user_id>`` is the same steam user id used in the rsrtools songlists menu.
+``<steam_account_id>`` is the same Steam account id used in the rsrtools songlists menu.
 
 As a check, this folder should contain a ``remotecache.vdf`` file and a ``remote``
 sub-directory. The ``remote`` subdirectory should contain a file named 
@@ -965,8 +972,6 @@ TODO
   integration option. 
 
 - Complete PSARC scanner (welder.py)
-
-- Add some defaults for bass and rhythm players.
 
 Development notes
 =================
