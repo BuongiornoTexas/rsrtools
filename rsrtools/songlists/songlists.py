@@ -17,6 +17,7 @@ from typing import Dict, List, Optional, TextIO, Union
 
 import rsrtools.utils as utils
 
+from rsrtools.steam import steam_active_user
 from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
 from rsrtools.songlists.configclasses import (
     Configuration,
@@ -360,15 +361,15 @@ class SongListCreator:
             steam_str = "'not set'"
         else:
             steam_str = ""
-            if self.steam_account_id == str(utils.steam_active_user()):
+            if self.steam_account_id == str(steam_active_user()):
                 steam_str = ", logged into Steam now"
 
-            steam_str = "".join(("'", self.steam_account_id, "'", steam_str))
+            steam_str = f"'{self.steam_account_id}'{steam_str}"
 
         if not self.player_profile:
             player_str = "'not set'"
         else:
-            player_str = "".join(("'", self.player_profile, "'"))
+            player_str = f"'{self.player_profile}'"
 
         if isinstance(self._cli_report_target, Path):
             report_to = f"File '{fsdecode(self._cli_report_target)}'."

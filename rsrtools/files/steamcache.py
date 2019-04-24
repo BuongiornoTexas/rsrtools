@@ -9,16 +9,13 @@ Refer to class SteamMetadata for further detail/definitions.
 from os import fsdecode
 from pathlib import Path
 from hashlib import sha1
-from collections import abc
 from enum import Enum
 from typing import Dict, Any, Iterator, Tuple, Mapping, Optional
 
 from rsrtools.utils import double_quote
+from rsrtools.steam import load_vdf, save_vdf
 
 REMOTE_CACHE_NAME = "remotecache.vdf"
-SECTION_START = "{"
-SECTION_END = "}"
-SEPARATOR = "\t\t"
 BLOCK_SIZE = 65536
 
 
@@ -29,23 +26,6 @@ class SteamMetadataKey(Enum):
     LOCALTIME = '"localtime"'
     TIME = '"time"'
     SHA = '"sha"'
-
-
-class SteamMetadataError(Exception):
-    """Base class for Steam metadata handling errors."""
-
-    def __init__(self, message: str = None) -> None:
-        """Minimal constructor.
-
-        Keyword Arguments:
-            message {str} -- Custom error text. If no message is supplied (default),
-                the exception will supply a not very informative message.
-                (default: {None})
-        """
-        if message is None:
-            message = "An unspecified Steam cloud metadata handling error had occurred."
-
-        super().__init__(message)
 
 
 class SteamMetadata:
@@ -111,37 +91,7 @@ class SteamMetadata:
 
     def _read_steam_metadata(self) -> None:
         """Read Steam metadata file and load metadata dictionary."""
-        self._steam_metadata = dict()
-
-        # ugly custom parser, cos Steam doesn't do standard file formats
-        # node needs a type to stop mypy collapsing during the walk
-        node: dict = self._steam_metadata
-        section_label = ""
-        branches = list()
-        with self._metadata_path.open("rt") as fh:
-            for line in fh:
-                key = line.strip()
-                try:
-                    (key, value) = key.split()
-                except ValueError:
-                    if key == SECTION_START:
-                        node[section_label] = dict()
-                        branches.append(node)
-                        node = node[section_label]
-                        section_label = ""
-                    elif key == SECTION_END:
-                        node = branches.pop()
-                    else:
-                        section_label = key
-                else:
-                    node[key] = value
-
-        # sense check
-        if branches:
-            raise SteamMetadataError(
-                "Incomplete Steam metadata file: at least one section is not "
-                'terminated.\n  (Missing "}".)'
-            )
+        self._steam_metadata = load_vdf(self._metadata_path, strip_quotes=False)
 
     @staticmethod
     def _update_metadata_key_value(
@@ -318,23 +268,6 @@ class SteamMetadata:
         # instance contents out of sync with metadata file.
         self._is_dirty = True
 
-    def _iter_tree(self, tree: Mapping[Any, Any]) -> Iterator[Tuple[Any, Any]]:
-        """Iterate (walk) the Steam metadata tree.
-
-        Arguments:
-            tree {dict} -- A node in the self._steam_metadata dictionary.
-
-        Helper method for write_metadata_file.
-
-        """
-        for key, value in tree.items():
-            if isinstance(value, abc.Mapping):
-                yield key, SECTION_START
-                for inner_key, inner_value in self._iter_tree(value):
-                    yield inner_key, inner_value
-                yield key, SECTION_END
-            else:
-                yield key, value
 
     def write_metadata_file(self, save_dir: Optional[Path]) -> None:
         """Write Steam metadata file if instance data differs from the original file.
@@ -344,7 +277,7 @@ class SteamMetadata:
                 file or None.
 
         If save_dir is specified as None, the original Steam metadata file will be
-        overwritten.
+        overwritten, and the instance marked as clean.
 
         Otherwise the updated file is written to save_dir with the original file name.
         Further, the object instance remains marked as dirty, as the object data is out
@@ -355,30 +288,17 @@ class SteamMetadata:
         Steam cloud file. This is typically the desired state.
         """
         if self._is_dirty:
-            indent = ""
-            file_lines = list()
-            for key, value in self._iter_tree(self._steam_metadata):
-                if value == SECTION_START:
-                    file_lines.append("".join([indent, key, "\n"]))
-                    file_lines.append("".join([indent, SECTION_START, "\n"]))
-                    indent = indent + "\t"
-                elif value == SECTION_END:
-                    indent = indent[:-1]
-                    file_lines.append("".join([indent, SECTION_END, "\n"]))
-                else:
-                    file_lines.append("".join([indent, key, SEPARATOR, value, "\n"]))
-
             if save_dir is None:
-                with self._metadata_path.open("wt") as fh:
-                    fh.writelines(file_lines)
+                save_path = self._metadata_path
+            else:
+                save_path = save_dir.joinpath(self._metadata_path.name)
+            
+            save_vdf(self._steam_metadata, save_path, add_quotes=False)
+            
+            if save_dir is None:
                 # original source file and instance now in sync
                 self._is_dirty = False
 
-            else:
-                save_path = save_dir.joinpath(self._metadata_path.name)
-
-                with save_path.open("xt") as fh:
-                    fh.writelines(file_lines)
 
     def __init__(self, search_dir: Path) -> None:
         """Locate Steam metadata file in search_dir and load it.

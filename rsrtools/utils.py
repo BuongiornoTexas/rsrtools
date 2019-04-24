@@ -4,11 +4,7 @@
 # cSpell:ignore HKEY, rsrpad
 
 # Not even trying to get stubs for winreg
-from sys import platform
-from pathlib import Path
-from typing import List, Optional, Dict, Tuple, Union, Any, Sequence
-if platform == 'win32':
-    import winreg  # type: ignore
+from typing import List, Optional, Tuple, Union, Any, Sequence
 
 
 def rsrpad(data: bytes, block_size_bytes: int) -> bytes:
@@ -146,95 +142,3 @@ def yes_no_dialog(prompt: str) -> bool:
 
         if s in ("N", "n"):
             return False
-
-
-# From here on down, a set of utilities relating to Steam.
-# Consider creating separate classes if these become extensive
-# utilities for extracting Steam parameters from the windows registry.
-def steam_path() -> Optional[Path]:
-    """Return Steam installation path as a string. Return None if not found."""
-    ret_val = None
-
-    # At the moment, this is the only OS dependent code in the package
-    if platform == "win32":
-        try:
-            with winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam"
-            ) as steam_key:
-                str_path, _ = winreg.QueryValueEx(steam_key, "SteamPath")
-        except OSError:
-            pass
-
-        ret_val = Path(str_path).resolve()
-
-    elif platform == 'darwin':
-        # Bad form, but at least this way I can't forget it later.
-        raise NotImplementedError()
-
-    else:
-        raise OSError(f"rsrtools doesn't know how to find Steam folder on {platform}")
-
-    return ret_val
-
-
-def steam_user_data_dirs() -> Dict[str, Path]:
-    """Return a dictionary of all userdata directories found in the Steam directory.
-
-    The dictionary keys are local Steam account ids as strings, values are the directory
-    paths. Returns an empty dict if no userdata directories are found.
-
-    """
-    ret_val = dict()
-
-    users_dir = steam_path()
-    if users_dir is not None:
-        # noinspection SpellCheckingInspection
-        users_dir = users_dir.joinpath("userdata")
-
-        if users_dir.is_dir():
-            for child in users_dir.iterdir():
-                if child.is_dir():
-                    ret_val[child.name] = child
-
-    return ret_val
-
-
-# replace this with a function that returns a dictionary of Steam user descriptions
-# dict[steam_account_id, <PersonaName> (account_name), most recently logged in account]
-def steam_active_user() -> int:
-    """Return Steam active user as an integer, or 0 for no active user."""
-    ret_val = 0
-    try:
-        with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam\ActiveProcess"
-        ) as sub_key:
-            ret_val, _ = winreg.QueryValueEx(sub_key, "ActiveUser")
-    except OSError:
-        pass
-
-    return ret_val
-
-
-# Not used. Delete in later version.
-def steam_registry_users() -> List[str]:
-    """Return list[str] of Steam account ids found in the registry."""
-    ret_val = list()
-
-    try:
-        with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam\Users"
-        ) as sub_key:
-            i = 0
-            while True:
-                try:
-                    account_id = winreg.EnumKey(sub_key, i)
-                except OSError:
-                    break
-
-                ret_val.append(account_id)
-                i = i + 1
-
-    except OSError:
-        pass
-
-    return ret_val

@@ -22,9 +22,10 @@ from pathlib import Path
 from os import fsdecode
 
 from rsrtools import utils
+from rsrtools.steam import steam_user_data_dirs, steam_active_user, SteamMetadataError
 from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
 from rsrtools.files.savefile import RSSaveFile, RSJsonRoot
-from rsrtools.files.steamcache import SteamMetadata, SteamMetadataError
+from rsrtools.files.steamcache import SteamMetadata
 
 # Rocksmith meta data file. Ties profile name to profile id.
 LOCAL_PROFILES = "LocalProfiles.json"
@@ -124,7 +125,6 @@ class RSSaveWrapper:
     Implementation note: I believe all Rocksmith Json objects have either names [str],
     such as 'Songlists' or integer indices into arrays [int], such as the second
     Songlist (2). Type annotations in this class reflect this assumption.
-
 
     Save wrapper instances should be marked as dirty when instance data is changed
     (i.e. the caller should mark the instance as dirty when the instance data no longer
@@ -350,16 +350,21 @@ class RSSaveWrapper:
         Arguments:
             json_path {Sequence[Union[int, str, ProfileKey]]} -- Path to json sub
                 container or data value. See class documentation for a description of
-                json_path.
+                json_path. If json_path is empty, returns self.json_tree.
 
         Returns:
             Any -- A json subtree (list, dict), or a json value (str, bool, Decimal)
-                found at the end of the json_path.
+                found at the end of the json_path. Keep in mind that editing a mutable
+                is editing the save file. If you do this, you should also mark the file
+                as dirty.
 
         """
-        parent_dict, key = self._json_node(json_path)
-
-        return parent_dict[key]
+        if not json_path:
+            # Nothing in json_path, return entire json_tree.
+            return self.json_tree
+        else:
+            parent_dict, key = self._json_node(json_path)
+            return parent_dict[key]
 
     def set_json_subtree(
         self, json_path: JSON_path_type, subtree_or_value: Any
@@ -369,7 +374,8 @@ class RSSaveWrapper:
         Arguments:
             json_path {Sequence[Union[int, str, ProfileKey]]} -- Path to json sub
                 container or data value. See class documentation for a description of
-                json_path.
+                json_path. If json_path is empty, the method will replace the entire
+                json tree for the instance (self.json_tree) with subtree_or_value.
             subtree_or_value {Any} -- A json subtree (list, dict), or a json value
                 (str, bool, Decimal) that replaces the subtree/value found at the end
                 of the json_path. The caller is responsible for ensuring the
@@ -377,9 +383,12 @@ class RSSaveWrapper:
 
         Marks instance as dirty, as this is the expected behaviour for a value change.
         """
-        parent_dict, key = self._json_node(json_path)
+        if not json_path:
+            self.json_tree = subtree_or_value
+        else:
+            parent_dict, key = self._json_node(json_path)
 
-        parent_dict[key] = subtree_or_value
+            parent_dict[key] = subtree_or_value
 
         self.mark_as_dirty()
 
@@ -1020,6 +1029,17 @@ class RSProfileManager:
         steam_account_id -- Read only property. The Steam account id of the file set in
             the working directory.
 
+        mark_as_dirty -- Mark profile data as dirty. Used to inform the instance that
+            profile save data in the json tree has been changed externally.
+
+        get_json_subtree -- Returns a save data json subtree from a profile. This may or
+            may not be mutable (json sub-dicts/lists are mutable, values are normally
+            not mutable). The caller is responsible for marking the profile as dirty if
+            it modifies the save data.
+        
+        set json_subtree -- Overwrites a save data json subtree in a profile and marks
+            the profile as dirty.
+
     RSProfileManager works on a base directory with the following structure:
         base_dir
             \-- RS_working   - This directory contains the working copy of the
@@ -1273,7 +1293,7 @@ class RSProfileManager:
 
         options = list()
 
-        active_user = str(utils.steam_active_user())
+        active_user = str(steam_active_user())
         for steam_account_id, file_set in steam_file_sets.items():
             option_text = f"Steam user '{steam_account_id}'"
             if steam_account_id == active_user:
@@ -1334,7 +1354,7 @@ class RSProfileManager:
         directories are found.
 
         """
-        user_dirs = utils.steam_user_data_dirs()
+        user_dirs = steam_user_data_dirs()
 
         if find_account_id:
             if not isinstance(find_account_id, str):
@@ -1709,6 +1729,67 @@ class RSProfileManager:
         self._profiles[profile_name].set_arrangement_play_count(
             arrangement_id, play_count
         )
+
+    def mark_as_dirty(self, profile_name: str) -> None:
+        """Mark the profile data as dirty.
+
+        WARNING! This method has not been tested yet.
+
+        Arguments:
+            profile_name {str} -- The target profile name or unique id.
+
+        This is intended to be used when:
+            - The caller has modified the profile save data external to this class.
+            - Restoring an old save. By marking the file as dirty, file data, local
+              profiles and Steam cache data can all be set in sync for the file. The
+              save file still needs to be represented in local profiles data and steam
+              cache file.
+            - Copying a save to a new location without changing it (write_file does
+              nothing unless the instance is marked dirty).
+        """
+        self._profiles[profile_name].mark_as_dirty()
+
+    def get_json_subtree(self, profile_name: str, json_path: JSON_path_type) -> Any:
+        """Return profile json subtree or value based on the json_path sequence.
+
+        WARNING! This method has not been tested yet.
+
+        Arguments:
+            profile_name {str} -- The target profile name or unique id.
+            json_path {Sequence[Union[int, str, ProfileKey]]} -- Path to json sub
+                container or data value. See RSWrapper documentation for a description
+                of json_path. If json_path is empty, returns full profile json_tree.
+
+        Returns:
+            Any -- A json subtree (list, dict), or a json value (str, bool, Decimal)
+                found at the end of the json_path. Keep in mind that editing a mutable
+                is editing the save file. If you do this, you should also mark the file
+                as dirty.
+
+        """
+        return self._profiles[profile_name].get_json_subtree(json_path)
+
+    def set_json_subtree(
+        self, profile_name: str, json_path: JSON_path_type, subtree_or_value: Any
+    ) -> None:
+        """Replace profile subtree or value at the end of json_path.
+
+        WARNING! This method has not been tested yet.
+
+        Arguments:
+            profile_name {str} -- The target profile name or unique id.
+            json_path {Sequence[Union[int, str, ProfileKey]]} -- Path to json sub
+                container or data value. See RSWrapper documentation for a description
+                of json_path. If json_path is empty, the method will replace the entire
+                json tree for the profile with subtree_or_value.
+            subtree_or_value {Any} -- A json subtree (list, dict), or a json value
+                (str, bool, Decimal) that replaces the subtree/value found at the end
+                of the json_path. The caller is responsible for ensuring the
+                format of this argument is consistent with Rocksmith json.
+
+        Marks instance as dirty, as this is the expected behaviour for a value change.
+        """
+        self._profiles[profile_name].set_json_subtree(json_path, subtree_or_value)
 
     def profile_names(self) -> List[str]:
         """Return a list of the profile names in the file set.
