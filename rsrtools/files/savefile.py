@@ -90,6 +90,7 @@ class RSSaveFile:
     Rocksmith and may corrupt the installation.
     """
 
+    # instance variables
     _debug: bool
     _json_debug_path: Optional[Path]
     _file_path: Path

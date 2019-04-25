@@ -10,7 +10,7 @@ from os import fsdecode
 from pathlib import Path
 from hashlib import sha1
 from enum import Enum
-from typing import Dict, Any, Iterator, Tuple, Mapping, Optional
+from typing import Dict, Optional
 
 from rsrtools.utils import double_quote
 from rsrtools.steam import load_vdf, save_vdf
@@ -82,7 +82,7 @@ class SteamMetadata:
 
     """
 
-    # lazy annotation here.
+    # instance variables
     # Path to Steam metadata file.
     _metadata_path: Path
     # Instance version of the Steam metadata
@@ -268,7 +268,6 @@ class SteamMetadata:
         # instance contents out of sync with metadata file.
         self._is_dirty = True
 
-
     def write_metadata_file(self, save_dir: Optional[Path]) -> None:
         """Write Steam metadata file if instance data differs from the original file.
 
@@ -292,13 +291,12 @@ class SteamMetadata:
                 save_path = self._metadata_path
             else:
                 save_path = save_dir.joinpath(self._metadata_path.name)
-            
+
             save_vdf(self._steam_metadata, save_path, add_quotes=False)
-            
+
             if save_dir is None:
                 # original source file and instance now in sync
                 self._is_dirty = False
-
 
     def __init__(self, search_dir: Path) -> None:
         """Locate Steam metadata file in search_dir and load it.

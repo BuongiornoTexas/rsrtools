@@ -17,12 +17,23 @@ import logging
 import shutil
 from decimal import Decimal
 from zipfile import ZipFile
-from typing import Dict, Sequence, Union, Tuple, Optional, Any, Iterator, Set, List
+from typing import (
+    cast,
+    Dict,
+    Sequence,
+    Union,
+    Tuple,
+    Optional,
+    Any,
+    Iterator,
+    Set,
+    List,
+)
 from pathlib import Path
 from os import fsdecode
 
 from rsrtools import utils
-from rsrtools.steam import steam_user_data_dirs, steam_active_user, SteamMetadataError
+from rsrtools.steam import SteamAccounts, SteamMetadataError
 from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
 from rsrtools.files.savefile import RSSaveFile, RSJsonRoot
 from rsrtools.files.steamcache import SteamMetadata
@@ -138,6 +149,7 @@ class RSSaveWrapper:
     appropriate.
     """
 
+    # instance variables
     _file_path: Path
     _is_dirty: bool
     __cached_rs_file: Optional[RSSaveFile]
@@ -509,6 +521,7 @@ class RSProfileDB(RSSaveWrapper):
             arrangement to a new value.
     """
 
+    # instance variables
     _unique_id: str
     _player_name: str
 
@@ -717,6 +730,7 @@ class RSFileSet:
     in cache). Save are lazy loaded, so a corrupt file may cause problems later.
     """
 
+    # instance variables
     _fs_steam_metadata: Optional[SteamMetadata]
     _fs_local_profiles: Optional[RSLocalProfiles]
     _fs_profiles: Dict[str, RSProfileDB]
@@ -1036,7 +1050,7 @@ class RSProfileManager:
             may not be mutable (json sub-dicts/lists are mutable, values are normally
             not mutable). The caller is responsible for marking the profile as dirty if
             it modifies the save data.
-        
+
         set json_subtree -- Overwrites a save data json subtree in a profile and marks
             the profile as dirty.
 
@@ -1058,7 +1072,7 @@ class RSProfileManager:
     it, and the class initialisation will fail if refused.
     """
 
-    # type hints
+    # instance variables
     # As we should be working on consistent fileset, none of these three
     # should ever be None.
     _steam_metadata: SteamMetadata
@@ -1069,6 +1083,10 @@ class RSProfileManager:
     _working_save_path: Path
     _backup_path: Path
     _update_save_path: Path
+
+    # None of the information in Steam accounts should change while we are running
+    # rsrtools, so we can make this a class object.
+    _steam_accounts: SteamAccounts = SteamAccounts()
 
     def __init__(
         self,
@@ -1195,8 +1213,8 @@ class RSProfileManager:
                 chosen_file_set = steam_file_sets[self._steam_account_id]
             else:
                 raise RSFileSetError(
-                    f"Rocksmith file set for Steam user {self._steam_account_id} is "
-                    f"either missing or inconsistent."
+                    f"Missing or inconsistent Rocksmith file set for Steam user:"
+                    f"\n    {self.steam_description(self._steam_account_id)}"
                 )
 
         if chosen_file_set is not working_file_set:
@@ -1237,9 +1255,35 @@ class RSProfileManager:
         """
         return self._steam_account_id
 
-    @staticmethod
+    def steam_description(self, account_id: str) -> str:
+        """Return a description string for a Steam account id.
+
+        Arguments:
+            account_id {str} -- The target account id.
+
+        Returns:
+            str -- The description string for the account, ideally from Steam accounts,
+                otherwise the profile manager will supply something.
+
+        """
+        description = ""
+        if account_id == MINUS_ONE:
+            description = f"{account_id} (working directory files, no Steam account)."
+
+        else:
+            try:
+                description = self._steam_accounts.account_info(account_id).description
+            except KeyError:
+                # no data for account_id.
+                pass
+
+        if not description:
+            description = f"{account_id} (no information available on Steam account)."
+
+        return description
+
     def _choose_file_set(
-        steam_file_sets: Dict[str, RSFileSet], working_file_set: RSFileSet
+        self, steam_file_sets: Dict[str, RSFileSet], working_file_set: RSFileSet
     ) -> Tuple[str, RSFileSet]:
         """Provide a command line menu for choosing a Rocksmith file set.
 
@@ -1293,12 +1337,9 @@ class RSProfileManager:
 
         options = list()
 
-        active_user = str(steam_active_user())
         for steam_account_id, file_set in steam_file_sets.items():
-            option_text = f"Steam user '{steam_account_id}'"
-            if steam_account_id == active_user:
-                option_text = option_text + ". This is the user logged into Steam now"
-            option_text = f"{option_text}. ({file_set.m_time})"
+            option_text = f"Steam user {self.steam_description(steam_account_id)}"
+            option_text = f"{option_text} ({file_set.m_time})"
             options.append((option_text, steam_account_id))
 
         if working_file_set.consistent:
@@ -1333,8 +1374,7 @@ class RSProfileManager:
 
         return steam_account_id, file_set
 
-    @staticmethod
-    def _get_steam_rs_user_dirs(find_account_id: str) -> Dict[str, Path]:
+    def _get_steam_rs_user_dirs(self, find_account_id: str) -> Dict[str, Path]:
         """Return Rocksmith save directories for those Steam users that have them.
 
         Arguments:
@@ -1354,7 +1394,9 @@ class RSProfileManager:
         directories are found.
 
         """
-        user_dirs = steam_user_data_dirs()
+        user_dirs: Dict[str, Path] = dict()
+        # List of valid steam accounts
+        account_list = self._steam_accounts.account_ids(only_valid=True)
 
         if find_account_id:
             if not isinstance(find_account_id, str):
@@ -1362,11 +1404,17 @@ class RSProfileManager:
                     "Unexpected type for find_account_id. This should be a string "
                     "version of the Steam integer account id."
                 )
-            # retain dir for specified id (if found), delete all other entries.
-            save_dir = user_dirs.get(find_account_id, None)
-            user_dirs.clear()
-            if save_dir is not None:
-                user_dirs[find_account_id] = save_dir
+            # Get path info if we have valid account data.
+            # If caller has asked for an invalid account, leave user_dirs empty.
+            if find_account_id in account_list:
+                info = self._steam_accounts.account_info(find_account_id)
+                # Should be safe to cast here, because we have asked for valid accounts
+                user_dirs[find_account_id] = cast(Path, info.path)
+
+        else:
+            for account_id in account_list:
+                info = self._steam_accounts.account_info(account_id)
+                user_dirs[account_id] = cast(Path, info.path)
 
         for account_id in list(user_dirs.keys()):
             # extend path to Steam rocksmith remote folder.
@@ -1402,8 +1450,8 @@ class RSProfileManager:
                 steam_file_sets[account_id] = file_set
             else:
                 logging.warning(
-                    f"Rocksmith save file set for Steam user {account_id} is not "
-                    f"consistent and will be discarded."
+                    f"Discarding inconsistent Rocksmith save file set for Steam user:"
+                    f"\n    {self.steam_description(account_id)}"
                     f"\nRefer to previous warnings for details ."
                 )
 
@@ -1627,8 +1675,9 @@ class RSProfileManager:
 
         if not steam_dirs:
             raise RSProfileError(
-                f"Moving updates failed. Steam Rocksmith save directory for account id "
-                f"'{target_steam_account_id}'' does not exist"
+                f"Moving updates failed. Steam Rocksmith save directory does not exist "
+                f"for account:"
+                f"\n    {self.steam_description(target_steam_account_id)}"
             )
 
         steam_save_dir = steam_dirs[target_steam_account_id]
@@ -1873,14 +1922,15 @@ class RSProfileManager:
         if int(self.steam_account_id) > 0:
             dlg = (
                 f",\nand will write the updated profile back to Steam "
-                f"user {self.steam_account_id}."
+                f"account:"
+                f"\n    {self.steam_description(self.steam_account_id)}"
             )
         else:
             dlg = "."
 
         dlg = (
-            f"Please confirm that you want to copy player data from profile '{src}' "
-            f"into profile '{dst}'."
+            f"Please confirm that you want to copy player data from profile"
+            f"\n'{src}' into profile '{dst}'.\n"
             f"\nThis will replace all existing data in profile '{dst}'{dlg}"
         )
 
@@ -1915,8 +1965,8 @@ class RSProfileManager:
 
         if int(self.steam_account_id) > 0:
             dlg = (
-                f",\nand write the updated profile back to Steam "
-                f"user {self.steam_account_id}."
+                f",\nand write the updated profile back to Steam user:"
+                f"\n\n    {self.steam_description(self.steam_account_id)}"
             )
         else:
             dlg = "\nand write these changes to the update directory."

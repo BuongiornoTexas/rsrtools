@@ -1008,11 +1008,12 @@ methods::
     RSProfileManager.set_json_subtree()
     RSProfileManager.mark_as_dirty()
 
-Before explaining these methods, note that you are on own with implementation and
-trouble shooting of changes to profiles, and  a warning: I haven't done any testing
-with these methods as documented - expect a bug or two for now . If you want a somewhat
+Before explaining these methods, please note that I haven't yet done any testing of
+these three methods - they are so simple that they should work out of the box, but bugs
+are possible, so please be careful with your save files. If you want a somewhat
 safer path for changes, please make a feature request on github and we'll see what we
-can work up.
+can work up. I will do some testing when I add a demonstration utility in a future 
+release (specifically, the feature request to delete progress for specified CDLCs).
 
 With that warning out of the way, onto the approach. The general steps are:
 
@@ -1048,9 +1049,6 @@ With that warning out of the way, onto the approach. The general steps are:
  
    Note that it's up to you to ensure that the save files match up with the
    steam account id (the method doesn't check this).
-
-I will add a demonstration utility showing these steps in a future release 
-(specifically, the feature request to delete progress for specified CDLCs).
 
 And finally, a brief explanation of json_path: the get/set_subtree methods use a JSON 
 path to navigate save data elements in the Rocksmith profile JSON dictionary. A JSON

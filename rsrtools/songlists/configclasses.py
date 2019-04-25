@@ -387,6 +387,7 @@ class Settings:
     Note: changes in attribute names should be reflected in default TOML.
     """
 
+    # instance variables
     CFSM_file_path: str = ""
     steam_account_id: str = ""
     player_profile: str = ""
@@ -404,6 +405,7 @@ class SubFilter:
     Note: changes in attribute names should be reflected in default TOML.
     """
 
+    # instance variables
     include: bool
 
 
@@ -435,6 +437,7 @@ class RangeSubFilter(SubFilter):
     Note: changes in attribute names should be reflected in default TOML.
     """
 
+    # instance variables
     # When pydantic supports dataclass validators, change this to
     # ranges: List[List[Union[int, float]]]
     ranges: List[List[float]]
@@ -546,6 +549,7 @@ class ListSubFilter(SubFilter):
     Note: changes in attribute names should be reflected in default TOML.
     """
 
+    # instance variables
     values: List[str]
 
     def list_clause(
@@ -629,6 +633,7 @@ class Filter:
     Note: changes in attribute names should be reflected in default TOML.
     """
 
+    # instance variables
     sub_filters: Dict[
         Union[RangeField, ListField], Union[RangeSubFilter, ListSubFilter]
     ] = field(default_factory=dict)

@@ -17,7 +17,6 @@ from typing import Dict, List, Optional, TextIO, Union
 
 import rsrtools.utils as utils
 
-from rsrtools.steam import steam_active_user
 from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
 from rsrtools.songlists.configclasses import (
     Configuration,
@@ -67,7 +66,7 @@ class SongListCreator:
 
     """
 
-    # member annotations.
+    # instance variables
     _configuration: Configuration
 
     _arr_db: ArrangementDB
@@ -257,9 +256,13 @@ class SongListCreator:
                 )
 
             if value not in self._profile_manager.profile_names():
+                description = self._profile_manager.steam_description(
+                    self.steam_account_id
+                )
                 raise RSFilterError(
                     f"Rocksmith player profile '{value}' does not exist in Steam file "
-                    f"set for user '{self.steam_account_id}'"
+                    f"set for user:"
+                    f"\n{description}"
                 )
 
             self._arr_db.load_player_profile(self._profile_manager, value)
@@ -357,14 +360,10 @@ class SongListCreator:
 
     def _cli_menu_header(self) -> str:
         """Create the command line interface header string."""
-        if not self.steam_account_id:
+        if not self._profile_manager:
             steam_str = "'not set'"
         else:
-            steam_str = ""
-            if self.steam_account_id == str(steam_active_user()):
-                steam_str = ", logged into Steam now"
-
-            steam_str = f"'{self.steam_account_id}'{steam_str}"
+            steam_str = self._profile_manager.steam_description(self.steam_account_id)
 
         if not self.player_profile:
             player_str = "'not set'"

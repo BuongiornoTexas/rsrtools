@@ -226,6 +226,7 @@ class SQLTable:
 
     """
 
+    # instance variables
     # dictionary of field types and SQL types for those fields.
     _fields_dict: SQLTableDict
     # table name  and primary key only needed for table functionality
@@ -411,6 +412,7 @@ class SongListSQLGenerator:
 
     """
 
+    # instance variables
     song_list_sql: List[SQLClause]
     tmp_table_sql: List[SQLClause]
     _list_validator: ListValidator
@@ -679,7 +681,7 @@ class ArrangementDB:
 
     """
 
-    # Type declarations
+    # instance variables
     _db_file_path: Path
     _arrangements_sql: SQLTable
     _profile_sql: SQLTable

@@ -3,12 +3,12 @@
 
 # Consider creating separate classes if these become extensive
 
-# cSpell:ignore HKEY
+# cSpell:ignore HKEY, isdigit
 
 from sys import platform
 from pathlib import Path
 from collections import abc
-from typing import Any, Dict, Iterator, Mapping, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Mapping, NamedTuple, Optional, Tuple
 
 from rsrtools.utils import double_quote
 
@@ -38,54 +38,6 @@ class SteamMetadataError(Exception):
         super().__init__(message)
 
 
-def steam_path() -> Optional[Path]:
-    """Return Steam installation path as a string. Return None if not found."""
-    ret_val = None
-
-    # At the moment, this is the only OS dependent code in the package
-    if platform == "win32":
-        try:
-            with winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam"
-            ) as steam_key:
-                str_path, _ = winreg.QueryValueEx(steam_key, "SteamPath")
-
-            ret_val = Path(str_path).resolve(strict=True)
-        except (OSError, FileNotFoundError):
-            pass
-
-    elif platform == "darwin":
-        # Bad form, but at least this way I can't forget it later.
-        raise NotImplementedError()
-
-    else:
-        raise OSError(f"rsrtools doesn't know how to find Steam folder on {platform}")
-
-    return ret_val
-
-
-def steam_user_data_dirs() -> Dict[str, Path]:
-    """Return a dictionary of all userdata directories found in the Steam directory.
-
-    The dictionary keys are local Steam account ids as strings, values are the directory
-    paths. Returns an empty dict if no userdata directories are found.
-
-    """
-    ret_val = dict()
-
-    users_dir = steam_path()
-    if users_dir is not None:
-        # noinspection SpellCheckingInspection
-        users_dir = users_dir.joinpath("userdata")
-
-        if users_dir.is_dir():
-            for child in users_dir.iterdir():
-                if child.is_dir():
-                    ret_val[child.name] = child
-
-    return ret_val
-
-
 def load_vdf(vdf_path: Path, strip_quotes: bool = False) -> Dict[Any, Any]:
     """Load a Steam .vdf file into a dictionary.
 
@@ -103,6 +55,7 @@ def load_vdf(vdf_path: Path, strip_quotes: bool = False) -> Dict[Any, Any]:
     This is a primitive .vdf loader. It makes minimal assumptions about .vdf file
     structure and attempts to parse a dictionary based on this structure. It is suitable
     for use in rsrtools, but should not be relied on more broadly.
+
     """
     vdf_dict: Dict[Any, Any] = dict()
 
@@ -167,18 +120,18 @@ def save_vdf(
     vdf_dict: Dict[Any, Any], vdf_path: Path, add_quotes: bool = False
 ) -> None:
     """Write a vdf dictionary to file.
-    
+
     Arguments:
         vdf_dict {Dict[Any, Any]} -- The vdf dictionary to write.
         vdf_path {Path} -- The save path for the file.
-    
+
     Keyword Arguments:
-        add_quotes {bool} -- If True, adds double quotes to all keys and 
+        add_quotes {bool} -- If True, adds double quotes to all keys and
             values before writing. If False, writes the keys and values as they
             appear in the vdf_dict (default: {False})
-    
-    """    
-    indent = ""        
+
+    """
+    indent = ""
     file_lines = list()
     for key, value in _iter_vdf_tree(vdf_dict):
         if add_quotes:
@@ -200,17 +153,203 @@ def save_vdf(
         fh.writelines(file_lines)
 
 
-# replace this with a function that returns a dictionary of Steam user descriptions
-# dict[steam_account_id, <PersonaName> (account_name), most recently logged in account]
-def steam_active_user() -> int:
-    """Return Steam active user as an integer, or 0 for no active user."""
-    ret_val = 0
-    try:
-        with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam\ActiveProcess"
-        ) as sub_key:
-            ret_val, _ = winreg.QueryValueEx(sub_key, "ActiveUser")
-    except OSError:
-        pass
+class SteamAccountInfo(NamedTuple):
+    """Provide Steam account information."""
 
-    return ret_val
+    name: str
+    persona: str
+    description: str
+    path: Optional[Path]
+    valid: bool
+
+
+class SteamAccounts:
+    """Provide data on Steam user accounts on the local machine.
+
+    Public methods:
+        account_ids --  Return a list Steam account ids in string form (8 digit
+            account ids as strings).
+        account_info -- Return a SteamAccountInfo named tuple for a specific account.
+    """
+
+    # instance variables
+    # Steam data is unlikely to change for the duration of the program, so
+    # we could use class variables here. But it'll be a lot effort, as this class
+    # probably only be instaniated once or twice.
+    # Path to the Steam application.
+    _steam_path: Optional[Path]
+    _account_info: Dict[str, SteamAccountInfo]
+
+    def __init__(self) -> None:
+        """Initialise steam account data for use."""
+        self._steam_path = self._get_steam_path()
+
+        self._account_info = self._find_info()
+
+    @staticmethod
+    def _get_steam_path() -> Optional[Path]:
+        """Return Steam installation path as a string. Return None if not found."""
+        ret_val = None
+
+        # At the moment, this is the only OS dependent code in the package
+        if platform == "win32":
+            try:
+                with winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam"
+                ) as steam_key:
+                    str_path, _ = winreg.QueryValueEx(steam_key, "SteamPath")
+
+                ret_val = Path(str_path).resolve(strict=True)
+            except (OSError, FileNotFoundError):
+                # Looks like we have no steam installation?
+                # Up to the user to decide what to do here.
+                pass
+
+        elif platform == "darwin":
+            # I believe this should work.
+            try:
+                ret_val = (
+                    Path.home()
+                    .joinpath("Library/Application Support/Steam")
+                    .resolve(strict=True)
+                )
+            except FileNotFoundError:
+                # Looks like we have no steam installation?
+                # Up to the user to decide what to do here.
+                pass
+
+        else:
+            raise OSError(
+                f"rsrtools doesn't know how to find Steam folder on {platform}"
+            )
+
+        return ret_val
+
+    def _find_info(self) -> Dict[str, SteamAccountInfo]:
+        """Find and record Steam account information on local machine."""
+        info: Dict[str, SteamAccountInfo] = dict()
+
+        if self._steam_path is not None:
+            # create info based on both login vdf file and userdata folder names.
+            user_dirs = self._user_data_dirs()
+            user_config = self._login_info()
+
+            user_path: Optional[Path]
+            for account, user_path in user_dirs.items():
+                if account not in user_config:
+                    # user folder with no account information.
+                    info[account] = SteamAccountInfo(
+                        name="",
+                        persona="",
+                        description=f"{account}, no Steam account info.",
+                        path=user_path,
+                        valid=False,
+                    )
+
+            for account, login_info in user_config.items():
+                if account in user_dirs:
+                    # We have account info and a userdata folder exists
+                    user_path = user_dirs[account]
+                    valid = True
+                else:
+                    # Account with no path. Shouldn't happen, but who knows ...
+                    user_path = None
+                    valid = False
+
+                name = login_info["AccountName"]
+                persona = login_info["PersonaName"]
+                if login_info["mostrecent"] == "1":
+                    most_recent = ", most recent Steam login"
+                else:
+                    most_recent = ""
+
+                info[account] = SteamAccountInfo(
+                    name=name,
+                    persona=persona,
+                    description=f"'{account}', ({persona}[{name}]){most_recent}.",
+                    path=user_path,
+                    valid=valid,
+                )
+
+        return info
+
+    def _login_info(self) -> Dict[str, Dict[str, str]]:
+        """Read the Steam loginusers.vdf file and returns a dictionary of account data.
+
+        Returns:
+            Dict[str, Dict[str, str]] -- A dictionary of:
+                Dict[Account id, Dict[Account Field, Field value].
+
+        """
+        info: Dict[str, Dict[str, str]] = dict()
+        if self._steam_path is not None:
+            vdf_dict = load_vdf(
+                self._steam_path.joinpath("config/loginusers.vdf"), strip_quotes=True
+            )
+
+            for steam_id, data in vdf_dict["users"].items():
+                # account id is low 32 bits of steam id.
+                account_id = str(int(steam_id) & 0xFFFFFFFF)
+
+                info[account_id] = data
+
+        return info
+
+    def _user_data_dirs(self) -> Dict[str, Path]:
+        """Return a dictionary of all userdata directories found in the Steam directory.
+
+        The dictionary keys are local Steam account ids as strings, values are the
+        directory paths. Returns an empty dict if no userdata directories are found.
+
+        """
+        ret_val = dict()
+
+        users_dir = self._steam_path
+        if users_dir is not None:
+            # noinspection SpellCheckingInspection
+            users_dir = users_dir.joinpath("userdata")
+
+            if users_dir.is_dir():
+                for child in users_dir.iterdir():
+                    if child.is_dir():
+                        if len(child.name) == 8 and child.name.isdigit():
+                            # Expecting an 8 digit integer account id.
+                            ret_val[child.name] = child
+
+        return ret_val
+
+    def account_ids(self, only_valid: bool = True) -> List[str]:
+        """Return list of Steam account ids found on the local machine.
+
+        Keyword Arguments:
+            only_valid {bool} -- If True, the list will contain only account ids that
+                have userdata folder and account details in the loginusers.vdf file.
+                If False, the list will also contain account ids with partial
+                information (either userdata folder or login information is missing).
+                (default: {True})
+
+        Returns:
+            List[str] -- A list of 8 digit account ids in string form.
+
+        """
+        if only_valid:
+            ids = [x for x in self._account_info.keys() if self._account_info[x].valid]
+        else:
+            ids = list(self._account_info.keys())
+
+        return ids
+
+    def account_info(self, account_id: str) -> SteamAccountInfo:
+        """Return the account info for the specified Steam account id.
+
+        Arguments:
+            account_id {str} -- An 8 digit steam id in string form.
+
+        Raises:
+            KeyError -- If account_id doesn't exist.
+
+        Returns:
+            SteamAccountInfo -- The account information object for account_id.
+
+        """
+        return self._account_info[account_id]
