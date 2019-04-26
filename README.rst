@@ -54,9 +54,8 @@ As this package is all about editing game saves, here are a couple of warnings.
 3. **Don't run this package at the same time as  Rocksmith is running.** You'll end up 
    crossing the save files and nobody will be happy (mostly you though).
 
-4. This package will only work on windows at the moment. It will require some 
-   customisation/testing for Mac OS X, and I have no idea what would be needed for 
-   Linux/PS4/XBox song lists. (The Mac OS X version should be out shortly.)
+4. This package will only work on Windows and Mac OS X at the moment. I have no idea
+   what would be needed for Linux/PS4/XBox song lists.
 
 
 TL:DNR
@@ -65,7 +64,7 @@ TL:DNR
 If you know what you are doing with python and know your way around the Customs Forge
 Song Manager, here are the recommended quick start steps.
 
-0. The package only works on Windows for now (Mac OS X support coming soon).
+0. The package only works on Windows and Mac OS X for now.
 
 1. **READ** the section on setting up a test profile (`Set up a Testing Profile!`_). 
    Until you are familiar with the
@@ -1081,7 +1080,9 @@ TODO
 Changelog
 ==========
 
-**0.1.x 2019-xx-xx** Minor updates to refer to Steam account id and Steam user id 
+**0.1.2beta 2019-04-26** Mac OS X support added. 
+
+**0.1.1beta 2019-04-26** Minor updates to refer to Steam account id and Steam user id 
 correctly. All Steam support functions moved to steam.py. Some windows specific Steam
 functions removed and replaced with methods based on Steam vdf files.
 
