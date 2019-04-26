@@ -65,7 +65,7 @@ TL:DNR
 If you know what you are doing with python and know your way around the Customs Forge
 Song Manager, here are the recommended quick start steps.
 
-0. The package only works on Windows for now (Mac OX X support coming soon).
+0. The package only works on Windows for now (Mac OS X support coming soon).
 
 1. **READ** the section on setting up a test profile (`Set up a Testing Profile!`_). 
    Until you are familiar with the
