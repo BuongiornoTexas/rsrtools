@@ -33,19 +33,23 @@ from pathlib import Path
 from os import fsdecode
 
 from rsrtools import utils
-from rsrtools.steam import SteamAccounts, SteamMetadataError
+from rsrtools.steam import (
+    SteamAccounts,
+    SteamMetadataError,
+    RS_APP_ID,
+    STEAM_REMOTE_DIR,
+)
 from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
 from rsrtools.files.savefile import RSSaveFile, RSJsonRoot
 from rsrtools.files.steamcache import SteamMetadata
 
 # Rocksmith meta data file. Ties profile name to profile id.
 LOCAL_PROFILES = "LocalProfiles.json"
-STEAM_REMOTE_DIR = "remote"
 RS_WORKING_DIR = "RS_working"
 RS_BACKUP_DIR = "RS_backup"
 RS_UPDATE_DIR = "RS_update"
 PROFILE_DB_STR = "_PRFLDB"
-RS_APP_ID = "221680"
+
 MINUS_ONE = "-1"
 
 # Local profiles keys

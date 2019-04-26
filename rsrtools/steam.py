@@ -19,6 +19,8 @@ VDF_SECTION_START = "{"
 VDF_SECTION_END = "}"
 VDF_INDENT = "\t"
 VDF_SEPARATOR = "\t\t"
+RS_APP_ID = "221680"
+STEAM_REMOTE_DIR = "remote"
 
 
 class SteamMetadataError(Exception):

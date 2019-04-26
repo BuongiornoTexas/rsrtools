@@ -4,16 +4,17 @@
 Refer to class SteamMetadata for further detail/definitions.
 """
 
-# cSpell:ignore platformstosync
+# cSpell:ignore platformstosync, PRFLDB
 
 from os import fsdecode
 from pathlib import Path
 from hashlib import sha1
 from enum import Enum
+import argparse
 from typing import Dict, Optional
 
 from rsrtools.utils import double_quote
-from rsrtools.steam import load_vdf, save_vdf
+from rsrtools.steam import load_vdf, save_vdf, RS_APP_ID, STEAM_REMOTE_DIR
 
 REMOTE_CACHE_NAME = "remotecache.vdf"
 BLOCK_SIZE = 65536
@@ -332,3 +333,81 @@ class SteamMetadata:
 
         """
         return self._metadata_path
+
+
+def self_test() -> None:
+    """Limited self test for SteamMetadata.
+
+    Run with:
+        py -m rsrtools.files.steamcache test_directory
+
+    test_directory must contain a remotecache.vdf file and remote directory containing
+    one or more Rocksmith files referenced in remotecache.vdf (*.crd,
+    LocalProfiles.json, *_PRFLDB). I'd suggest setting up a profile manager working
+    directory and running this self test on it.
+
+    I'd strongly recommend you **do not** run this script on any of your Steam
+    directories.
+    """
+    parser = argparse.ArgumentParser(
+        description="Runs a self test of SteamMetadata on a specified directory."
+    )
+    parser.add_argument(
+        "test_directory",
+        help="A directory containing remotecache.vdf and Steam remote directory that "
+        "will be used for the self test.",
+    )
+    test_path = Path(parser.parse_args().test_directory)
+
+    metadata = SteamMetadata(test_path)
+
+    # get a separate copy of the cache for comparison
+    orig_metadata = load_vdf(test_path.joinpath(REMOTE_CACHE_NAME), strip_quotes=False)
+
+    test_passed = True
+    orig_metadata = orig_metadata[double_quote(RS_APP_ID)]
+    for cachefile in orig_metadata.keys():
+        filepath = test_path.joinpath(STEAM_REMOTE_DIR + "/" + cachefile.strip('"'))
+
+        print(f"\nTest results for: {filepath.name}.")
+        if not filepath.exists():
+            print("  File not found.")
+
+        else:
+            metadata.update_metadata_set(RS_APP_ID, filepath)
+
+            # reach into object for updated data set.
+            calculated_metadata = metadata._cloud_file_metadata_set(RS_APP_ID, filepath)
+
+            for steam_key in SteamMetadataKey:
+                # report on differences/matches between original data and calculated
+                # versions
+                orig_value = orig_metadata[cachefile][steam_key.value]
+                new_value = calculated_metadata[steam_key.value]
+                if orig_value == new_value:
+                    outcome = "OK value:"
+                else:
+                    outcome = "Bad value:"
+                    test_passed = False
+
+                print(
+                    f"  {outcome} {steam_key.value} - remotecache.vdf: {orig_value}, "
+                    f"calculated: {new_value}."
+                )
+
+    if test_passed:
+        print(
+            "\nTest passed. All values calculated from the source files match"
+            "\nthe values in the remotecache.vdf file.\n"
+        )
+    else:
+        print(
+            "\nTest failed. At least one value calculated the source files does not "
+            "\nmatch the corresponding value in the remotecache.vdf file."
+            "\nNote that a 1 second difference in time values is not a cause for "
+            "concern.\n"
+        )
+
+
+if __name__ == "__main__":
+    self_test()
