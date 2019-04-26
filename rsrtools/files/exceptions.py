@@ -29,14 +29,10 @@ class RSFileFormatError(RsrError):
             message {[type]} -- Custom error text.
         """
         super().__init__(
-            "".join(
-                [
-                    message,
-                    "\nPossible reasons:\n"
-                    "- This may not be a Rocksmith file.\n"
-                    "- This file may be corrupt.\n"
-                    "- Ubisoft may have changed the file format (requires"
-                    "  update to rsrtools).",
-                ]
-            )
+            f"{message}"
+            f"\nPossible reasons:\n"
+            f"- This may not be a Rocksmith file.\n"
+            f"- This file may be corrupt.\n"
+            f"- Ubisoft may have changed the file format (requires"
+            f"  update to rsrtools).",
         )

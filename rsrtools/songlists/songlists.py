@@ -6,6 +6,8 @@ For command line options (database setup, reporting), run:
     'python -m rsrtools.songlists.songlists -h'
 """
 
+# cSpell:ignore unsubscriptable
+
 import argparse
 import sys
 
@@ -16,8 +18,12 @@ from typing import Dict, List, Optional, TextIO, Union
 import rsrtools.utils as utils
 
 from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
-from rsrtools.songlists.configclasses import Configuration, Settings, Filter, \
-    RSFilterError
+from rsrtools.songlists.configclasses import (
+    Configuration,
+    Settings,
+    Filter,
+    RSFilterError,
+)
 from rsrtools.songlists.database import ArrangementDB
 from rsrtools.files.profilemanager import RSProfileManager, RSFileSetError
 
@@ -34,11 +40,11 @@ class SongListCreator:
     The public members of this class also provide hooks that could be used to implement
     a GUI for creating song lists. The public members are:
 
-        Contructor -- Sets up the song list creator working directory and files, and
+        Constructor -- Sets up the song list creator working directory and files, and
             loads the configuration file.
 
         create_song_lists -- Creates song lists for the filters in a set and writes the
-            resulting song lists back to the currently specified steam user id/player
+            resulting song lists back to the currently specified Steam account id/player
             profile.
 
         load_cfsm_arrangements -- Loads arrangement data from the CFSM file defined in
@@ -51,16 +57,16 @@ class SongListCreator:
         cfsm_arrangement_file -- Read/write property. Path to a CFSM arrangement file
             that can be used for setting up the arrangement database.
 
-        steam_user_id -- Read/write property. Steam user id (8 digit decimal number
-            found under steam user data folder) to use for Rocksmith saves. Can be set
-            as an int or a string representation of the int, always returns str.
+        steam_account_id -- Read/write property. Steam account id (8 digit decimal
+            number found under Steam user data folder) to use for Rocksmith saves. Can
+            be set as an int or a string representation of the int, always returns str.
 
         player_profile -- Read/write property. Rocksmith player profile name to use for
             song list generation.
 
     """
 
-    # member annotations.
+    # instance variables
     _configuration: Configuration
 
     _arr_db: ArrangementDB
@@ -113,7 +119,7 @@ class SongListCreator:
 
         Gets:
             Dict[str, Filter] -- Each key is the name of a filter, and Filter is the
-                corresponding defintion.
+                corresponding definition.
 
         Each filter can be used to generate a song list or as a base filter for building
         other filters.
@@ -150,46 +156,47 @@ class SongListCreator:
         self._settings.CFSM_file_path = fsdecode(file_path.resolve())
 
     # ****************************************************
-    # Steam user id, _profile_manager, player profile and player data in database are
+    # Steam account id, _profile_manager, player profile and player data in database are
     # tightly linked.
     # Initialisation uses these properties and exception handlers to manage auto-loading
     # from json.
     @property
-    def steam_user_id(self) -> str:
-        """Get/set the Steam user id to use for song list creation.
+    def steam_account_id(self) -> str:
+        """Get/set the Steam account id to use for song list creation.
 
         Gets/sets:
-            str -- String representation of Steam user id, or the empty string if it has
-                not been set yet.
+            str -- String representation of Steam account id, or the empty string if it
+                has not been set yet.
 
-        The steam user id is an 8 digit number, which is the name of steam user data
-        directory.
+        The Steam account id is an 8 digit number, which is also the name of Steam user
+        data directory.
 
         Song list changes affect Rocksmith profiles in this Steam user's directories.
-        Setting the steam user id to the empty string triggers an interactive command
-        line process to choose a new steam user id and triggers the side effects below.
+        Setting the Steam account id to the empty string triggers an interactive command
+        line process to choose a new Steam account id and triggers the side effects
+        below.
 
-        Setting steam user id has the following side effects:
-            - The instance flushes and reloads steam profile data.
+        Setting Steam account id has the following side effects:
+            - The instance flushes and reloads Steam profile data.
             - The instance clears the player profile and flushes player data from the
               arrangement database (reset with self.player_profile)
 
         """
         # could do extensive validation here, but there is already error checking in the
-        # profile manager, and any ui will need to find valid steam ids to load up.
+        # profile manager, and any ui will need to find valid Steam ids to load up.
         # So no error checking here.
-        return self._settings.steam_user_id
+        return self._settings.steam_account_id
 
-    @steam_user_id.setter
-    def steam_user_id(self, value: str) -> None:
-        """Steam user id setter."""
+    @steam_account_id.setter
+    def steam_account_id(self, value: str) -> None:
+        """Steam account id setter."""
         # reset configuration value to "" in case of errors (correct at end of routine)
-        self._settings.steam_user_id = ""
+        self._settings.steam_account_id = ""
 
-        # Changing steam user id, so clear profile manager and player profile (and
+        # Changing Steam account id, so clear profile manager and player profile (and
         # implicitly, flush db as well)
         # Conservative assumption - flush  and everything, even if the assignment
-        # doesn't change the original steam id
+        # doesn't change the original Steam id
         self.player_profile = ""
         self._profile_manager = None
 
@@ -200,18 +207,18 @@ class SongListCreator:
         # (Working set files are really only intended for debugging).
         self._profile_manager = RSProfileManager(
             self._working_dir,
-            steam_user_id=value,
+            steam_account_id=value,
             auto_setup=True,
             flush_working_set=True,
         )
 
-        final_uid = value
-        if not final_uid:
-            # Get the steam user id resulting from an interactive call to
+        final_account_id = value
+        if not final_account_id:
+            # Get the Steam account id resulting from an interactive call to
             # RSProfileManager
-            final_uid = self._profile_manager.source_steam_uid
+            final_account_id = self._profile_manager.steam_account_id
 
-        self._settings.steam_user_id = final_uid
+        self._settings.steam_account_id = final_account_id
 
     @property
     def player_profile(self) -> str:
@@ -226,10 +233,10 @@ class SongListCreator:
         loads the profile data for player_profile into the database. Setting to the
         empty string deletes all profile data without loading new data.
 
-        A steam user id must be specified before setting the player profile.
+        A Steam account id must be specified before setting the player profile.
         """
         # can't do any useful validation without loading profile, so similar to the
-        # steam user id, push it down to the profile manager or up to the ui.
+        # Steam account id, push it down to the profile manager or up to the ui.
         return self._settings.player_profile
 
     @player_profile.setter
@@ -244,14 +251,18 @@ class SongListCreator:
             if self._profile_manager is None:
                 # shouldn't happen, but just in case
                 raise RSFilterError(
-                    f"Attempt to set player profile to {value} before steam user "
+                    f"Attempt to set player profile to {value} before Steam user "
                     f"id/file set has been chosen (profile_manager is None)."
                 )
 
             if value not in self._profile_manager.profile_names():
+                description = self._profile_manager.steam_description(
+                    self.steam_account_id
+                )
                 raise RSFilterError(
-                    f"Rocksmith player profile '{value}' does not exist in steam file "
-                    f"set for user '{self.steam_user_id}'"
+                    f"Rocksmith player profile '{value}' does not exist in Steam file "
+                    f"set for user:"
+                    f"\n{description}"
                 )
 
             self._arr_db.load_player_profile(self._profile_manager, value)
@@ -259,7 +270,7 @@ class SongListCreator:
             # set this last in case of errors along the way.
             self._settings.player_profile = value
 
-    # End player steam_user_id, player_profile properties block
+    # End player steam_account_id, player_profile properties block
 
     def load_cfsm_arrangements(self) -> None:
         """Load arrangement data from the CFSM file into the arrangement database.
@@ -304,20 +315,20 @@ class SongListCreator:
 
         # The next block is a slightly clumsy way of avoiding separate auto load code
         # for setting up profile manager and player database from json parameters for
-        # steam id and player profile name
-        if not self.steam_user_id:
-            # reset player profile and database (invalid with no steam id anyway).
+        # Steam id and player profile name
+        if not self.steam_account_id:
+            # reset player profile and database (invalid with no Steam id anyway).
             tmp_profile = ""
         else:
-            # resetting steam id will trash player profile, so grab a temp copy
+            # resetting Steam id will trash player profile, so grab a temp copy
             tmp_profile = self.player_profile
             try:
                 # this looks like a non-op, but triggers the side effect of loading the
-                # profile manager for the steam user id.
-                self.steam_user_id = self.steam_user_id
+                # profile manager for the Steam account id.
+                self.steam_account_id = self.steam_account_id
             except RSFileSetError:
-                # invalid steam id, steam id will have been reset to "".
-                # discard player profile as well (meaningless without steam id)
+                # invalid Steam id, Steam id will have been reset to "".
+                # discard player profile as well (meaningless without Steam id)
                 tmp_profile = ""
 
         try:
@@ -349,19 +360,15 @@ class SongListCreator:
 
     def _cli_menu_header(self) -> str:
         """Create the command line interface header string."""
-        if not self.steam_user_id:
+        if not self._profile_manager:
             steam_str = "'not set'"
         else:
-            steam_str = ""
-            if self.steam_user_id == str(utils.steam_active_user()):
-                steam_str = ", logged into steam now"
-
-            steam_str = "".join(("'", self.steam_user_id, "'", steam_str))
+            steam_str = self._profile_manager.steam_description(self.steam_account_id)
 
         if not self.player_profile:
             player_str = "'not set'"
         else:
-            player_str = "".join(("'", self.player_profile, "'"))
+            player_str = f"'{self.player_profile}'"
 
         if isinstance(self._cli_report_target, Path):
             report_to = f"File '{fsdecode(self._cli_report_target)}'."
@@ -371,7 +378,7 @@ class SongListCreator:
         header = (
             f"Rocksmith song list generator main menu."
             f"\n"
-            f"\n    Steam user id:       {steam_str}"
+            f"\n    Steam account id:    {steam_str}"
             f"\n    Rocksmith profile:   {player_str}"
             f"\n    Reporting to:        {report_to}"
             f"\n    Working directory:   {fsdecode(self._working_dir)}"
@@ -381,16 +388,16 @@ class SongListCreator:
 
         return header
 
-    def _cli_select_steam_user(self) -> None:
-        """Select a steam user id from a command line menu."""
+    def _cli_select_steam_account(self) -> None:
+        """Select a Steam account id from a command line menu."""
         # daft as it looks, this will trigger an interactive selection process
-        self.steam_user_id = ""
+        self.steam_account_id = ""
 
     def _cli_select_profile(self) -> None:
         """Select a Rocksmith profile from a command line menu."""
         # ask the user to select a profile to load.
         if self._profile_manager is None:
-            # can't select a player profile until the steam user/profile manager have
+            # can't select a player profile until the Steam user/profile manager have
             # been selected
             return
 
@@ -557,8 +564,9 @@ class SongListCreator:
         options = list()
         options.append(
             (
-                "Change/select steam user id. This also clears the profile selection.",
-                self._cli_select_steam_user,
+                "Change/select Steam account id. This also clears the profile "
+                "selection.",
+                self._cli_select_steam_account,
             )
         )
         options.append(
@@ -597,9 +605,9 @@ class SongListCreator:
 
         help_text = (
             "Help:  "
-            "\n    - The steam user id owns the Rocksmith profile."
-            "\n    - A steam user id must be selected before a Rocksmith profile can "
-            "be selected."
+            "\n    - The Steam account id owns the Rocksmith profile."
+            "\n    - A Steam account id must be selected before a Rocksmith profile "
+            "can be selected."
             "\n    - Song lists are saved to a Rocksmith profile. Player data is "
             "extracted from this"
             "\n      profile."
@@ -659,7 +667,7 @@ class SongListCreator:
 
         Keyword Arguments:
             debug_target {Optional[Union[Path, TextIO]]} -- If set to None, the song
-                lists will be written to the current selected steam user id and
+                lists will be written to the currently selected Steam account id and
                 Rocksmith profile. Otherwise, a diagnostic report will be written to the
                 file or stream specified by debug target.  (default: {None})
 
@@ -672,7 +680,8 @@ class SongListCreator:
 
         The song list creator will only create up to 6 song lists, and song lists for
         list entries with an empty string value will not be changed. Further,
-        steam_user_id and player_profile must be set to valid values before executing.
+        steam_account_id and player_profile must be set to valid values before
+        executing.
 
         If debug target is not None, song lists are not saved to the instance profile.
         Instead:
@@ -692,7 +701,7 @@ class SongListCreator:
 
         if list_target is ProfileKey.SONG_LISTS:
             if len(song_list_set) > MAX_SONG_LIST_COUNT:
-                use_set = song_list_set[0 : MAX_SONG_LIST_COUNT]
+                use_set = song_list_set[0:MAX_SONG_LIST_COUNT]
             else:
                 use_set = song_list_set[:]
         elif list_target is ProfileKey.FAVORITES_LIST:
@@ -722,12 +731,12 @@ class SongListCreator:
             if self._profile_manager is None:
                 # shouldn't happen, but just in case
                 raise RSFilterError(
-                    "Attempt to write song lists to a player profile before steam "
+                    "Attempt to write song lists to a player profile before Steam "
                     "user id/file set has been chosen (profile_manager is None)."
                 )
 
             # Song list update
-            # Note that an empy list will flush the existing song list!
+            # Note that an empty list will flush the existing song list!
             # If this is a problem for people, we can add a check for an empty list
             # at the same place we do a None check and skip.
             for idx, song_list in enumerate(song_lists):
@@ -739,7 +748,7 @@ class SongListCreator:
 
             # Steam update
             self._profile_manager.write_files()
-            self._profile_manager.move_updates_to_steam(self.steam_user_id)
+            self._profile_manager.move_updates_to_steam(self.steam_account_id)
 
     def _cli_utilities(self) -> None:
         """Provide command line utilities menu."""
@@ -752,7 +761,7 @@ class SongListCreator:
                     (
                         "Clone profile. Copies source profile data into target "
                         "profile. Replaces all target profile data."
-                        "\n      - Reloads steam user/profile after cloning.",
+                        "\n      - Reloads Steam user/profile after cloning.",
                         self._cli_clone_profile,
                     ),
                 ],
@@ -780,13 +789,13 @@ class SongListCreator:
         if self._profile_manager is None:
             # shouldn't happen, but just in case
             raise RSFilterError(
-                "Attempt to clone player profile before steam user "
+                "Attempt to clone player profile before Steam user "
                 "id/file set has been chosen (profile_manager is None)."
             )
         self._profile_manager.cl_clone_profile()
 
         # force a reload regardless of outcome.
-        self.steam_user_id = self.steam_user_id
+        self.steam_account_id = self.steam_account_id
         # profile has been nuked, so reset with temp copy.
         self.player_profile = profile
 

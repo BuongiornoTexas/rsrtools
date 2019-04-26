@@ -11,10 +11,10 @@ class ProfileKey(Enum):
 
     FAVORITES_LIST = "FavoritesList"
     FAVORITES_LIST_ROOT = "FavoritesListRoot"
-    PLAY_NEXTS = "Playnexts"
+    PLAY_NEXTS = "Playnexts"  # cSpell:disable-line
     PLAYED_COUNT = "PlayedCount"
     SONGS = "Songs"
     SONG_LISTS = "SongLists"
     SONG_LISTS_ROOT = "SongListsRoot"
     SONG_SA = "SongSA"
-    STATS = "Stats"
+    STATS = "Stats"  # cSpell:disable-line

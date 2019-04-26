@@ -4,19 +4,19 @@
 Refer to class SteamMetadata for further detail/definitions.
 """
 
+# cSpell:ignore platformstosync, PRFLDB
+
 from os import fsdecode
 from pathlib import Path
 from hashlib import sha1
-from collections import abc
 from enum import Enum
-from typing import Dict, Any, Iterator, Tuple, Mapping, Optional
+import argparse
+from typing import Dict, Optional
 
 from rsrtools.utils import double_quote
+from rsrtools.steam import load_vdf, save_vdf, RS_APP_ID, STEAM_REMOTE_DIR
 
 REMOTE_CACHE_NAME = "remotecache.vdf"
-SECTION_START = "{"
-SECTION_END = "}"
-SEPARATOR = "\t\t"
 BLOCK_SIZE = 65536
 
 
@@ -27,23 +27,6 @@ class SteamMetadataKey(Enum):
     LOCALTIME = '"localtime"'
     TIME = '"time"'
     SHA = '"sha"'
-
-
-class SteamMetadataError(Exception):
-    """Base class for Steam metadata handling errors."""
-
-    def __init__(self, message: str = None) -> None:
-        """Minimal constructor.
-
-        Keyword Arguments:
-            message {str} -- Custom error text. If no message is supplied (default),
-                the exception will supply a not very informative message.
-                (default: {None})
-        """
-        if message is None:
-            message = "An unspecified Steam cloud metadata handling error had occurred."
-
-        super().__init__(message)
 
 
 class SteamMetadata:
@@ -62,7 +45,7 @@ class SteamMetadata:
         Steam cloud file: A file automatically backed up by Steam to a remote server.
             A Steam cloud file has both a path and an associated app_id. The path is
             typically of the form:
-                <Steam path>\<user_id>\<app_id>\remote\<cloud file name>.
+                <Steam path>\<user_account_id>\<app_id>\remote\<cloud file name>.
         app_id: A Steam game or application identifier.
         Steam cloud file metadata set or cloud file metadata set: Metadata describing a
             single Steam cloud file, such as modification time, hashes, etc.
@@ -86,7 +69,7 @@ class SteamMetadata:
                 "platformstosync2"		"-1"
             }
 
-    Warning: The class does not validate the steam cloud files and does not validate
+    Warning: The class does not validate the Steam cloud files and does not validate
     the file locations. These are caller responsibilities.
 
     Implementation notes for the Steam metadata dictionary (self._steam_metadata):
@@ -100,46 +83,16 @@ class SteamMetadata:
 
     """
 
-    # lazy annotation here.
+    # instance variables
     # Path to Steam metadata file.
     _metadata_path: Path
-    # Instance version of the steam metadata
+    # Instance version of the Steam metadata
     _steam_metadata: Dict[str, Dict[str, Dict[str, str]]]
     _is_dirty: bool
 
     def _read_steam_metadata(self) -> None:
         """Read Steam metadata file and load metadata dictionary."""
-        self._steam_metadata = dict()
-
-        # ugly custom parser, cos Steam doesn't do standard file formats
-        # node needs a type to stop mypy collapsing during the walk
-        node: dict = self._steam_metadata
-        section_label = ""
-        branches = list()
-        with self._metadata_path.open("rt") as fh:
-            for line in fh:
-                key = line.strip()
-                try:
-                    (key, value) = key.split()
-                except ValueError:
-                    if key == SECTION_START:
-                        node[section_label] = dict()
-                        branches.append(node)
-                        node = node[section_label]
-                        section_label = ""
-                    elif key == SECTION_END:
-                        node = branches.pop()
-                    else:
-                        section_label = key
-                else:
-                    node[key] = value
-
-        # sense check
-        if branches:
-            raise SteamMetadataError(
-                "Incomplete Steam metadata file: at least one section is not "
-                'terminated.\n  (Missing "}".)'
-            )
+        self._steam_metadata = load_vdf(self._metadata_path, strip_quotes=False)
 
     @staticmethod
     def _update_metadata_key_value(
@@ -152,7 +105,7 @@ class SteamMetadata:
                 (see _cloud_file_metadata_set).
             key {SteamMetadataKey} -- Key to update in the metadata set. Must be a
                 member of SteamMetadataKey enum. The key must already exist in the
-                metatdata dict (no creating new keys).
+                metadata dict (no creating new keys).
             value {str} -- New value to be assigned to the key. The caller is
                 responsible for value formatting per Steam standards.
 
@@ -188,7 +141,7 @@ class SteamMetadata:
             file_path {pathlib.Path} -- Path to the Steam cloud file. Warning: this
                 method extracts the filename from the path and ignores all other path
                 information. It is the caller responsibility to ensure the path points
-                to the correct steam cloud file.
+                to the correct Steam cloud file.
 
         Raises:
             KeyError -- Raised if the Steam metadata does not contain an entry for the
@@ -205,7 +158,7 @@ class SteamMetadata:
         file_metadata = None
         # This will throw a key error if the metadata dictionary doesn't contain
         # entries for app_id. Otherwiser returns a dictionary of dicts containing
-        # metadata for *ALL* of the steam cloud files associated with the app_id. Need
+        # metadata for *ALL* of the Steam cloud files associated with the app_id. Need
         # to search this dict to find the sub-dictionary for the target file.
         file_dict = self._steam_metadata[double_quote(app_id)]
 
@@ -233,7 +186,7 @@ class SteamMetadata:
             file_path {pathlib.Path} -- Path to the Steam cloud file. Warning: this
                 method extracts the filename from the path and ignores all other path
                 information. It is the caller responsibility to ensure the path points
-                to the correct steam cloud file.
+                to the correct Steam cloud file.
 
         """
         ret_val = True
@@ -255,9 +208,9 @@ class SteamMetadata:
             file_path {pathlib.Path} -- Path to the Steam cloud file. Warning: this
                 method extracts the filename from the path to identify the metadata set
                 and updates metadata based on the file properties. It is the caller
-                responsibility to ensure the path points to the correct steam cloud
+                responsibility to ensure the path points to the correct Steam cloud
                 file (i.e. this method does not validate that the file is valid
-                steam cloud file in a valid location).
+                Steam cloud file in a valid location).
 
         Keyword Arguments:
             data {bytes} -- Binary Steam cloud file held in memory
@@ -265,7 +218,7 @@ class SteamMetadata:
 
         By default, this method will determine the writeable Steam cloud metadata
         values (hash, size and modification times) directly from the file on  disk.
-        However, if the otional data argument is supplied, the hash and size values
+        However, if the optional data argument is supplied, the hash and size values
         will be calculated from the contents of data.
 
         This method does nothing if the metadata set for the Steam cloud file does not
@@ -287,7 +240,7 @@ class SteamMetadata:
                     buffer = fh.read(BLOCK_SIZE)
 
             # st_size works on windows
-            file_size = file_path.stat().st_size
+            file_size = file_path.stat().st_size  # cSpell:disable-line
         else:
             hasher.update(data)
             file_size = len(data)
@@ -303,42 +256,28 @@ class SteamMetadata:
         # st_mtime appears gives the right (UTC since jan 1 1970) values on Windows,
         # probably also OK on OSX, Linux?
         self._update_metadata_key_value(
-            cache_dict, SteamMetadataKey.LOCALTIME, str(int(file_path.stat().st_mtime))
+            cache_dict,
+            SteamMetadataKey.LOCALTIME,
+            str(int(file_path.stat().st_mtime)),  # cSpell:disable-line
         )
         self._update_metadata_key_value(
-            cache_dict, SteamMetadataKey.TIME, str(int(file_path.stat().st_mtime))
+            cache_dict,
+            SteamMetadataKey.TIME,
+            str(int(file_path.stat().st_mtime)),  # cSpell:disable-line
         )
 
         # instance contents out of sync with metadata file.
         self._is_dirty = True
 
-    def _iter_tree(self, tree: Mapping[Any, Any]) -> Iterator[Tuple[Any, Any]]:
-        """Iterate (walk) the Steam metadata tree.
-
-        Arguments:
-            tree {dict} -- A node in the self._steam_metadata dictionary.
-
-        Helper method for write_metadata_file.
-
-        """
-        for key, value in tree.items():
-            if isinstance(value, abc.Mapping):
-                yield key, SECTION_START
-                for inner_key, inner_value in self._iter_tree(value):
-                    yield inner_key, inner_value
-                yield key, SECTION_END
-            else:
-                yield key, value
-
     def write_metadata_file(self, save_dir: Optional[Path]) -> None:
         """Write Steam metadata file if instance data differs from the original file.
 
         Arguments:
-            save_dir {Optional[pathlib.Path]} -- Save directory for the steam metadata
+            save_dir {Optional[pathlib.Path]} -- Save directory for the Steam metadata
                 file or None.
 
-        If save_dir is specified as None, the original steam metadata file will be
-        overwritten.
+        If save_dir is specified as None, the original Steam metadata file will be
+        overwritten, and the instance marked as clean.
 
         Otherwise the updated file is written to save_dir with the original file name.
         Further, the object instance remains marked as dirty, as the object data is out
@@ -349,30 +288,16 @@ class SteamMetadata:
         Steam cloud file. This is typically the desired state.
         """
         if self._is_dirty:
-            indent = ""
-            file_lines = list()
-            for key, value in self._iter_tree(self._steam_metadata):
-                if value == SECTION_START:
-                    file_lines.append("".join([indent, key, "\n"]))
-                    file_lines.append("".join([indent, SECTION_START, "\n"]))
-                    indent = indent + "\t"
-                elif value == SECTION_END:
-                    indent = indent[:-1]
-                    file_lines.append("".join([indent, SECTION_END, "\n"]))
-                else:
-                    file_lines.append("".join([indent, key, SEPARATOR, value, "\n"]))
-
             if save_dir is None:
-                with self._metadata_path.open("wt") as fh:
-                    fh.writelines(file_lines)
-                # original source file and instance now in sync
-                self._is_dirty = False
-
+                save_path = self._metadata_path
             else:
                 save_path = save_dir.joinpath(self._metadata_path.name)
 
-                with save_path.open("xt") as fh:
-                    fh.writelines(file_lines)
+            save_vdf(self._steam_metadata, save_path, add_quotes=False)
+
+            if save_dir is None:
+                # original source file and instance now in sync
+                self._is_dirty = False
 
     def __init__(self, search_dir: Path) -> None:
         """Locate Steam metadata file in search_dir and load it.
@@ -408,3 +333,81 @@ class SteamMetadata:
 
         """
         return self._metadata_path
+
+
+def self_test() -> None:
+    """Limited self test for SteamMetadata.
+
+    Run with:
+        py -m rsrtools.files.steamcache test_directory
+
+    test_directory must contain a remotecache.vdf file and remote directory containing
+    one or more Rocksmith files referenced in remotecache.vdf (*.crd,
+    LocalProfiles.json, *_PRFLDB). I'd suggest setting up a profile manager working
+    directory and running this self test on it.
+
+    I'd strongly recommend you **do not** run this script on any of your Steam
+    directories.
+    """
+    parser = argparse.ArgumentParser(
+        description="Runs a self test of SteamMetadata on a specified directory."
+    )
+    parser.add_argument(
+        "test_directory",
+        help="A directory containing remotecache.vdf and Steam remote directory that "
+        "will be used for the self test.",
+    )
+    test_path = Path(parser.parse_args().test_directory)
+
+    metadata = SteamMetadata(test_path)
+
+    # get a separate copy of the cache for comparison
+    orig_metadata = load_vdf(test_path.joinpath(REMOTE_CACHE_NAME), strip_quotes=False)
+
+    test_passed = True
+    orig_metadata = orig_metadata[double_quote(RS_APP_ID)]
+    for cachefile in orig_metadata.keys():
+        filepath = test_path.joinpath(STEAM_REMOTE_DIR + "/" + cachefile.strip('"'))
+
+        print(f"\nTest results for: {filepath.name}.")
+        if not filepath.exists():
+            print("  File not found.")
+
+        else:
+            metadata.update_metadata_set(RS_APP_ID, filepath)
+
+            # reach into object for updated data set.
+            calculated_metadata = metadata._cloud_file_metadata_set(RS_APP_ID, filepath)
+
+            for steam_key in SteamMetadataKey:
+                # report on differences/matches between original data and calculated
+                # versions
+                orig_value = orig_metadata[cachefile][steam_key.value]
+                new_value = calculated_metadata[steam_key.value]
+                if orig_value == new_value:
+                    outcome = "OK value:"
+                else:
+                    outcome = "Bad value:"
+                    test_passed = False
+
+                print(
+                    f"  {outcome} {steam_key.value} - remotecache.vdf: {orig_value}, "
+                    f"calculated: {new_value}."
+                )
+
+    if test_passed:
+        print(
+            "\nTest passed. All values calculated from the source files match"
+            "\nthe values in the remotecache.vdf file.\n"
+        )
+    else:
+        print(
+            "\nTest failed. At least one value calculated the source files does not "
+            "\nmatch the corresponding value in the remotecache.vdf file."
+            "\nNote that a 1 second difference in time values is not a cause for "
+            "concern.\n"
+        )
+
+
+if __name__ == "__main__":
+    self_test()

@@ -3,7 +3,7 @@
 
 I do not recommend using this class on its own, as it does not provide any protection
 from overwriting save files (no backups) and doesn't manage interactions between the
-Rocksmith files and steam.
+Rocksmith files and Steam.
 
 Instead, use the profile manager class, RSProfileManager, which handles these issues
 automatically. RSSaveFile is a service provider for RSProfileManager.
@@ -22,10 +22,12 @@ run from the command line by:
     python -m rsrtools.files.savefile <test_dir>
 
 Where test_dir is the name of a directory containing one or more files that can be used
-for testing (I wouldn't run this on any files in the steam directory though ...)
+for testing (I wouldn't run this on any files in the Steam directory though ...)
 """
 
-import struct
+# cSpell:ignore PRFLDB, pycryptodome, rsrpad
+
+import struct  # cSpell:disable-line
 import zlib
 import argparse
 from os import fsdecode
@@ -62,7 +64,7 @@ class RSSaveFile:
 
     Rocksmith save files (*_PRFLDB, *.crd, and LocalProfiles.json) should be managed
     with RSProfileManager, which automatically handles interactions between Rocksmith
-    files and steam (not managed by this class).
+    files and Steam (not managed by this class).
 
     Based on routines from 0x0L.
 
@@ -88,6 +90,7 @@ class RSSaveFile:
     Rocksmith and may corrupt the installation.
     """
 
+    # instance variables
     _debug: bool
     _json_debug_path: Optional[Path]
     _file_path: Path
@@ -95,7 +98,7 @@ class RSSaveFile:
     _original_file_data: bytes
     _header: bytes
     # too hard to figure out how factory annotation works today.
-    # for now make _cipher explictly dynamic with an Any type
+    # for now make _cipher explicitly dynamic with an Any type
     # TODO: more reading another time.
     _cipher: Any
     _debug_z_payload: bytes  # compressed payload
@@ -231,7 +234,7 @@ class RSSaveFile:
 
         Arguments:
             self_check {bool} -- If True, the call will run a self check on file
-                reconstructabilty. Only meaningful in constructor. Use True in
+                reconstructability. Only meaningful in constructor. Use True in
                 __init__, False elsewhere.
 
         Returns:
@@ -253,7 +256,7 @@ class RSSaveFile:
 
         file_data = self._cipher.encrypt(z_payload)
 
-        size_array = struct.pack("<L", payload_size)
+        size_array = struct.pack("<L", payload_size)  # cSpell:disable-line
 
         file_data = b"".join([self._header, size_array, file_data])
 
@@ -323,7 +326,7 @@ class RSSaveFile:
         self._header = self._original_file_data[0:HEADER_BYTES]
 
         found_magic = self._header[0:4]
-        expect_magic = b"EVAS"
+        expect_magic = b"EVAS"  # cSpell:disable-line
         if found_magic != expect_magic:
             raise RSFileFormatError(
                 f"Unexpected value in in file: \n\n    {fsdecode(self._file_path)}"
@@ -361,7 +364,7 @@ class RSSaveFile:
         # if I'm reading this correctly, 4 byte little endian value
         # starting from byte 16 (Thanks 0x0L)
         size_array = self._original_file_data[HEADER_BYTES:FIRST_PAYLOAD_BYTE]
-        expect_payload_size = struct.unpack("<L", size_array)[0]
+        expect_payload_size = struct.unpack("<L", size_array)[0]  # cSpell:disable-line
 
         if len(payload) != expect_payload_size:
             raise RSFileFormatError(

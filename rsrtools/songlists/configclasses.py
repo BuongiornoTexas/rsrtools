@@ -2,13 +2,15 @@
 
 """Provide song list creator configuration dataclasses and supporting elements."""
 
+# cSpell: ignore pydantic
+
 import toml
 
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
-from dataclasses import field, asdict, replace
+from dataclasses import field, asdict, replace  # cSpell: disable-line
 from pydantic.dataclasses import dataclass
 
 from rsrtools import __version__ as RSRTOOLS_VERSION
@@ -66,9 +68,9 @@ Testing = [
   "Played Count of 1 to 15",
 ]
 
-"Recurse_2_test" = ["Recurse2A"]
+"Recursive_2_test" = ["Recursive2A"]
 
-"Recurse_3_test" = ["Recurse1A"]
+"Recursive_3_test" = ["Recursive1A"]
 
 [{CONFIG_FILTERS}."Easy Plat Badge in progress"]
 {CONFIG_BASE} = ""
@@ -303,43 +305,43 @@ Testing = [
 {CONFIG_RANGES} = [[28, 5000]]
 
 # recursion testing
-[{CONFIG_FILTERS}."Recurse1A"]
-{CONFIG_BASE} = "Recurse1B"
+[{CONFIG_FILTERS}."Recursive1A"]
+{CONFIG_BASE} = "Recursive1B"
 {CONFIG_MODE} = "AND"
 
-[{CONFIG_FILTERS}."Recurse1A".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
+[{CONFIG_FILTERS}."Recursive1A".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
 {CONFIG_INCLUDE} = true
 {CONFIG_VALUES} = ["D Drop C"]
 
-[{CONFIG_FILTERS}."Recurse1B"]
-{CONFIG_BASE} = "Recurse1C"
+[{CONFIG_FILTERS}."Recursive1B"]
+{CONFIG_BASE} = "Recursive1C"
 {CONFIG_MODE} = "AND"
 
-[{CONFIG_FILTERS}."Recurse1B".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
+[{CONFIG_FILTERS}."Recursive1B".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
 {CONFIG_INCLUDE} = true
 {CONFIG_VALUES} = ["D Drop C"]
 
-[{CONFIG_FILTERS}."Recurse1C"]
-{CONFIG_BASE} = "Recurse1A"
+[{CONFIG_FILTERS}."Recursive1C"]
+{CONFIG_BASE} = "Recursive1A"
 {CONFIG_MODE} = "AND"
 
-[{CONFIG_FILTERS}."Recurse1C".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
+[{CONFIG_FILTERS}."Recursive1C".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
 {CONFIG_INCLUDE} = true
 {CONFIG_VALUES} = ["D Drop C"]
 
-[{CONFIG_FILTERS}."Recurse2A"]
-{CONFIG_BASE} = "Recurse2B"
+[{CONFIG_FILTERS}."Recursive2A"]
+{CONFIG_BASE} = "Recursive2B"
 {CONFIG_MODE} = "AND"
 
-[{CONFIG_FILTERS}."Recurse2A".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
+[{CONFIG_FILTERS}."Recursive2A".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
 {CONFIG_INCLUDE} = true
 {CONFIG_VALUES} = ["D Drop C"]
 
-[{CONFIG_FILTERS}."Recurse2B"]
-{CONFIG_BASE} = "Recurse2A"
+[{CONFIG_FILTERS}."Recursive2B"]
+{CONFIG_BASE} = "Recursive2A"
 {CONFIG_MODE} = "AND"
 
-[{CONFIG_FILTERS}."Recurse2B".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
+[{CONFIG_FILTERS}."Recursive2B".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
 {CONFIG_INCLUDE} = true
 {CONFIG_VALUES} = ["D Drop C"]
 """
@@ -376,8 +378,8 @@ class Settings:
     Public attributes:
         CFSM_file_path {str} -- The string form path the Customs Forge Song Manager
             arrangements file, or the empty string if it has not been set.
-        steam_user_id {str} -- String representation of Steam user id, or the empty
-            string if it has not been set yet.
+        steam_account_id {str} -- String representation of Steam account id, or
+            the empty string if it has not been set yet.
         player_profile {str} -- The player profile name. Get returns the empty string if
             the player profile it has not been set yet.
         version {str} -- Future functionality for configuration changes.
@@ -385,8 +387,9 @@ class Settings:
     Note: changes in attribute names should be reflected in default TOML.
     """
 
+    # instance variables
     CFSM_file_path: str = ""
-    steam_user_id: str = ""
+    steam_account_id: str = ""
     player_profile: str = ""
     version: str = ""
 
@@ -402,6 +405,7 @@ class SubFilter:
     Note: changes in attribute names should be reflected in default TOML.
     """
 
+    # instance variables
     include: bool
 
 
@@ -415,12 +419,12 @@ class RangeSubFilter(SubFilter):
         range_clause: returns the range clause and values tuple for the filter.
 
     The low/high pairs are used to build SQL IN BETWEEN queries.
-    
+
     Implementation note: Pydantic will convert integer values to floats as part of
     constructor input validation. The range_clause method will try to convert integer
     values back to integer form before generating the range clause. However, if you
     are getting odd results from integer range queries, you may want to switch to
-    floating values with appropriate small margins to insure integer values are 
+    floating values with appropriate small margins to insure integer values are
     captured correctly. For example [0.99, 2.01] to capture integer values in the
     range 1 to 2 inclusive. A future update may address this issues (requires
     pydantic to support dataclasses validators (0.24+?), converting the type of ranges
@@ -428,11 +432,12 @@ class RangeSubFilter(SubFilter):
 
     include implementation -- If True if the filter will return records where the
         field value lies int the specified ranges. If False, it will return records
-        where the field value lies outside the specifie ranges.
+        where the field value lies outside the specific ranges.
 
     Note: changes in attribute names should be reflected in default TOML.
     """
 
+    # instance variables
     # When pydantic supports dataclass validators, change this to
     # ranges: List[List[Union[int, float]]]
     ranges: List[List[float]]
@@ -475,7 +480,7 @@ class RangeSubFilter(SubFilter):
 
         if not self.ranges:
             raise RSFilterError(
-                f"WHERE clause error: Ranges is empty for " 
+                f"WHERE clause error: Ranges is empty for "
                 f"field type {field_type.value}."
             )
 
@@ -544,6 +549,7 @@ class ListSubFilter(SubFilter):
     Note: changes in attribute names should be reflected in default TOML.
     """
 
+    # instance variables
     values: List[str]
 
     def list_clause(
@@ -627,6 +633,7 @@ class Filter:
     Note: changes in attribute names should be reflected in default TOML.
     """
 
+    # instance variables
     sub_filters: Dict[
         Union[RangeField, ListField], Union[RangeSubFilter, ListSubFilter]
     ] = field(default_factory=dict)
@@ -702,7 +709,7 @@ class Filter:
             mode_text = FilterMode(self.mode).value
         except ValueError:
             raise RSFilterError(
-                f"WHERE clause error: Invalid mode '{self.mode}''. Shoud be a member "
+                f"WHERE clause error: Invalid mode '{self.mode}''. Should be a member "
                 f"of FilterMode Enum."
             )
 
@@ -774,7 +781,7 @@ class Configuration:
             toml_path {Path} -- Path to the toml file.
         """
         with toml_path.open("wt") as fp:
-            for key, item in asdict(self).items():
+            for key, item in asdict(self).items():  # cSpell: disable-line
                 if key != "filters":
                     toml.dump({key: item}, fp)
                     fp.write("\n")

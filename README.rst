@@ -1,4 +1,5 @@
-
+.. cSpell:ignore venv, Analyzer, userdata, remotecache, PRFLDB, pypi, profilemanager
+.. cSpell:ignore docstrings, dict, CDLCs, tuple, stats
 
 **rsrtools** is a package for creating and saving Rocksmith 2014 songlists **to** 
 Rocksmith save files (profiles). Incidentally, it also provides tools for managing
@@ -17,6 +18,15 @@ tools. All of the save file and data file handling routines are based on this co
 **@sandiz** for `rs-manager <https://github.com/sandiz/rs-manager>`_, which is an 
 awesome set listing tool. This package also gave me a deeper understanding of the 
 Rocksmith PSARC structure.
+
+Breaking Changes
+=================
+
+**0.1.0 to 0.1.1+** Terminology correction from Steam user id to Steam account id. 
+Probably the only effect for most people is to edit 'config.toml' and replace 
+steam_user_id with steam_account_id. All Steam functions moved to steam.py, some windows
+registry functions for Steam removed and replaced with functions based on Steam vdf
+files.
 
 Warnings
 ========
@@ -44,9 +54,8 @@ As this package is all about editing game saves, here are a couple of warnings.
 3. **Don't run this package at the same time as  Rocksmith is running.** You'll end up 
    crossing the save files and nobody will be happy (mostly you though).
 
-4. This package will only work on windows at the moment. It will require some 
-   customisation/testing for Mac OS X, and I have no idea what would be needed for 
-   Linux/PS4/XBox song lists. (The Mac OS X version should be out shortly.)
+4. This package will only work on Windows and Mac OS X at the moment. I have no idea
+   what would be needed for Linux/PS4/XBox song lists.
 
 
 TL:DNR
@@ -55,7 +64,7 @@ TL:DNR
 If you know what you are doing with python and know your way around the Customs Forge
 Song Manager, here are the recommended quick start steps.
 
-0. The package only works on Windows for now (Mac OX X support coming soon).
+0. The package only works on Windows and Mac OS X for now.
 
 1. **READ** the section on setting up a test profile (`Set up a Testing Profile!`_). 
    Until you are familiar with the
@@ -386,14 +395,14 @@ Preliminaries
 
       Rocksmith song list generator main menu.
 
-          Steam user id:       'not set'
+          Steam account id:    'not set'
           Rocksmith profile:   'not set'
           Reporting to:        Standard output/console
           Working directory:   D:\RS Stuff\Working
 
       Please choose from the following options:
 
-        1) Change/select steam user id. This also clears the profile selection.
+        1) Change/select Steam account id. This also clears the profile selection.
         2) Change/select Rocksmith player profile.
         3) Toggle the report destination.
         4) Choose a single filter and create a song list report.
@@ -409,29 +418,29 @@ Preliminaries
    All of the text menus and text prompts will ask you to either select a number or 
    select y/n (followed by enter to action).
 
-7. At this menu, you first need to select a steam user id, so choose 1 to start a text 
-   menu for selecting from the available steam user ids. For this tutorial, our 
+7. At this menu, you first need to select a Steam account id, so choose 1 to start a
+   text menu for selecting from the available Steam account ids. For this tutorial, our 
    selection options look like this::
 
-      Please select a steam user id/Rocksmith file set from the following options.
+      Please select a Steam account id/Rocksmith file set from the following options.
 
-      1) Steam user '12345678'. This is the user logged into steam now. (Sat Sep  1 16:47:25 2018).
+      1) Steam user '12345678'. This is the user logged into Steam now. (Sat Sep  1 16:47:25 2018).
       0) Do nothing and raise error.
 
-   We get a bit of help here - only one steam id is available, and it is the user logged
-   into steam now. So we choose 1 to select user ``12345678``.
+   We get a bit of help here - only one Steam id is available, and it is the user logged
+   into Steam now. So we choose 1 to select user ``12345678``.
 
-   Most people will only have one user id available - if you have more than one, you may
-   need a bit of trial and error to work out which one in is yours. The easiest way to
-   do this is select an id and then check if the Testing profile can be selected (next
-   step). If not, you have the wrong steam id and need to try another one.
+   Most people will only have one account id available - if you have more than one, you 
+   may need a bit of trial and error to work out which one in is yours. The easiest way
+   to do this is select an id and then check if the Testing profile can be selected
+   (next step). If not, you have the wrong Steam id and need to try another one.
 
-8. After selecting a steam id, you need to select a user profile for song list creation.
+8. After selecting a Steam id, you need to select a user profile for song list creation.
    Choose 2 to start this process, and then choose a profile ('Testing' for this
    tutorial). After completing this process, the first two information lines of the 
    song list menu should be similar to::
 
-            Steam user id:       '12345678'
+            Steam account id:    '12345678'
             Rocksmith profile:   'Testing'
 
 9. At this point, it's worth saving the changes you have made.
@@ -450,8 +459,8 @@ Preliminaries
      song_lists.bat          - If you created it.
      .\RS_backup             - Backups of Rocksmith save files will be stored here.
      .\RS_update             - Changed save files will be stored here before copying
-                               back to steam.
-     .\RS_working            - Save files will be copied from steam to this folder 
+                               back to Steam.
+     .\RS_working            - Save files will be copied from Steam to this folder 
                                before working on them.
 
    If your working directory doesn't match this, try this step again.
@@ -498,9 +507,9 @@ The package is now set up with a default configuration, which you can use for so
 basic testing before creating your own song list filters - or you can skip this step
 and go straight to making your own.
 
-Run the batch file and check that the steam user id and profile are as expected::
+Run the batch file and check that the Steam account id and profile are as expected::
 
-        Steam user id:       '12345678'
+        Steam account id:     '12345678'
         Rocksmith profile:   'Testing'
 
 Experiment with the reporting options:
@@ -609,11 +618,11 @@ Settings
 --------
 
 The settings section is the simplest of the three, describing the location of the CFSM 
-xml file (optional), the default steam user id, and the default profile name::
+xml file (optional), the default Steam account id, and the default profile name::
 
       [settings]
       CFSM_file_path: "D:\\RS Stuff\\Working\\ArrangementsGrid.xml"
-      steam_user_id": "12345678"
+      steam_account_id": "12345678"
       player_profile": "Testing"
       version = "x.x.x"
 
@@ -914,16 +923,16 @@ Something Went Wrong!
 
 Something unexpected has happened with loading a profile in Rocksmith? All is (probably)
 not lost. Before rsrtools writes files to the Rocksmith Steam folders, it creates a 
-zip archive of **all** of the key files associated with the steam user id. These backups
-are kept in the working directory under ``RS_backup``.
+zip archive of **all** of the key files associated with the Steam account id. These
+backups are kept in the working directory under ``RS_backup``.
 
 To restore a backup, extract the contents of the zip file and copy the contents into
 your Steam Rocksmith save folder. For most people, this should be in your Steam
 install directory under::
 
-    <Steam directory>\userdata\<steam_user_id>\221680
+    <Steam directory>\userdata\<steam_account_id>\221680
 
-``<steam_user_id>`` is the same steam user id used in the rsrtools songlists menu.
+``<steam_account_id>`` is the same Steam account id used in the rsrtools songlists menu.
 
 As a check, this folder should contain a ``remotecache.vdf`` file and a ``remote``
 sub-directory. The ``remote`` subdirectory should contain a file named 
@@ -957,6 +966,103 @@ filter at least once, and then apply a minimum play count criteria. For my use c
 this is mainly an issue for E standard arrangements - I don't tend to worry about this
 for the alternate tunings.
 
+Sidebar: Rocksmith Save File Editing
+======================================
+
+The primary purpose of this package is to provide facilities for customising Rocksmith 
+song lists. However, along the way I needed to develop classes for opening, editing
+and saving Rocksmith save files (profiles). 
+
+If you are interested in using this functionality, you should start with 
+RSProfileManager in profilemanager.py, which is the primary class for managing
+Rocksmith profiles and their associated steam *and* Rocksmith metadata. The class
+methods are currently only documented in their docstrings, although I plan to provide
+more detail in this document in the future (and I'm happy to answer questions via
+github issues).
+
+The RSProfileManager class provides two simple examples of profile editing:
+
+- ``RSProfileManager.cl_set_play_counts()``, which is a command line mechanism 
+  for setting the 'Learn a Song' play counts for one or more song arrangements.
+- ``RSProfileManager.cl_clone_profile()``, which is a command line mechanism for
+  cloning a player data from one profile into another (a destructive copy). 
+
+Both of these routines can be run from the command line. For further details see the
+profile manager help, which can be obtained from the command line::
+
+    python -m rsrtools.files.profilemanager -h
+
+The song list creator also uses the profile manager to obtain player data and to write
+song lists into player profiles.
+
+These methods either a) implement very small changes to save files with a lot of
+care to maintain Rocksmith formats or b) replace Rocksmith data with Rocksmith data.
+Consequently their implementations are buried within classes used by the profile
+manager.
+
+If you want to make more general changes to Rocksmith profiles, you can use the 
+methods::
+
+    RSProfileManager.get_json_subtree()
+    RSProfileManager.set_json_subtree()
+    RSProfileManager.mark_as_dirty()
+
+Before explaining these methods, please note that I haven't yet done any testing of
+these three methods - they are so simple that they should work out of the box, but bugs
+are possible, so please be careful with your save files. If you want a somewhat
+safer path for changes, please make a feature request on github and we'll see what we
+can work up. I will do some testing when I add a demonstration utility in a future 
+release (specifically, the feature request to delete progress for specified CDLCs).
+
+With that warning out of the way, onto the approach. The general steps are:
+
+1. Create a profile manager instance (pm), which will need a working directory.
+
+2. Read json data from a profile using::
+
+     pm.get_json_subtree(profile_name, json_path).
+   
+   Keep in mind this may return a mutable (list, dict), in which case, editing the
+   json data is effectively editing the profile data. (My preferred approach is to edit
+   a copy and write the copy back using ``set_json_subtree``). If you do choose to edit
+   a mutable json object, you need to let the profile manager know that you have done
+   this by calling::
+   
+      pm.mark_as_dirty(profile_name)
+
+3. If you are working on new data, a copy of data obtained from get_json_subtree, or a 
+   non-mutable value, replace the instance data in the profile manager with the new
+   data by::
+   
+      pm.set_json_subtree(profile_name, json_path, new_values)
+
+   This approach will automatically mark the instance data for profile_name as dirty.
+
+4. Write the files to the update folder (and generate backups along the way)::
+
+      pm.write_files()
+
+5. Move the updated files to the Steam folder::
+
+      pm.move_update_to_steam(steam_account_id)
+ 
+   Note that it's up to you to ensure that the save files match up with the
+   steam account id (the method doesn't check this).
+
+And finally, a brief explanation of json_path: the get/set_subtree methods use a JSON 
+path to navigate save data elements in the Rocksmith profile JSON dictionary. A JSON
+path is a list or tuple of the elements used to locate a specific value or subtree in
+the save data. E.g. the json_path to song list 2 is::
+
+        ('SongListsRoot', 'SongLists', 1)
+
+and the Learn a song play count for Take Me Out is::
+
+      ("Stats", "Songs", "AB6880DBE00E6E059A5B8449873BE187", "PlayedCount")
+
+(I grabbed the Take Me Out Arrangement Id of AB6880DBE00E6E059A5B8449873BE187 from
+an rsrtools report.)
+
 TODO
 =====
 - Convert major TODO items to issues.
@@ -964,9 +1070,25 @@ TODO
 - Add whatever functionality is needed for rs-manager to use rsrtools as an
   integration option. 
 
-- Complete PSARC scanner (welder.py)
+- Complete PSARC scanner (welder.py).
 
-- Add some defaults for bass and rhythm players.
+- Add more substantial documentation on profile manager (for Rocksmith file editing),
+  database, and song lists (hooks for GUI implementations).
+
+- Add command line option for profilemanager to dump profile json to file.
+
+Changelog
+==========
+
+**0.1.2beta 2019-04-26** Mac OS X support added. 
+
+**0.1.1beta 2019-04-26** Minor updates to refer to Steam account id and Steam user id 
+correctly. All Steam support functions moved to steam.py. Some windows specific Steam
+functions removed and replaced with methods based on Steam vdf files.
+
+**0.1.0beta 2019-04-22** First functional beta release for rsrtools. Windows only.
+
+**0.0.1 2019-03-12** Place holder release to lock package name down in pypi.
 
 Development notes
 =================
