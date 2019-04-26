@@ -21,6 +21,7 @@ VDF_INDENT = "\t"
 VDF_SEPARATOR = "\t\t"
 RS_APP_ID = "221680"
 STEAM_REMOTE_DIR = "remote"
+REMOTE_CACHE_NAME = "remotecache.vdf"
 
 
 class SteamMetadataError(Exception):

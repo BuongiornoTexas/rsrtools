@@ -28,6 +28,8 @@ steam_user_id with steam_account_id. All Steam functions moved to steam.py, some
 registry functions for Steam removed and replaced with functions based on Steam vdf
 files.
 
+**0.1.2 to 0.1.3+** Relocated steam.py, moved some Steam constants to steam.py.
+
 Warnings
 ========
 
@@ -1079,6 +1081,8 @@ TODO
 
 Changelog
 ==========
+
+**0.1.3beta 2019-xx-xx** Added field reports to song list cli, moved steam.py.
 
 **0.1.2beta 2019-04-26** Mac OS X support added. 
 

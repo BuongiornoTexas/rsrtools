@@ -33,7 +33,7 @@ from pathlib import Path
 from os import fsdecode
 
 from rsrtools import utils
-from rsrtools.steam import (
+from rsrtools.files.steam import (
     SteamAccounts,
     SteamMetadataError,
     RS_APP_ID,

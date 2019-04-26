@@ -14,9 +14,8 @@ import argparse
 from typing import Dict, Optional
 
 from rsrtools.utils import double_quote
-from rsrtools.steam import load_vdf, save_vdf, RS_APP_ID, STEAM_REMOTE_DIR
+from rsrtools.files.steam import load_vdf, save_vdf, STEAM_REMOTE_DIR, REMOTE_CACHE_NAME
 
-REMOTE_CACHE_NAME = "remotecache.vdf"
 BLOCK_SIZE = 65536
 
 
@@ -362,38 +361,40 @@ def self_test() -> None:
     metadata = SteamMetadata(test_path)
 
     # get a separate copy of the cache for comparison
-    orig_metadata = load_vdf(test_path.joinpath(REMOTE_CACHE_NAME), strip_quotes=False)
+    remote_cache = load_vdf(test_path.joinpath(REMOTE_CACHE_NAME), strip_quotes=False)
 
     test_passed = True
-    orig_metadata = orig_metadata[double_quote(RS_APP_ID)]
-    for cachefile in orig_metadata.keys():
-        filepath = test_path.joinpath(STEAM_REMOTE_DIR + "/" + cachefile.strip('"'))
+    for app_id in remote_cache.keys():
+        print(f"\nTesting steam app: {app_id}.")
+        for cachefile in remote_cache[app_id].keys():
+            print(f"\n  Test results for file: {cachefile}.")
+            filepath = test_path.joinpath(STEAM_REMOTE_DIR + "/" + cachefile.strip('"'))
+            if not filepath.exists():
+                print("  File not found.")
 
-        print(f"\nTest results for: {filepath.name}.")
-        if not filepath.exists():
-            print("  File not found.")
+            else:
+                metadata.update_metadata_set(app_id, filepath)
 
-        else:
-            metadata.update_metadata_set(RS_APP_ID, filepath)
-
-            # reach into object for updated data set.
-            calculated_metadata = metadata._cloud_file_metadata_set(RS_APP_ID, filepath)
-
-            for steam_key in SteamMetadataKey:
-                # report on differences/matches between original data and calculated
-                # versions
-                orig_value = orig_metadata[cachefile][steam_key.value]
-                new_value = calculated_metadata[steam_key.value]
-                if orig_value == new_value:
-                    outcome = "OK value:"
-                else:
-                    outcome = "Bad value:"
-                    test_passed = False
-
-                print(
-                    f"  {outcome} {steam_key.value} - remotecache.vdf: {orig_value}, "
-                    f"calculated: {new_value}."
+                # reach into object for updated data set.
+                calculated_metadata = metadata._cloud_file_metadata_set(
+                    app_id, filepath
                 )
+
+                for steam_key in SteamMetadataKey:
+                    # report on differences/matches between original data and calculated
+                    # versions
+                    orig_value = remote_cache[app_id][cachefile][steam_key.value]
+                    new_value = calculated_metadata[steam_key.value]
+                    if orig_value == new_value:
+                        outcome = "OK value:"
+                    else:
+                        outcome = "Bad value:"
+                        test_passed = False
+
+                    print(
+                        f"    {outcome} {steam_key.value} - remotecache.vdf: "
+                        f"{orig_value}, calculated: {new_value}."
+                    )
 
     if test_passed:
         print(
