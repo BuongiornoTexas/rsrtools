@@ -33,6 +33,15 @@ class SQLField(Enum):
 
         return ret_val
 
+    @classmethod
+    def report_field_values(cls) -> None:
+        """Print a list of the Enum values, which correspond to database field names."""
+        print()
+        print("Field names:")
+        for field in cls:
+            print(f"  {field.value}")
+        print()
+
 
 class ListField(SQLField):
     """Provide Enum of list type SQL fields that can be used as filters."""

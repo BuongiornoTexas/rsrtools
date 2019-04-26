@@ -714,7 +714,7 @@ The list type sub-filter is of the form::
    
 ArrangementId may be useful for building song lists of alternative/bonus arrangements.
 
-In future, the utilities menu will provide a list of these field names.
+The utilities menu includes an option to list all of these field names.
 
 ``include`` must be ``true`` or ``false``. If ``true``, the filter will return the
 records for song arrangements whose field value matches any of the values in the list. If 
@@ -761,7 +761,7 @@ The range type sub-filter is of the form::
         SAHardBadges
         SAMasterBadges
 
-In future, the utilities menu will provide a list of these field names.
+The utilities menu includes an option to list all of these field names.
 
 A note of caution: I'm pretty sure the MasteryPeak values are *not quite right*. At the
 moment, I'm calculating these by multiplying the raw mastery peak value from the player

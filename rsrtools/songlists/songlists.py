@@ -18,6 +18,7 @@ from typing import Dict, List, Optional, TextIO, Union
 import rsrtools.utils as utils
 
 from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
+from rsrtools.songlists.config import  ListField, RangeField
 from rsrtools.songlists.configclasses import (
     Configuration,
     Settings,
@@ -758,6 +759,14 @@ class SongListCreator:
                 no_action="Return to main menu.",
                 options=[
                     ("Database reports.", self._arr_db.run_cl_reports),
+                    (
+                        "Database string field names (for list type sub-filters).",
+                        ListField.report_field_values,
+                    ),
+                    (
+                        "Database numeric field names (for range type sub-filters).",
+                        RangeField.report_field_values,
+                    ),                    
                     (
                         "Clone profile. Copies source profile data into target "
                         "profile. Replaces all target profile data."
