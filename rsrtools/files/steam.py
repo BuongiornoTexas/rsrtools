@@ -15,6 +15,7 @@ from rsrtools.utils import double_quote
 if platform == "win32":
     import winreg  # type: ignore
 
+ACCOUNT_MASK = 0xFFFFFFFF
 VDF_SECTION_START = "{"
 VDF_SECTION_END = "}"
 VDF_INDENT = "\t"
@@ -292,7 +293,7 @@ class SteamAccounts:
 
             for steam_id, data in vdf_dict["users"].items():
                 # account id is low 32 bits of steam id.
-                account_id = str(int(steam_id) & 0xFFFFFFFF)
+                account_id = str(int(steam_id) & ACCOUNT_MASK)
 
                 info[account_id] = data
 
@@ -356,3 +357,57 @@ class SteamAccounts:
 
         """
         return self._account_info[account_id]
+
+    def find_account_id(self, test_value: str, only_valid: bool = True) -> str:
+        """Convert test value into an 32 bit (8 digit) Steam account id.
+
+        Arguments:
+            test_value {str} -- This may be a 32 bit Steam ID, an 32 bit steam account
+                ID, a Steam account name, or a Steam profile alias.
+            only_valid {bool} -- If True, the method will only return the account id
+                for an account with a userdata directory and a loginusers.vdf entry.
+                If False, it will return an account id for records which have partial
+                data (either a userdata directory or login information is missing).
+                (default: {True})
+
+        Raises:
+            KeyError -- If the account id does not exist on the local machine, or if
+                a partial record is found and only_valid is True.
+
+        Returns:
+            str -- A 32 bit/8 digit Steam account id.
+
+        """
+        if not test_value:
+            raise KeyError("Empty string is not a valid Steam account ID.")
+
+        account_id = ""
+        if test_value in self._account_info:
+            # Maybe we have been given what we need.
+            account_id = test_value
+
+        else:
+            if len(test_value) == 17 and test_value.isdigit():
+                # test 64 bit id.
+                test_id = str(int(test_value) & ACCOUNT_MASK)
+                if test_id in self._account_info:
+                    account_id = test_id
+
+        upper_value = test_value.upper()
+        if not account_id:
+            # lastly check the account dictionary.
+            for test_id, info in self._account_info.items():
+                if (
+                    info.name.upper() == upper_value
+                    or info.persona.upper() == upper_value
+                ):
+                    account_id = test_id
+                    break
+
+        if not account_id:
+            raise KeyError(f"No Steam account id found for {test_value}.")
+
+        elif only_valid and not self._account_info[account_id].valid:
+            raise KeyError(f"No valid Steam account id found for {test_value}.")
+
+        return account_id
