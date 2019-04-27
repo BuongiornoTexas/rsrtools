@@ -92,11 +92,15 @@ Song Manager, here are the recommended quick start steps.
 8. Start your virtual environment and run the package (with appropriate substitution for
    ``<path_to_your_working_directory>``)::
 
-    python -m rsrtools.songlists.songlists <path_to_your_working_directory>
+        songlists <path_to_your_working_directory>
+
+   Or, if you'd rather not use an entry point::
+
+        python3 -m rsrtools.songlists.songlists <path_to_your_working_directory>
 
    If you start python in the working directory, you could use::
 
-    python -m rsrtools.songlists.songlists .
+    songlists .
 
 9. **Clone your save game into the test profile** and do all of your testing on this
    test profile until you are comfortable that the package is working and doing what you
@@ -223,8 +227,8 @@ Alternatives
    
    *However*, @sandiz, the rs-manager developer, has implemented functionality to export 
    rs-manager set lists in a format that can be used by rsrtools. A near term update of
-   rsrtools will allow loading of these set lists into Rocksmith save files. Once this is
-   done, we will have a work flow where set lists can be generated using the
+   rsrtools will allow loading of these set lists into Rocksmith save files. Once this
+   is done, we will have a work flow where set lists can be generated using the
    rs-manager GUI and then exported for loading into Rocksmith by a simple 
    rsrtools command (bypassing the joys of setting up text filters for rsrtools).
 
@@ -259,13 +263,19 @@ Pre-requisites
   what I'm using).
 
 * Create a folder/directory for running rsrtools. For this tutorial, I'm assuming this 
-  is: ``D:\RS Stuff``, and create an environment sub-directory ``Env`` and a working 
+  is: ``D:\RS_Stuff``, and create an environment sub-directory ``Env`` and a working 
   sub-directory ``Working`` in the rsrtools directory. At the end of this step, my 
   folders are::
 
-       D:\RS Stuff
-       D:\RS Stuff\Env
-       D:\RS Stuff\Working
+       D:\RS_Stuff
+       D:\RS_Stuff\Env
+       D:\RS_Stuff\Working
+
+  For a Mac OS X user working in ``~/Documents``, this might look like::
+
+       ~/Documents/RS_Stuff
+       ~/Documents/RS_Stuff/Env
+       ~/Documents/RS_Stuff/Working
 
 * Set up a python virtual environment for rsrtools and install the package via pip. If
   you are unfamiliar with python, follow these steps:
@@ -276,13 +286,19 @@ Pre-requisites
      command does and can be ignored::
         
         # Change paths as required to match your rsrtools directory
-        # Create the environment in D:\RS Stuff\Env
-        python -m venv "d:\RS Stuff\Env"
+        # Create the environment in D:\RS_Stuff\Env
+        python -m venv "d:\RS_Stuff\Env"
 
         # Activate the python environment
-        "d:\RS Stuff\Env\Scripts\activate.bat"
+        "d:\RS_Stuff\Env\Scripts\activate.bat"
 
         # install rsrtools and supporting libraries
+        pip install rsrtools
+
+     Or, for a Mac OS X user::
+
+        python3 -m venv ~/Documents/RS_Stuff/Env
+        . ~/Documents/RS_Stuff/Env/scripts/activate
         pip install rsrtools
 
   3. Exit the command window.
@@ -325,7 +341,7 @@ Preliminaries
    arrangement database, and the song list configuration file. For this tutorial I will 
    use the folder/directory set up in the previous section::
 
-       D:\RS Stuff\Working
+       D:\RS_Stuff\Working
 
 2. Download and install the Customs Forge Song Manager from: http://customsforge.com/
 
@@ -366,9 +382,16 @@ Preliminaries
    directory. Let's call it 'song_lists.bat' and put the following lines in it::
 
         echo on
-        Call "D:\RS Stuff\Env\Scripts\Activate.bat"
-        python -m rsrtools.songlists.songlists "D:\RS Stuff\Working"
+        Call "D:\RS_Stuff\Env\Scripts\Activate.bat"
+        songlists "D:\RS_Stuff\Working"
         Deactivate.bat
+
+   Or, for a Mac OS X user, create a shell script containing::
+
+        . ~/Documents/RS_Stuff/Env/scripts/activate
+        songlists ~/Documents/RS_Stuff/Working
+        deactivate
+
 
    You will need to edit your paths to match where you have put your python environment
    and your working directory.
@@ -386,11 +409,12 @@ Preliminaries
    following commands in command shell, substituting in the path to your working 
    folder and the path to the arrangements file (``<path_to_xml_file>``)::
 
-        Call "D:\RS Stuff\Env\Scripts\Activate.bat"
-        python -m rsrtools.songlists.songlists "D:\RS Stuff\Working" --CFSMxml <path_to_xml_file>
+        Call "D:\RS_Stuff\Env\Scripts\Activate.bat"
+        songlists "D:\RS_Stuff\Working" --CFSMxml <path_to_xml_file>
 
    When the menu comes up, choose 0 to exit the package, and then choose y to save the
-   configuration. (hit enter after making a choice). Then exit the command shell.
+   configuration. (hit enter after making a choice). Then exit the command shell. For
+   Mac OS X users, make appropriate activation and path substitutions.
 
 6. Run the batch file to set up the default configuration. This should result in text 
    menu something like the following::
@@ -400,7 +424,7 @@ Preliminaries
           Steam account id:    'not set'
           Rocksmith profile:   'not set'
           Reporting to:        Standard output/console
-          Working directory:   D:\RS Stuff\Working
+          Working directory:   D:\RS_Stuff\Working
 
       Please choose from the following options:
 
@@ -623,7 +647,7 @@ The settings section is the simplest of the three, describing the location of th
 xml file (optional), the default Steam account id, and the default profile name::
 
       [settings]
-      CFSM_file_path: "D:\\RS Stuff\\Working\\ArrangementsGrid.xml"
+      CFSM_file_path: "D:\\RS_Stuff\\Working\\ArrangementsGrid.xml"
       steam_account_id": "12345678"
       player_profile": "Testing"
       version = "x.x.x"
@@ -968,6 +992,32 @@ filter at least once, and then apply a minimum play count criteria. For my use c
 this is mainly an issue for E standard arrangements - I don't tend to worry about this
 for the alternate tunings.
 
+Python Entry Points
+====================
+
+**New in 0.1.3**. The package supports, and this documents assumes, use of python entry
+points for the profile manager and the song list creator. If you would prefer to use 
+python directly, here are the command equivalents (in all cases assuming you have 
+*already activated your virtual environment*).
+
+For Windows::
+
+        py -m rsrtools.songlists.songlists
+        songlists
+        songlists.exe
+
+        py -m rsrtools.files.profilemanager
+        profilemanager
+        profilemanager.exe
+
+For Mac OS X::
+
+        python3 -m rsrtools.songlists.lists
+        songlists
+
+        python3 -m rsrtools.files.profilemanager
+        profilemanager
+
 Sidebar: Rocksmith Save File Editing
 ======================================
 
@@ -995,7 +1045,7 @@ The RSProfileManager class provides two simple examples of profile editing:
 Both of these routines can be run from the command line. For further details see the
 profile manager help, which can be obtained from the command line::
 
-    python -m rsrtools.files.profilemanager -h
+    profilemanager -h
 
 The song list creator also uses the profile manager to obtain player data and to write
 song lists into player profiles.
@@ -1085,7 +1135,7 @@ not human readable).
 rsrtools includes facilities to export the JSON objects as text. The simplest method
 is to run the command line tool::
 
-        py -m rsrtools.files.profilemanager --dump-profile <path_to_working_directory>
+        profilemanager --dump-profile <path_to_working_directory>
 
 This tool will ask you to select a steam account and a Rocksmith profile and then
 will export the profile data into the working directory as '<profile_name>.json'.
@@ -1108,8 +1158,13 @@ TODO
 Changelog
 ==========
 
-**0.1.3beta 2019-xx-xx** Added field reports to song list cli, moved steam.py. Fixed
-a major oversight and added an export profile as json method to profile manager.
+**0.1.3beta 2019-xx-xx** 
+
+- Added field reports to song list cli, moved steam.py.
+
+- Fixed a major oversight and added an export profile as json method to profile manager.
+
+- Added entry points for profilemanager and songlists.
 
 **0.1.2beta 2019-04-26** Mac OS X support added. 
 
