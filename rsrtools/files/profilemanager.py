@@ -117,8 +117,9 @@ class RSSaveWrapper:
             may not be mutable (json sub-dicts are mutable, values are normally not
             mutable). In line with json_tree above, the caller is responsible for
             marking the instance as dirty if it modifies the save data.
-        set json_subtree -- Overwrites a subtree in the instance save data and marks
+        set_json_subtree -- Overwrites a subtree in the instance save data and marks
             the instance as dirty.
+        save_json_file -- Calls save_json_file for the underlying RSSaveFile object.
 
     Note: This class is only intended for use by the profile manager. Use RSSaveFile
     if you want direct access to a save file.
@@ -407,6 +408,10 @@ class RSSaveWrapper:
             parent_dict[key] = subtree_or_value
 
         self.mark_as_dirty()
+
+    def save_json_file(self, file_path: Path) -> None:
+        """Generate file data in JSON format and saves to the specified path."""
+        self._rs_file.save_json_file(file_path)
 
 
 class RSLocalProfiles(RSSaveWrapper):
@@ -1057,6 +1062,8 @@ class RSProfileManager:
 
         set json_subtree -- Overwrites a save data json subtree in a profile and marks
             the profile as dirty.
+
+        export_json_profile -- Calls save_json_file for a specified profile.
 
     RSProfileManager works on a base directory with the following structure:
         base_dir
@@ -1961,7 +1968,7 @@ class RSProfileManager:
         """
         target = self.cl_choose_profile(
             no_action_text="Exit.",
-            header_text="Which profile do you want to apply play count changes to?.",
+            header_text="Which profile do you want to apply play count changes to?",
         )
 
         if not target:
@@ -1993,6 +2000,17 @@ class RSProfileManager:
             if int(self.steam_account_id) > 0:
                 self.move_updates_to_steam(self.steam_account_id)
 
+    def export_json_profile(self, profile_name: str, export_path: Path) -> None:
+        """Export profile data as text json file.
+
+        Arguments:
+            profile_name {str} -- The profile name.
+            export_path {Path} -- The path for the file, which will be created but not
+                over-written.
+
+        """
+        self._profiles[profile_name].save_json_file(export_path)
+
 
 def main() -> None:
     """Provide basic command line main."""
@@ -2013,27 +2031,52 @@ def main() -> None:
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--clone-profile",
-        help="Interactive process to copy the contents of a source profile into "
-        "a target profile. This replaces the target profile contents.",
+        help="Interactive process to select a Steam account and copy the contents of a "
+        "Rocksmith source profile into a target profile. This replaces the target "
+        "profile contents.",
         action="store_true",
     )
     group.add_argument(
         "--set-play-counts",
-        help="Sets play counts for arrangements as specified in the play count "
-        "file. Each line in this file should consist of: "
+        help="After interactive selection of Steam account and Rocksmith profile, sets "
+        "play counts for arrangements as specified in the play count "
+        "file. Each line in this file should consist of comma separated pairs: "
         "<ArrangementID>, <NewPlayCount>.",
         metavar="play_count_file_path",
+    )
+    group.add_argument(
+        "--dump-profile",
+        help="After interactive selection of Steam account and Rocksmith profile, "
+        "exports selected profile as a text JSON file in the working directory."
+        "The file name will be '<profile>.json', and an error will occur if the file"
+        "exists already (no over-writing).",
+        action="store_true",
     )
 
     args = parser.parse_args()
 
-    pm = RSProfileManager(Path(args.working_dir))
+    working = Path(args.working_dir)
+    pm = RSProfileManager(working)
 
     if args.clone_profile:
         pm.cl_clone_profile()
 
-    if args.set_play_counts:
+    elif args.set_play_counts:
         pm.cl_set_play_counts(Path(args.set_play_counts))
+
+    elif args.dump_profile:
+        target = pm.cl_choose_profile(
+            no_action_text="Exit.",
+            header_text="Which profile do you want to export as a JSON file?",
+        )
+        if target:
+            pm.export_json_profile(target, working.joinpath(target + ".json"))
+            print(f"Profile exported as '{target}.json'.")
+        else:
+            print("No profile selected, no data exported.")
+
+    else:
+        print("No action specified for profile manager. Missing arguments?")
 
 
 if __name__ == "__main__":

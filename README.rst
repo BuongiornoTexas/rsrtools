@@ -982,6 +982,9 @@ methods are currently only documented in their docstrings, although I plan to pr
 more detail in this document in the future (and I'm happy to answer questions via
 github issues).
 
+Profile Editing Examples
+--------------------------
+
 The RSProfileManager class provides two simple examples of profile editing:
 
 - ``RSProfileManager.cl_set_play_counts()``, which is a command line mechanism 
@@ -1002,6 +1005,9 @@ care to maintain Rocksmith formats or b) replace Rocksmith data with Rocksmith d
 Consequently their implementations are buried within classes used by the profile
 manager.
 
+Roll Your Own Editor
+----------------------
+
 If you want to make more general changes to Rocksmith profiles, you can use the 
 methods::
 
@@ -1017,6 +1023,10 @@ can work up. I will do some testing when I add a demonstration utility in a futu
 release (specifically, the feature request to delete progress for specified CDLCs).
 
 With that warning out of the way, onto the approach. The general steps are:
+
+0. Export a profile in JSON format so that you can work out which fields and data
+   you want to work with in your editor. To this end, rsrtools includes a handy profile 
+   export feature described in `Exporting Human Readable Profiles`_.
 
 1. Create a profile manager instance (pm), which will need a working directory.
 
@@ -1065,6 +1075,22 @@ and the Learn a song play count for Take Me Out is::
 (I grabbed the Take Me Out Arrangement Id of AB6880DBE00E6E059A5B8449873BE187 from
 an rsrtools report.)
 
+Exporting Human Readable Profiles
+----------------------------------
+
+In their raw form, Rocksmith profiles are human readable(-ish) JSON objects. Rocksmith
+compresses and encrypts these objects before saving the profiles to disk (distinctly
+not human readable). 
+
+rsrtools includes facilities to export the JSON objects as text. The simplest method
+is to run the command line tool::
+
+        py -m rsrtools.files.profilemanager --dump-profile <path_to_working_directory>
+
+This tool will ask you to select a steam account and a Rocksmith profile and then
+will export the profile data into the working directory as '<profile_name>.json'.
+
+
 TODO
 =====
 - Convert major TODO items to issues.
@@ -1082,7 +1108,8 @@ TODO
 Changelog
 ==========
 
-**0.1.3beta 2019-xx-xx** Added field reports to song list cli, moved steam.py.
+**0.1.3beta 2019-xx-xx** Added field reports to song list cli, moved steam.py. Fixed
+a major oversight and added an export profile as json method to profile manager.
 
 **0.1.2beta 2019-04-26** Mac OS X support added. 
 
