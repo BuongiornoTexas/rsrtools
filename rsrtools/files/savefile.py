@@ -460,10 +460,10 @@ def self_test() -> None:
         help="A directory containing RS save files that will be used for the "
         "self test.",
     )
-    test_dir = parser.parse_args().test_directory
+    test_dir = Path(parser.parse_args().test_directory).resolve(True)
 
     keep_save_file = None
-    for child in Path(test_dir).iterdir():
+    for child in test_dir.iterdir():
         if child.is_file():
             try:
                 keep_save_file = RSSaveFile(child)

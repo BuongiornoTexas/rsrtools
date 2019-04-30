@@ -1,6 +1,5 @@
 .. cSpell:ignore venv, Analyzer, userdata, remotecache, PRFLDB, pypi, profilemanager
-.. cSpell:ignore docstrings, dict, CDLCs, tuple, stats
-
+.. cSpell:ignore docstrings, dict, CDLCs, tuple, stats, simplejson
 **rsrtools** is a package for creating and saving Rocksmith 2014 songlists **to** 
 Rocksmith save files (profiles). Incidentally, it also provides tools for managing
 Rocksmith profiles.
@@ -22,13 +21,17 @@ Rocksmith PSARC structure.
 Breaking Changes
 =================
 
+**0.1.2 to 0.1.3+** 
+
+- Relocated steam.py, moved some Steam constants to steam.py.
+
+- Change in ArrangementDB.list_validator() signature.
+
 **0.1.0 to 0.1.1+** Terminology correction from Steam user id to Steam account id. 
 Probably the only effect for most people is to edit 'config.toml' and replace 
-steam_user_id with steam_account_id. All Steam functions moved to steam.py, some windows
+steam_user_id with steam_account_id. All Steam functions moved to steam.py, some Windows
 registry functions for Steam removed and replaced with functions based on Steam vdf
 files.
-
-**0.1.2 to 0.1.3+** Relocated steam.py, moved some Steam constants to steam.py.
 
 Warnings
 ========
@@ -50,7 +53,7 @@ As this package is all about editing game saves, here are a couple of warnings.
 2. This package is (obviously) not endorsed by Ubisoft - if you use this package and run
    into problems with your save files, Ubisoft will not be very interested in helping
    you. If this happens, I will try to help, but will be limited by my available time
-   and the complexity of your problem. So, in effect repeating the first warning: use
+   and the complexity of your problem. So, in effect repeating the previous warning: use
    this package at your own risk.
 
 3. **Don't run this package at the same time as  Rocksmith is running.** You'll end up 
@@ -253,8 +256,8 @@ This package provides:
   tools (I have not implemented a GUI, as the command line is sufficient for my
   requirements - see the section on `Alternatives`_ for more GUI oriented solutions).
 
-Repeating warning #4, this package is currently only supported on Windows (and only
-tested on Windows 10). 
+Repeated warning (`Warnings`_): this package is currently only supported on Windows 
+(tested on Windows 10) and Mac OS X (tested on High Sierra).
 
 Pre-requisites
 --------------
@@ -330,9 +333,9 @@ b. At the Select Profile Menu, click New Profile, name the profile and go throug
 Command line work flow summary
 ===============================
 
-Repeating an important warning: **Don't run this package at the same time as  Rocksmith 
-is running.** You'll end up crossing the save files and nobody will be happy (mostly you
-though).
+Repeating an important warning (`Warnings`_): **Don't run this package at the same time
+as  Rocksmith is running.** You'll end up crossing the save files and nobody will be
+happy (mostly you though).
 
 Preliminaries
 -------------
@@ -450,11 +453,12 @@ Preliminaries
 
       Please select a Steam account id/Rocksmith file set from the following options.
 
-      1) Steam user '12345678'. This is the user logged into Steam now. (Sat Sep  1 16:47:25 2018).
+      1) Steam user '12345678', (HalfABee [eric]), most recent Steam login. (Sun Apr 4 15:32:52 2019).
       0) Do nothing and raise error.
 
-   We get a bit of help here - only one Steam id is available, and it is the user logged
-   into Steam now. So we choose 1 to select user ``12345678``.
+   We get a bit of help here - only one Steam id is available, and it is the user most
+   recently logged into steam with a profile name/alias of HalfABee and a steam account
+   name of eric. So we choose 1 to select user ``12345678``.
 
    Most people will only have one account id available - if you have more than one, you 
    may need a bit of trial and error to work out which one in is yours. The easiest way
@@ -466,7 +470,7 @@ Preliminaries
    tutorial). After completing this process, the first two information lines of the 
    song list menu should be similar to::
 
-            Steam account id:    '12345678'
+            Steam account id:    '12345678', (HalfABee [eric]), most recent Steam login.
             Rocksmith profile:   'Testing'
 
 9. At this point, it's worth saving the changes you have made.
@@ -1051,9 +1055,9 @@ The song list creator also uses the profile manager to obtain player data and to
 song lists into player profiles.
 
 These methods either a) implement very small changes to save files with a lot of
-care to maintain Rocksmith formats or b) replace Rocksmith data with Rocksmith data.
-Consequently their implementations are buried within classes used by the profile
-manager.
+care to maintain Rocksmith formats (see `Notes on Formats`_), or b) replace Rocksmith
+data with Rocksmith data. Consequently their implementations are buried within classes
+used by the profile manager.
 
 Roll Your Own Editor
 ----------------------
@@ -1072,7 +1076,11 @@ safer path for changes, please make a feature request on github and we'll see wh
 can work up. I will do some testing when I add a demonstration utility in a future 
 release (specifically, the feature request to delete progress for specified CDLCs).
 
-With that warning out of the way, onto the approach. The general steps are:
+I also suggest you review the `Notes on Formats`_ section which discusses how to ensure
+any edits you make conform as closely as possible to the Ubisoft file format (and hence
+maximise your chances of profile edits loading successfully).
+
+With those warnings out of the way, onto the approach. The general steps are:
 
 0. Export a profile in JSON format so that you can work out which fields and data
    you want to work with in your editor. To this end, rsrtools includes a handy profile 
@@ -1140,6 +1148,36 @@ is to run the command line tool::
 This tool will ask you to select a steam account and a Rocksmith profile and then
 will export the profile data into the working directory as '<profile_name>.json'.
 
+Notes on formats
+------------------
+
+As a general principle, I recommend using the JSON exported from a save file created by
+**Rocksmith** (and not one created by rsrtools!) as a template for any editing that you
+want to apply to save files. 
+
+The things that I pay particular attention to are:
+
+- Strings vs values. In particular, integers are sometimes treated as string values, and
+  sometimes treated as numbers with six decimal places. Make sure you follow whatever 
+  Rocksmith does!
+- From the checking I've done so far, Rocksmith appears to treat *all* numeric values as
+  real numbers with six decimal digits. I use code on the following lines to ensure
+  integers are presented in this format::
+
+    from decimal import Decimal
+
+    json_6d_value = Decimal(
+      integer_value
+    ) + Decimal("0.000000")
+
+  This method converts the integer to a Decimal and forces the 6 digit precision used
+  by Rocksmith. You will need to apply a similar approach to convert floats to a 
+  6 digit Decimal (I haven't needed to do this yet). 
+
+Note that rsrtools imports all numeric values as Decimal types, and I would recommend
+that you ensure any edits you apply to numeric values in the JSON dictionary also have
+a Decimal type to ensure decimal precision is maintained in the profile (rsrtools
+implements this via the simplejson library, which has handles for Decimal objects).
 
 TODO
 =====
@@ -1152,8 +1190,6 @@ TODO
 
 - Add more substantial documentation on profile manager (for Rocksmith file editing),
   database, and song lists (hooks for GUI implementations).
-
-- Add command line option for profilemanager to dump profile json to file.
 
 Changelog
 ==========
@@ -1169,7 +1205,7 @@ Changelog
 **0.1.2beta 2019-04-26** Mac OS X support added. 
 
 **0.1.1beta 2019-04-26** Minor updates to refer to Steam account id and Steam user id 
-correctly. All Steam support functions moved to steam.py. Some windows specific Steam
+correctly. All Steam support functions moved to steam.py. Some Windows specific Steam
 functions removed and replaced with methods based on Steam vdf files.
 
 **0.1.0beta 2019-04-22** First functional beta release for rsrtools. Windows only.

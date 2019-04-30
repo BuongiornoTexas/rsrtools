@@ -2055,13 +2055,13 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    working = Path(args.working_dir)
+    working = Path(args.working_dir).resolve(True)
     pm = RSProfileManager(working)
 
     if args.clone_profile:
         pm.cl_clone_profile()
 
-    elif args.set_play_counts:
+    elif args.set_play_counts is not None:
         pm.cl_set_play_counts(Path(args.set_play_counts))
 
     elif args.dump_profile:

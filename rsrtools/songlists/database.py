@@ -729,17 +729,23 @@ class ArrangementDB:
         ):
             raise ValueError(f"Invalid table name {name}")
 
-        conn = self.open_db()
-        ret_val = True
-        try:
-            count = conn.execute(f"SELECT COUNT(*) FROM {name};").fetchone()
-        except sqlite3.OperationalError:
+        if not self._db_file_path.exists():
+            # No file => no data, but let's not create the file by accident.
             ret_val = False
-        else:
-            if count[0] == 0:
-                ret_val = False
 
-        conn.close()
+        else:
+            conn = self.open_db()
+            ret_val = True
+            try:
+                count = conn.execute(f"SELECT COUNT(*) FROM {name};").fetchone()
+            except sqlite3.OperationalError:
+                ret_val = False
+            else:
+                if count[0] == 0:
+                    ret_val = False
+
+            conn.close()
+
         return ret_val
 
     @property
@@ -959,16 +965,18 @@ class ArrangementDB:
         conn.close()
 
     def list_validator(
-        self, validator_report: Optional[ListField] = None
+        self, target: Optional[ListField] = None, write_report: bool = False
     ) -> ListValidator:
         """Create dictionary of list field validators.
 
         Keyword Arguments:
-            validator_report {Optional[ListField]} -- If a list field is specified, the
-                method prints a summary report of unique values for that field to
-                stdout. If None, the method generates validator lists for
-                all members of the ListField Enum without any reporting.
-                (default: {None})
+            target {Optional[ListField]} -- If a list field is specified, the method
+                generates the validator list for that field. If None, the method
+                generates validator lists for all members of the ListField Enum
+                without any reporting. (default: {None})
+            write_report {bool} -- If True and target is not None, the method prints a
+                summary report of unique values for that field to stdout.
+                (default: {False})
 
         Returns:
             Dict[ListField, List[str]] -- For each list field in the dictionary,
@@ -977,13 +985,13 @@ class ArrangementDB:
         The validator lists created by this method are intended for use in creating song
         lists or UI drop down lists.
 
-        """
-        if validator_report is None:
+        """ 
+        if target is None:
             # Create validators for ALL list fields.
             validators = tuple(ListField)
         else:
             # Create a validator for the single specified field.
-            validators = (validator_report,)
+            validators = (target,)
 
         ret_dict = dict()
 
@@ -1002,7 +1010,7 @@ class ArrangementDB:
             value_list = [i[0] for i in result]
             ret_dict[list_field] = value_list
 
-            if validator_report is not None:
+            if write_report and target is not None:
                 print()
                 print(f"  {len(result)} unique records for {list_field.value}")
                 print("    Unique item: Count")
@@ -1042,11 +1050,10 @@ class ArrangementDB:
         # I could have created a list_validator member. However this would need to be
         # refreshed after every routine that modified the SQL tables. It is easier to
         # just create it on demand.
-        list_validator = self.list_validator()
         sql_queries = SongListSQLGenerator(
             song_list_set,
             filter_definitions,
-            list_validator,
+            self.list_validator(),
             arrangements_name=ARRANGEMENTS_TABLE,
             profile_name=PROFILE_TABLE,
         )
@@ -1128,7 +1135,7 @@ class ArrangementDB:
 
             actor = choice[0]
             if isinstance(actor, ListField):
-                self.list_validator(actor)
+                self.list_validator(actor, write_report=True)
             if callable(actor):
                 actor()
 
@@ -1178,13 +1185,15 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    db = ArrangementDB(Path(args.db_directory))
+    db_dir = Path(args.db_directory).resolve(True)
 
-    if args.CFSMxml:
-        db.load_cfsm_arrangements(Path(args.CFSMxml))
+    db = ArrangementDB(db_dir)
+
+    if args.CFSMxml is not None:
+        db.load_cfsm_arrangements(Path(args.CFSMxml).resolve(True))
 
     if args.update_player_data:
-        db.cl_update_player_data(Path(args.db_directory))
+        db.cl_update_player_data(db_dir)
 
     if args.reports:
         db.run_cl_reports()

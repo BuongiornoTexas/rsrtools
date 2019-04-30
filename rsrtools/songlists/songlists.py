@@ -830,9 +830,9 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    main = SongListCreator(Path(args.working_dir))
+    main = SongListCreator(Path(args.working_dir).resolve(True))
 
-    if args.CFSMxml:
+    if args.CFSMxml is not None:
         # String path by definition here.
         main.cfsm_arrangement_file = args.CFSMxml
         main.load_cfsm_arrangements()

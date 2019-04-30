@@ -356,7 +356,7 @@ def self_test() -> None:
         help="A directory containing remotecache.vdf and Steam remote directory that "
         "will be used for the self test.",
     )
-    test_path = Path(parser.parse_args().test_directory)
+    test_path = Path(parser.parse_args().test_directory).resolve(True)
 
     metadata = SteamMetadata(test_path)
 
