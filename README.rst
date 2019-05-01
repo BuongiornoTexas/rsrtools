@@ -1,9 +1,10 @@
 .. cSpell:ignore venv, Analyzer, userdata, remotecache, PRFLDB, pypi, profilemanager
-.. cSpell:ignore docstrings, dict, CDLCs, tuple, stats, simplejson
+.. cSpell:ignore docstrings, dict, CDLCs, tuple, stats, simplejson, importrsm
+.. cSpell:ignore faves, newlist
+
 **rsrtools** is a package for creating and saving Rocksmith 2014 songlists **to** 
 Rocksmith save files (profiles). Incidentally, it also provides tools for managing
 Rocksmith profiles.
-
 
 .. contents::
 
@@ -18,10 +19,20 @@ tools. All of the save file and data file handling routines are based on this co
 awesome set listing tool. This package also gave me a deeper understanding of the 
 Rocksmith PSARC structure.
 
-Breaking Changes
-=================
+News and Breaking Changes
+==========================
 
-**0.1.2 to 0.1.3+** 
+**0.2.0** This release provides a command line tool for importing song lists/set lists
+exported from `rs-manager <https://github.com/sandiz/rs-manager>`_. With this
+functionality, you can take advantage of rs-manager's flexible GUI to generate set lists,
+export them to file, and then save them to a Rocksmith profile using rsrtools. Unless
+you have a particular desire to roll your own rsrtools filters, I'd suggest this as 
+a recommended use case. The documentation below provides further details on importrsm. 
+
+@sandiz is looking the possibility of integrating the rsrtools importer into rs-manager.
+Watch this space! Well actually, watch rs-manager! That's where the action will be.
+
+**0.1.2 to 0.2.0+** Breaking Changes:
 
 - Relocated steam.py, moved some Steam constants to steam.py.
 
@@ -66,33 +77,71 @@ As this package is all about editing game saves, here are a couple of warnings.
 TL:DNR
 ======
 
-If you know what you are doing with python and know your way around the Customs Forge
-Song Manager, here are the recommended quick start steps.
+If you know what you are doing with python, here are the recommended quick start steps.
+
+Installation and Set Up
+----------------------------
 
 0. The package only works on Windows and Mac OS X for now.
 
-1. **READ** the section on setting up a test profile (`Set up a Testing Profile!`_). 
-   Until you are familiar with the
-   package, this will be your best safeguard against damaging your precious save
-   game(s).
+1. Install python 3.7.x (I'm on 3.7.3, and you will need some 3.7 features).
 
-2. **SET UP** a Rocksmith test profile.
+2. Create a virtual environment. 
 
-3. Install python 3.7.x (I'm on 3.7.3, and you will need some 3.7 features).
-
-4. Create a virtual environment. 
-
-5. Install rsrtools into your virtual environment with::
+3. Install rsrtools into your virtual environment with::
 
     pip install rsrtools
 
-6. Create a working folder/directory.
+4. Create a working folder/directory.
 
-7. Create an ArrangementsGrid.xml file from Customs Forge Song Manger and copy or move
-   it into the working directory (hopefully this step will become optional with the
-   implementation of a PSARC scanner).
+5. **READ** the section on setting up a test profile (`Set up a Testing Profile!`_). 
+   Until you are familiar with the package, this will be your best safeguard against 
+   damaging your precious save game(s).
 
-8. Start your virtual environment and run the package (with appropriate substitution for
+6. **SET UP** a Rocksmith test profile. Open Rocksmith, create a new profile named e.g.
+   'Testing', and run through the profile set up (unavoidable).
+
+7. Optional, but highly recommended: **Clone your save game into the test profile** and
+   do all of your testing on this test profile until you are comfortable that the
+   package is working and doing what you want it to do (`Clone Profile`_). The following
+   command provides a short cut for profile cloning::
+
+      profilemanager --clone-profile <path_to_your_working_directory>
+
+   Profile cloning is destructive - make sure you get your source and your target
+   correct! 
+
+Using importrsm
+------------------
+
+You can get help for the rs-manager importer by running either of::
+
+    importrsm -h
+    python3 -m rsrtools.importrsm -h
+
+If you have two song list JSON files ``faves.json`` and ``newlist1.json`` that you want
+to import into Favorites and song list 3, the following command will get you started::
+
+    importrsm <path_to_your_working_directory> -sl F faves.json -sl 3 newlist1.json
+
+This will perform basic checks on the JSON files and will prompt you for a Steam 
+account and a Rocksmith profile (remember to use your test profile while you are trying
+things out!), and finally will ask you to confirm the file write. Most of these steps
+can be automated and the logging silenced - refer to the help for more details.
+
+Using rsrtools
+---------------
+
+If you'd like to use rsrtools filters, you will need to install Customs Forge Manger 
+so that you can get song arrangement data (hopefully this will become optional with the
+implementation of a PSARC scanner in the future).
+
+After this, the steps are:
+
+1. Create an ArrangementsGrid.xml file from Customs Forge Song Manger and copy or move
+   it into the working directory .
+
+2. Start your virtual environment and run the package (with appropriate substitution for
    ``<path_to_your_working_directory>``)::
 
         songlists <path_to_your_working_directory>
@@ -101,13 +150,12 @@ Song Manager, here are the recommended quick start steps.
 
         python3 -m rsrtools.songlists.songlists <path_to_your_working_directory>
 
-   If you start python in the working directory, you could use::
+   If you start in the working directory, you could use::
 
     songlists .
 
-9. **Clone your save game into the test profile** and do all of your testing on this
-   test profile until you are comfortable that the package is working and doing what you
-   want it to do.
+3. Try out the test filters, reports and song lists, and then move on to creating your
+   own in ``config.toml``. Remember to use your test profile!
 
 Motivation
 ==========
@@ -229,11 +277,11 @@ Alternatives
    lists into Rocksmith save files).
    
    *However*, @sandiz, the rs-manager developer, has implemented functionality to export 
-   rs-manager set lists in a format that can be used by rsrtools. A near term update of
-   rsrtools will allow loading of these set lists into Rocksmith save files. Once this
-   is done, we will have a work flow where set lists can be generated using the
-   rs-manager GUI and then exported for loading into Rocksmith by a simple 
-   rsrtools command (bypassing the joys of setting up text filters for rsrtools).
+   rs-manager set lists in a format that can be used by rsrtools. As of 0.2.0, rsrtools
+   allows loading of these set lists into Rocksmith save files. So we now have a work
+   flow where set lists can be generated using the rs-manager GUI and then exported for
+   loading into Rocksmith by rsrtools (bypassing the joys of setting up text filters for
+   rsrtools).
 
 That's the Long Intro over. 
 
@@ -249,9 +297,13 @@ to match your own environment).
 
 This package provides:
 
+- A command line tool for reading song lists created by rs-manager and writing these 
+  song lists into a Rocksmith profile. The work flow for this process is described below.
+
 - A command line tool for creating Rocksmith song lists from a series of filters, and
   writing the resulting song lists into a Rocksmith profile. The command line work flow
   is described below.
+
 - A set of routines that can be used to implement a GUI version of the command line
   tools (I have not implemented a GUI, as the command line is sufficient for my
   requirements - see the section on `Alternatives`_ for more GUI oriented solutions).
@@ -259,8 +311,8 @@ This package provides:
 Repeated warning (`Warnings`_): this package is currently only supported on Windows 
 (tested on Windows 10) and Mac OS X (tested on High Sierra).
 
-Pre-requisites
---------------
+Installation and Set Up
+========================
 
 * Download and install Python 3.7+ from www.python.org. (I'd recommend 3.7.3, which is 
   what I'm using).
@@ -279,6 +331,9 @@ Pre-requisites
        ~/Documents/RS_Stuff
        ~/Documents/RS_Stuff/Env
        ~/Documents/RS_Stuff/Working
+
+I will continue to use these directory paths for the remainder of this document. Please
+adjust your paths to reflect your own set up.
 
 * Set up a python virtual environment for rsrtools and install the package via pip. If
   you are unfamiliar with python, follow these steps:
@@ -307,31 +362,166 @@ Pre-requisites
   3. Exit the command window.
 
 Set up a Testing Profile!
--------------------------
+===========================
 
 Until you are confident that this package is working properly, I **strongly** suggest
-you do some testing on a temporary Rocksmith profile. I'd also suggest testing all new
-song list filters on the temporary profile before applying them to your main profile.
+you use a temporary testing Rocksmith profile. I'd also suggest trying all new song list
+imports/filters on the testing profile before applying them to your main profile.
 
 The process I follow for testing changes before applying them to my main profile is:
 
 - Create the Testing profile (described in this section).
 
 - Clone my profile into the Testing profile. This is very useful if you want to test 
-  song lists based on played counts, score attack, mastery, etc. The command line
-  work flow in the following section explains how to clone your profile.
+  song lists based on played counts, score attack, mastery, etc. The next section
+  explains how to clone your profile.
 
-- Try out the song filters on the Testing profile.
+- Try out the song list filters/imports on the Testing profile.
 
-The process for setting up a temporary profile is as easy as it sounds:
+The process for setting up a temporary profile is about as easy as it gets:
 
 a. Start Rocksmith.
 
 b. At the Select Profile Menu, click New Profile, name the profile and go through set up
    (the set up step can't be avoided unfortunately).
 
-Command line work flow summary
-===============================
+Clone Profile
+==================
+
+**Optional, but recommended**. Clone data into the Testing profile. If you clone data
+from your main profile, you can test out the song list filters/imports before 
+overwriting the song lists in your main profile.
+
+I'll assume we are cloning data in the Steam account with description 
+``'12345678', (HalfABee [eric])`` and we want to clone the profile 
+``'Eric the Half a Bee'`` into ``'Testing'``. This will replace all data in the 
+Testing profile.
+
+There are two ways to access profile cloning. Both require that you activate your python
+environment first. As ever, adjust paths to reflect your own set up.
+
+1. From the profile manager command line for Windows::
+
+        Call "D:\RS_Stuff\Env\Scripts\Activate.bat"
+        profilemanager --clone-profile "D:\RS_Stuff\Working
+
+   Or, for Mac OS X::
+
+        . ~/Documents/RS_Stuff/Env/scripts/activate
+        profilemanager --clone-profile ~/Documents/RS_Stuff/Working
+
+   Select Steam account '12345678' for profile cloning.
+
+2. From the songlists command line for Windows::
+
+        Call "D:\RS_Stuff\Env\Scripts\Activate.bat"
+        songlists "D:\RS_Stuff\Working"
+
+   Or, for Mac OS X::
+
+        . ~/Documents/RS_Stuff/Env/scripts/activate
+        songlists ~/Documents/RS_Stuff/Working
+
+   Select the 'Change/select Steam account id' menu option, and then select Steam
+   account '12345678' for profile cloning.
+
+   Select the 'Utilities' option, and then select the 'Clone profile' option. 
+
+In either case, you should now have the profile cloning menu up.
+
+**Make sure you get the next two right**. Cloning destroys data in the profile you are
+copying to (the target).
+
+Select the source profile for cloning. For the tutorial, I'm copying **FROM** 
+'Eric the Half a Bee'.
+
+Select the target profile for cloning. For the tutorial, I'm copying **TO** 
+'Testing'.
+
+A yes/non confirmation message will pop up. Check that the cloning operation is
+doing what you expect, and if so choose y.
+
+Return to the main menu and exit the program. If you are asked, there is no need to save
+config changes this time.
+
+Now is a good time to start up Rocksmith and check the Testing profile:
+
+* To see that it still works after cloning.
+
+* To check that the data from your main profile has been copied in correctly.
+
+Importing Songs from rs-manager
+=================================
+
+This section explains how to use the importrsm command line program to read
+song lists created by `rs-manager <https://github.com/sandiz/rs-manager>`_, and then
+write these song lists to a Rocksmith profile. I am expecting this will be the 
+main use case use for most rsrtools users. 
+
+Repeating an important warning (`Warnings`_): **Don't run this package at the same time
+as  Rocksmith is running.** You'll end up crossing the save files and nobody will be
+happy (mostly you though).
+
+For this section, I'll assume you have created a couple of song lists with rs-manager,
+and that the files ``list1.json``, ``list2.json``, ``list3.json`` have been saved to
+your working directory (and as before this is either ``D:\RS_Stuff\Working`` or 
+``~/Documents/RS_Stuff/Working``).
+
+Running the rs-manager importer is straightforward - you need to activate your python
+environment and run importrsm with a working directory and a set of command line
+options. For Windows, this looks like::
+
+        Call "D:\RS_Stuff\Env\Scripts\Activate.bat"
+        importrsm "D:\RS_Stuff\Working" <options>
+
+Or, for Mac OS X::
+
+        . ~/Documents/RS_Stuff/Env/scripts/activate
+        importrsm ~/Documents/RS_Stuff/Working <options>
+    
+I'll go through each of the options in turn. First up, you can specify one or more song
+lists to import. Each song list is specified as either::
+
+      -sl <destination> <filename>
+      --song-list <destination> <filename>
+
+<destination> is the destination for the song list, and must be F for Favorites or a
+number from 1-6 for those song lists, and <filename> is the name of the rs-manager
+song list/set list file. For example::
+
+    -sl F list2.json -sl 3 list3.json -sl 2 list1.json
+
+will write the songs in list2.json to Favorites, list3.json to song list 3 and 
+list1.json to song list 2. If you don't supply any additional arguments, importrsm will
+start an interactive process to select a Steam account and the Rocksmith profile that
+will be updated with the new song lists.
+
+If you'd rather not deal with the interactive account process, you can use the following
+options to specify a Steam account and Rocksmith profile::
+
+    -a <Steam_account_identifier>
+    --account-id <Steam_account_identifier>
+    -p <profile_name>
+    --profile <profile_name>
+
+importrsm is relatively smart about Steam_account_identifier - this can be an account
+name, and account alias, an 8 digit account id or a 17 digit Steam id. Profile name
+must the be name as used in Rocksmith.
+
+Finally, you can use ``--silent`` to disable logging and interactive prompts (but then
+you must provide at least one song list specification and Steam account and Rocksmith
+profile arguments), and ``--no-check`` to disable checking of song key strings. 
+
+For more details on these options, consult the help for importrsm::
+
+    importrsm -h
+
+Creating Song Lists with rsrtools
+=====================================
+
+This section explains how to use the songlists command line program to generate
+song lists from pre-defined filters, and how to write these song lists to a Rocksmith
+profile. The following sections explain how to set up these filters.
 
 Repeating an important warning (`Warnings`_): **Don't run this package at the same time
 as  Rocksmith is running.** You'll end up crossing the save files and nobody will be
@@ -373,13 +563,9 @@ Preliminaries
    I normally drop the xml file into my working directory - this allows automatic 
    loading of the arrangement data into the database.
 
-3. Optional, but strongly recommended: Create a temporary/testing profile so that you 
-   can get comfortable with how this package works on Rocksmith save files (I use this
-   approach any time I'm experimenting with major changes). See the previous section for
-   a description of this process.
-
-   For this tutorial, I'll assume the test profile is called 'Testing'. I'll go through
-   the steps to clone data from your normal profile into the test profile later on.
+3. Optional, but strongly recommended: Create a temporary/testing profile and clone your
+   main profile into it - see `Set up a Testing Profile!`_ and `Clone Profile`_ for 
+   details.
 
 4. Because I'm lazy, at this point I put together a batch file in the working 
    directory. Let's call it 'song_lists.bat' and put the following lines in it::
@@ -394,7 +580,6 @@ Preliminaries
         . ~/Documents/RS_Stuff/Env/scripts/activate
         songlists ~/Documents/RS_Stuff/Working
         deactivate
-
 
    You will need to edit your paths to match where you have put your python environment
    and your working directory.
@@ -495,43 +680,9 @@ Preliminaries
 
    If your working directory doesn't match this, try this step again.
 
-Clone Profile
--------------
 
-**Optional, but recommended**. Clone data into the Testing profile. If you clone data
-from your main profile, you can test out the song list filters before overwriting
-the song list in your main profile.
-
-I'll assume we are cloning data from the profile 'Eric the Half a Bee' into 
-'Testing'. This will replace all data in the Testing profile.
-
-Run the batch file.
-
-Select the utilities sub-menu, and then select Clone profile.
-
-Make sure you get the next two right. Cloning destroys data in the profile you are
-copying to (the target).
-
-Select the source profile for cloning. For the tutorial, I'm copying **FROM** 
-'Eric the Half a Bee'.
-
-Select the target profile for cloning. For the tutorial, I'm copying **TO** 
-'Testing'.
-
-A yes/non confirmation message will pop up. Check that the cloning operation is
-doing what you expect, and if so choose y.
-
-Return to the main menu and exit the program. No need to save config changes this
-time.
-
-Now is a good time to start up Rocksmith and check the Testing profile:
-
-* To see that it still works after cloning.
-
-* To check that the data from your main profile has been copied in correctly.
-
-Song List Testing
-------------------
+Generating and Saving Song Lists
+-----------------------------------
 
 The package is now set up with a default configuration, which you can use for some
 basic testing before creating your own song list filters - or you can skip this step
@@ -1014,6 +1165,10 @@ For Windows::
         profilemanager
         profilemanager.exe
 
+        py -m rsrtools.importrsm
+        importrsm
+        importrsm.exe
+
 For Mac OS X::
 
         python3 -m rsrtools.songlists.lists
@@ -1021,6 +1176,9 @@ For Mac OS X::
 
         python3 -m rsrtools.files.profilemanager
         profilemanager
+
+        python3 -m rsrtools.importrsm
+        importrsm
 
 Sidebar: Rocksmith Save File Editing
 ======================================
@@ -1039,7 +1197,22 @@ github issues).
 Profile Editing Examples
 --------------------------
 
-The RSProfileManager class provides two simple examples of profile editing:
+The best example of a save file editor is importrsm.py - I deliberately structured this
+module to act as sample/template for editors using the RSProfileManager class. The 
+main() function is structured as follows:
+
+- Argument parsing.
+
+- Loading and validating data.
+
+- Selecting Steam account and Rocksmith profile.
+
+- Calls to functions that demonstrate the two ways of modifying save data (detailed in
+  the next section).
+
+- Writing updates to the working folder, and then moving the updated files to steam.
+
+The RSProfileManager class provides two more simple examples of profile editing:
 
 - ``RSProfileManager.cl_set_play_counts()``, which is a command line mechanism 
   for setting the 'Learn a Song' play counts for one or more song arrangements.
@@ -1054,10 +1227,10 @@ profile manager help, which can be obtained from the command line::
 The song list creator also uses the profile manager to obtain player data and to write
 song lists into player profiles.
 
-These methods either a) implement very small changes to save files with a lot of
-care to maintain Rocksmith formats (see `Notes on Formats`_), or b) replace Rocksmith
-data with Rocksmith data. Consequently their implementations are buried within classes
-used by the profile manager.
+Aside from importrsm, these methods either a) implement very small changes to save files
+with a lot of care to maintain Rocksmith formats (see `Notes on Formats`_), or b) 
+replace Rocksmith data with Rocksmith data. Consequently their implementations are
+buried within classes used by the profile manager.
 
 Roll Your Own Editor
 ----------------------
@@ -1069,12 +1242,15 @@ methods::
     RSProfileManager.set_json_subtree()
     RSProfileManager.mark_as_dirty()
 
-Before explaining these methods, please note that I haven't yet done any testing of
-these three methods - they are so simple that they should work out of the box, but bugs
-are possible, so please be careful with your save files. If you want a somewhat
-safer path for changes, please make a feature request on github and we'll see what we
-can work up. I will do some testing when I add a demonstration utility in a future 
-release (specifically, the feature request to delete progress for specified CDLCs).
+``importrsm.py`` illustrates how to use these methods in the functions: 
+``import_faves_by_replace`` and ``import_song_lists_by_mutable``. To date, this is the
+only place I have used (and tested) these get/set json routines. As these routines are
+very simple, I would expect them to work without problem in other applications. However,
+given the limited testing, bugs are possible, so please be careful with your save files
+(in case you haven't heard it before - use a Testing profile!). 
+
+(If you want a somewhat safer path for changes to Rocksmith save files, please make a
+feature request on github and we'll see what we can work up. )
 
 I also suggest you review the `Notes on Formats`_ section which discusses how to ensure
 any edits you make conform as closely as possible to the Ubisoft file format (and hence
@@ -1143,7 +1319,7 @@ not human readable).
 rsrtools includes facilities to export the JSON objects as text. The simplest method
 is to run the command line tool::
 
-        profilemanager --dump-profile <path_to_working_directory>
+        profilemanager --dump-profile <path_to_your_working_directory>
 
 This tool will ask you to select a steam account and a Rocksmith profile and then
 will export the profile data into the working directory as '<profile_name>.json'.
@@ -1174,6 +1350,9 @@ The things that I pay particular attention to are:
   by Rocksmith. You will need to apply a similar approach to convert floats to a 
   6 digit Decimal (I haven't needed to do this yet). 
 
+  For an implementation example, see ``set_arrangement_play_count()`` in the 
+  ``RSProfileManager`` class.
+
 Note that rsrtools imports all numeric values as Decimal types, and I would recommend
 that you ensure any edits you apply to numeric values in the JSON dictionary also have
 a Decimal type to ensure decimal precision is maintained in the profile (rsrtools
@@ -1194,13 +1373,15 @@ TODO
 Changelog
 ==========
 
-**0.1.3beta 2019-xx-xx** 
+**0.2.0beta 2019-05-01** 
 
 - Added field reports to song list cli, moved steam.py.
 
 - Fixed a major oversight and added an export profile as json method to profile manager.
 
-- Added entry points for profilemanager and songlists.
+- Added a command line importer for song lists/set lists exported from rs-manager.
+
+- Added entry points for profilemanager, songlists and importrsm.
 
 **0.1.2beta 2019-04-26** Mac OS X support added. 
 
