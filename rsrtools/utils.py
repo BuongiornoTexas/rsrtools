@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Provide utilities for rsrtools."""
 
 # cSpell:ignore HKEY, rsrpad

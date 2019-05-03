@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Provide steam related utilities for rsrtools."""
 
 # Consider creating separate classes if these become extensive

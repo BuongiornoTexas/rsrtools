@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Provides classes for managing a group of Rocksmith save files owned by a Steam user.
 
 The primary public class is RSProfileManager. The other classes are helpers that support

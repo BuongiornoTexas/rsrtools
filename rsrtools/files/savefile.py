@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Provides a class (RSSaveFile) for loading and saving Rocksmith save files.
 
 I do not recommend using this class on its own, as it does not provide any protection

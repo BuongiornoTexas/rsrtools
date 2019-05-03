@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 """Provide methods and classes for creating and querying a song arrangement database.
 

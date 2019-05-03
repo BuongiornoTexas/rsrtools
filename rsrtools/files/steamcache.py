@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Provides classes for managing Steam cloud metadata files (remotecache.vdf).
 
 Refer to class SteamMetadata for further detail/definitions.

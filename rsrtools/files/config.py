@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Provide shared constants and definitions for Rocksmith files and profiles."""
 
 from enum import Enum

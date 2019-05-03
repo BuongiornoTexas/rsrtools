@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Provide a basic Rocksmith importer for set lists created by rs-manager.
 
 As the functionality of this module is straightforward and linear, I have provided

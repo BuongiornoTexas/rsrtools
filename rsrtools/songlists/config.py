@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 """Provide type aliases, shared strings and JSON schemas used by song list creator."""
 

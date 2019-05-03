@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 """Provide SongListCreator, which is the main class of the rsrtools package.
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 """Provide song list creator configuration dataclasses and supporting elements."""
 
