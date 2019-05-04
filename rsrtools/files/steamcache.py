@@ -130,6 +130,11 @@ class SteamMetadata:
         else:
             # this really, really shouldn't happen implies a corrupt Steam cache
             # file/file with missing keys.
+            # Actually, not quite true - Steam can be a bit inconsistent on keyword
+            # casing - if this error is thrown, it should be the first thing to 
+            # investigate. However, I've sampled about 15 remotecache.vdf files
+            # and they do all seem to use lower case keys. So for now, I'm
+            # just going to assume this will keep working.
             raise KeyError(f"Steam metadata entry does not exist for key {key.name}.")
 
     def _cloud_file_metadata_set(self, app_id: str, file_path: Path) -> Dict:

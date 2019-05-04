@@ -22,6 +22,11 @@ Rocksmith PSARC structure.
 News and Breaking Changes
 ==========================
 
+As of version `2.1.3 <https://github.com/sandiz/rs-manager/releases/tag/v2.1.3>`_,  
+rs-manager integrates rsrtools support out of the box. This means you can install 
+rs-manager and rsrtools, and then export set lists/song list directly from rs-manager 
+into your Rocksmith profile.
+
 **0.2.0** This release provides a command line tool for importing song lists/set lists
 exported from `rs-manager <https://github.com/sandiz/rs-manager>`_. With this
 functionality, you can take advantage of rs-manager's flexible GUI to generate set lists,
@@ -79,8 +84,8 @@ TL:DNR
 
 If you know what you are doing with python, here are the recommended quick start steps.
 
-Installation and Set Up
-----------------------------
+Installation and Basic Set Up
+------------------------------
 
 0. The package only works on Windows and Mac OS X for now.
 
@@ -110,6 +115,13 @@ Installation and Set Up
 
    Profile cloning is destructive - make sure you get your source and your target
    correct! 
+
+Running importrsm from rs-manager
+----------------------------------
+
+Go to settings and check that the path to importrsm is correct. After that, you should
+be able to use the rs-manager export buttons to save set lists/song lists to a Rocksmith
+profile.
 
 Using importrsm
 ------------------
@@ -156,6 +168,62 @@ After this, the steps are:
 
 3. Try out the test filters, reports and song lists, and then move on to creating your
    own in ``config.toml``. Remember to use your test profile!
+
+Python Entry Points
+====================
+
+**New in 0.2.0**. The package supports, and this documents assumes, use of python entry
+points for the profile manager, the song list creator, and the song list importer.
+
+This means you can run these tools by specifying an explicit path to the location you
+have installed them into. For example, for a Windows install to ``D\RS_Stuff\Env``, the
+commands are::
+
+        D:\RS_Stuff\Env\songlists.exe
+        D:\RS_Stuff\Env\profilemanager.exe
+        D:\RS_Stuff\Env\importrsm.exe
+
+Or, for a Mac OS X install to ``~/Documents/RS_Stuff/Env``::
+
+        ~/Documents/RS_Stuff/Env/songlists.exe
+        ~/Documents/RS_Stuff/Env/profilemanager.exe
+        ~/Documents/RS_Stuff/Env/importrsm.exe
+
+If you'd rather use python directly, or if you don't want to type command paths, you
+will need to *activate your virtual environment* and use one of the following command
+forms. For Windows::
+
+        py -m rsrtools.songlists.songlists
+        songlists
+        songlists.exe
+
+        py -m rsrtools.files.profilemanager
+        profilemanager
+        profilemanager.exe
+
+        py -m rsrtools.importrsm
+        importrsm
+        importrsm.exe
+
+For Mac OS X::
+
+        python3 -m rsrtools.songlists.lists
+        songlists
+
+        python3 -m rsrtools.files.profilemanager
+        profilemanager
+
+        python3 -m rsrtools.importrsm
+        importrsm
+
+The sections on `Installation and Set Up`_, 
+`Importing Song Lists Created by rs-manager`_, 
+and `Creating Song Lists with rsrtools`_ explain how to set up and activate virtual
+environments. 
+
+You can use whichever approach works better for you. The remainder of the document 
+assumes environment activation and commands without paths, but in practice, I tend to 
+alternate depending on what I'm doing. 
 
 Motivation
 ==========
@@ -272,16 +340,18 @@ Alternatives
 
 2. rs-manager (https://github.com/sandiz/rs-manager) is a GUI application that can 
    create set lists manually or from procedural filtering similar to rsrtools. It is a
-   much friendlier way to generate song/set lists than rsrtools. The rs-manager 
-   set lists are for reference only (i.e. rs-manager does not support loading set
-   lists into Rocksmith save files).
+   much friendlier way to generate song/set lists than rsrtools. @sandiz, the 
+   rs-manager developer, has implemented functionality to run rsrtools from within 
+   rs-manager. This process is described below (`rs-manager Song List Export`_), and is
+   likely to be the recommended use case for most people.
    
-   *However*, @sandiz, the rs-manager developer, has implemented functionality to export 
-   rs-manager set lists in a format that can be used by rsrtools. As of 0.2.0, rsrtools
-   allows loading of these set lists into Rocksmith save files. So we now have a work
-   flow where set lists can be generated using the rs-manager GUI and then exported for
-   loading into Rocksmith by rsrtools (bypassing the joys of setting up text filters for
-   rsrtools).
+   Alternatively, rs-manager can export set lists in a format that can be used by 
+   rsrtools. As of 0.2.0, rsrtools allows loading of these set lists into Rocksmith save
+   files. This allows a work flow where set lists can be generated using the rs-manager
+   GUI and then exported for loading into Rocksmith by rsrtools (bypassing the joys of
+   setting up text filters for rsrtools). This process is a manual version of the 
+   process used by rs-manager, so is only of interest to those who want fine grained
+   control of the process.
 
 That's the Long Intro over. 
 
@@ -450,13 +520,29 @@ Now is a good time to start up Rocksmith and check the Testing profile:
 
 * To check that the data from your main profile has been copied in correctly.
 
-Importing Songs from rs-manager
-=================================
+rs-manager Song List Export
+=============================
+
+This section describes using `rs-manager <https://github.com/sandiz/rs-manager>`_
+to export a set list/song list directly into a Rocksmith profile. I am expecting this
+will be the main use case use for most rsrtools users. 
+
+0. Install both rsrtools and rs-manager.
+
+1. Start rs-manager.
+
+2. Go to settings and check that the path to importrsm is correct. 
+
+3. Go to Set Lists, pick a set list, hit the export button, and follow the prompts
+
+That's it!
+
+Importing Song Lists Created by rs-manager
+===========================================
 
 This section explains how to use the importrsm command line program to read
-song lists created by `rs-manager <https://github.com/sandiz/rs-manager>`_, and then
-write these song lists to a Rocksmith profile. I am expecting this will be the 
-main use case use for most rsrtools users. 
+song lists created and exported by `rs-manager <https://github.com/sandiz/rs-manager>`_,
+and then write these song lists to a Rocksmith profile.
 
 Repeating an important warning (`Warnings`_): **Don't run this package at the same time
 as  Rocksmith is running.** You'll end up crossing the save files and nobody will be
@@ -1146,39 +1232,6 @@ The way I work around this is to play all of the tracks that I want to show up i
 filter at least once, and then apply a minimum play count criteria. For my use case, 
 this is mainly an issue for E standard arrangements - I don't tend to worry about this
 for the alternate tunings.
-
-Python Entry Points
-====================
-
-**New in 0.1.3**. The package supports, and this documents assumes, use of python entry
-points for the profile manager and the song list creator. If you would prefer to use 
-python directly, here are the command equivalents (in all cases assuming you have 
-*already activated your virtual environment*).
-
-For Windows::
-
-        py -m rsrtools.songlists.songlists
-        songlists
-        songlists.exe
-
-        py -m rsrtools.files.profilemanager
-        profilemanager
-        profilemanager.exe
-
-        py -m rsrtools.importrsm
-        importrsm
-        importrsm.exe
-
-For Mac OS X::
-
-        python3 -m rsrtools.songlists.lists
-        songlists
-
-        python3 -m rsrtools.files.profilemanager
-        profilemanager
-
-        python3 -m rsrtools.importrsm
-        importrsm
 
 Sidebar: Rocksmith Save File Editing
 ======================================
