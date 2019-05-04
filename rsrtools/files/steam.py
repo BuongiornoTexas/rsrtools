@@ -260,12 +260,18 @@ class SteamAccounts:
                     user_path = None
                     valid = False
 
-                name = login_info["AccountName"]
-                persona = login_info["PersonaName"]
-                if login_info["mostrecent"] == "1":
-                    most_recent = ", most recent Steam login"
-                else:
-                    most_recent = ""
+                for key in login_info.keys():
+                    # Deal with variable case in Steam keys. Joy.
+                    loki = key.lower()
+                    if loki == "accountname":
+                        name = login_info[key]
+                    elif loki == "personaname":    
+                        persona = login_info[key]
+                    elif loki == "mostrecent":
+                        if login_info[key] == "1":
+                            most_recent = ", most recent Steam login"
+                        else:
+                            most_recent = ""
 
                 info[account] = SteamAccountInfo(
                     name=name,
