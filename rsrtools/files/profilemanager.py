@@ -561,7 +561,7 @@ class RSProfileDB(RSSaveWrapper):
         super().__init__(file_path.resolve())
 
         self._unique_id = file_path.name.upper()
-        if not self._unique_id.endswith(PROFILE_DB_STR):
+        if not self._unique_id.endswith(PROFILE_DB_STR.upper()):
             raise RSProfileError(
                 f"RSProfileDB objects require a file ending in {PROFILE_DB_STR}."
             )
@@ -1064,6 +1064,8 @@ class RSProfileManager:
             the profile as dirty.
 
         export_json_profile -- Calls save_json_file for a specified profile.
+
+        unique_id_to_profile -- Convert a unique id to a Rocksmith profile name.
 
     RSProfileManager works on a base directory with the following structure:
         base_dir
@@ -1865,6 +1867,38 @@ class RSProfileManager:
                 ret_val.append(name)
 
         return ret_val
+
+    def unique_id_to_profile(self, unique_id: str) -> str:
+        """Convert a unique id to a Rocksmith profile name.
+
+        Arguments:
+            unique_id {str} -- The unique id to be converted. The unique id is assumed
+                to exist for the account.
+
+        Returns:
+            str -- The profile name corresponding to the unique id.
+
+        The method will ignore the case of the unique id. The method will raise a
+        ValueError if the unique id does not exist or if the profile name does not
+        exist.
+
+        """
+        profile_name = ""
+
+        find_id = unique_id.upper()
+        for test_id in self._profiles.keys():
+            if test_id.upper() == find_id:
+                # Found the unique id, let's see if we have a name.
+                profile_name = self._profiles[test_id].player_name
+
+        if not profile_name:
+            raise ValueError(
+                f"Either unique id '{unique_id}' does not exist for account "
+                f"'{self.steam_account_id}',\nor else there is no corresponding "
+                f"profile name."
+            )
+
+        return profile_name
 
     def cl_choose_profile(self, header_text: str, no_action_text: str) -> str:
         """Provide a command line menu for selecting a Rocksmith profile name.

@@ -265,7 +265,7 @@ class SteamAccounts:
                     loki = key.lower()
                     if loki == "accountname":
                         name = login_info[key]
-                    elif loki == "personaname":    
+                    elif loki == "personaname":
                         persona = login_info[key]
                     elif loki == "mostrecent":
                         if login_info[key] == "1":

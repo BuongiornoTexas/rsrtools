@@ -9,18 +9,18 @@ rsrtools profile manager facility.
 If the module complexity increases, I may re-implement in class form.
 """
 
-# cSpell:ignore CDLC, faves, isalnum, isdigit
+# cSpell:ignore CDLC, faves, isalnum, isdigit, prfldb
 
 import argparse
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
 import simplejson
 
-from pathlib import Path
-from typing import Dict, List, Optional
-
+from rsrtools.files.profilemanager import PROFILE_DB_STR, RSProfileManager
+from rsrtools.files.steam import RS_APP_ID, STEAM_REMOTE_DIR, SteamAccounts
 from rsrtools.songlists.config import ListField
 from rsrtools.songlists.database import ArrangementDB
-from rsrtools.files.steam import SteamAccounts
-from rsrtools.files.profilemanager import RSProfileManager
 from rsrtools.utils import yes_no_dialog
 
 # We are going to use the logger all over the place.
@@ -224,8 +224,6 @@ def get_profile_manager(
             flush_working_set=True,
         )
 
-    logger.log_this(f"Loaded Steam account {pm.steam_description(account_id)}")
-
     return pm
 
 
@@ -269,8 +267,6 @@ def select_profile(
                 f"'{input_profile}' is not a valid profile name for' Steam "
                 f"account '{pm.steam_account_id}'"
             )
-
-    logger.log_this(f"Selected profile '{profile}' for song list updates.")
 
     return profile
 
@@ -335,6 +331,53 @@ def import_song_lists_by_mutable(
             pm.mark_as_dirty(profile)
 
 
+def parse_prfldb_path(raw_path: str) -> Tuple[str, str]:
+    """Convert prfldb path into an account id and profile unique id.
+
+    Arguments:
+        path {str} -- A path as described in the argument for --prfldb-path.
+
+    Returns:
+        {Tuple[str, str]} -- A steam account id and the unique profile corresponding to
+            the file in the path.
+
+    """
+    # Eliminate relative path elements, get the path
+    path = Path(raw_path).resolve(False)
+
+    unique_id = path.name
+    if not unique_id.upper().endswith(PROFILE_DB_STR.upper()):
+        raise ValueError(
+            f"Profile db path must end with file name "
+            f"'*<unique_id>{PROFILE_DB_STR}'."
+        )
+
+    unique_id = unique_id[: -len(PROFILE_DB_STR)]
+
+    logger.log_this(f"Found unique id '{unique_id}' from path.")
+
+    path = path.parent
+    for id in (STEAM_REMOTE_DIR, RS_APP_ID):
+        if path.name.upper() == id.upper():
+            path = path.parent
+        else:
+            raise ValueError(
+                f"Path to profile id must have the following elements:"
+                f"<Steam account id>\\{RS_APP_ID}\\{STEAM_REMOTE_DIR}\\<profile name>."
+                f"\nFailed on element '{id}'."
+            )
+
+    account_id = path.name
+    if len(account_id) != 8 or not account_id.isdigit():
+        raise ValueError(
+            f"Steam account id must be 8 digits. '{account_id}' is invalid."
+        )
+
+    logger.log_this(f"Found account id '{account_id}' from path.")
+
+    return account_id, unique_id
+
+
 def main() -> None:
     """Provide command line entry point for rsm importer."""
     parser = argparse.ArgumentParser(
@@ -363,6 +406,18 @@ def main() -> None:
         help="The name of the profile that the song list will be written to. If "
         "omitted, an interactive selection will be triggered.",
         metavar="<profile_name>",
+    )
+
+    parser.add_argument(
+        "--prfldb-path",
+        help="The path to a target Rocksmith profile. This option is provided as a "
+        "helper function for rs-manager. The path should be of the form: "
+        "<steam path>/userdata/<account id>/221680/remote/<profile name>. Everything "
+        "up to to ...userdata/ is optional and will be ignored. The profile name must "
+        "end in _prfldb (case insensitive). If the path does not correspond to a valid "
+        "account and profile, an exception will be raised. Finally, the prfldb_path "
+        "option cannot be used with either --profile or --account-id.",
+        metavar="<profile_path>",
     )
 
     parser.add_argument(
@@ -431,9 +486,31 @@ def main() -> None:
 
     # Now we have a valid set of song lists, so the next thing is to get the
     # steam account id and set up the profile manager.
-    pm = get_profile_manager(args.account_id, args.silent, working)
+    if args.prfldb_path is not None and (
+        args.account_id is not None or args.profile is not None
+    ):
+        raise ValueError(
+            "--prfldb-path can't be used at the same time as either --account-id "
+            "or --profile.\n    (--account-id and --profile can be used together.)"
+        )
 
-    profile = select_profile(pm, args.profile, args.silent)
+    if args.prfldb_path is not None:
+        account_id, unique_id = parse_prfldb_path(args.prfldb_path)
+
+    else:
+        account_id = args.account_id
+        unique_id = ""
+
+    pm = get_profile_manager(account_id, args.silent, working)
+
+    if unique_id:
+        profile = pm.unique_id_to_profile(unique_id)
+        logger.log_this(f"Unique id '{unique_id}' corresponds to profile '{profile}'.")
+    else:
+        profile = select_profile(pm, args.profile, args.silent)
+
+    logger.log_this(f"Loaded Steam account {pm.steam_description(pm.steam_account_id)}")
+    logger.log_this(f"Selected profile '{profile}' for song list updates.")
 
     # and now we can write the updates.
     # This could all be done in the one routine, but I wanted to demonstrate
