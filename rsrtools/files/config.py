@@ -16,5 +16,5 @@ class ProfileKey(Enum):
     SONGS = "Songs"
     SONG_LISTS = "SongLists"
     SONG_LISTS_ROOT = "SongListsRoot"
-    SONG_SA = "SongSA"
+    SONG_SA = "SongsSA"
     STATS = "Stats"  # cSpell:disable-line

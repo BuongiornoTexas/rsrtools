@@ -1267,10 +1267,15 @@ main() function is structured as follows:
 
 The RSProfileManager class provides two more simple examples of profile editing:
 
-- ``RSProfileManager.cl_set_play_counts()``, which is a command line mechanism 
-  for setting the 'Learn a Song' play counts for one or more song arrangements.
+- ``RSProfileManager.cl_edit_action()`` and ``RSProfileManager.set_play_counts()``, 
+  which provide a command line mechanism for setting the 'Learn a Song' play counts for
+  one or more song arrangements.
 - ``RSProfileManager.cl_clone_profile()``, which is a command line mechanism for
   cloning a player data from one profile into another (a destructive copy). 
+
+(For a more brutal edit style, command line arrangement id deletion is implemented by:
+``RSProfileManager.cl_edit_action()`` and 
+``RSProfileManager.delete_profile_arrangements()``.)
 
 Both of these routines can be run from the command line. For further details see the
 profile manager help, which can be obtained from the command line::

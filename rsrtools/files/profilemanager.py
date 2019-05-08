@@ -8,39 +8,42 @@ For command line options (database setup, reporting), run:
     'python -m rsrtools.files.profilemanager -h'
 """
 
-# cSpell:ignore shutil, PRFLDB, mkdir, strftime
+# cSpell:ignore shutil, PRFLDB, mkdir, strftime, nargs
 
 import argparse
-import time
 import copy
 import logging
 import shutil
+import time
 from decimal import Decimal
-from zipfile import ZipFile
-from typing import (
-    cast,
-    Dict,
-    Sequence,
-    Union,
-    Tuple,
-    Optional,
-    Any,
-    Iterator,
-    Set,
-    List,
-)
-from pathlib import Path
 from os import fsdecode
+from pathlib import Path
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
+from zipfile import ZipFile
+
+import simplejson
 
 from rsrtools import utils
+from rsrtools.files.config import MAX_SONG_LIST_COUNT, ProfileKey
+from rsrtools.files.savefile import RSJsonRoot, RSSaveFile
 from rsrtools.files.steam import (
-    SteamAccounts,
-    SteamMetadataError,
     RS_APP_ID,
     STEAM_REMOTE_DIR,
+    SteamAccounts,
+    SteamMetadataError,
 )
-from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
-from rsrtools.files.savefile import RSSaveFile, RSJsonRoot
 from rsrtools.files.steamcache import SteamMetadata
 
 # Rocksmith meta data file. Ties profile name to profile id.
@@ -1984,12 +1987,117 @@ class RSProfileManager:
             if int(self.steam_account_id) > 0:
                 self.move_updates_to_steam(self.steam_account_id)
 
-    def cl_set_play_counts(self, play_count_file_path: Path) -> None:
+    def delete_profile_arrangements(
+        self, target: str, arrangement_path: Optional[Path]
+    ) -> None:
+        """Delete some arrangements from a profile (very primitive).
+
+        Arguments:
+            target {str} -- The target profile.
+            arrangement_path {Optional[Path]} -- Path to file. If None, the user
+                will be prompted to provide one or more arrangement ids for deletion.
+
+        Mostly intended for tidying up arrangements that have been deleted from the
+        library. Use with **extreme** caution (I suggest you really want to know
+        how your save file works and how to restore a backup).
+
+        If provided, this method expects the file to contain one arrangement id per
+        line.
+
+        """
+        arrangements: List[str] = list()
+        if arrangement_path is None:
+            # interactive version
+            while True:
+                arr = input(
+                    "Enter and arrangement id, 'w' to apply edits, or 'a' to abort> "
+                )
+                arr = arr.strip()
+                if arr == "a" or arr == "A":
+                    raise RSProfileError("User aborted arrangement deletion.")
+                elif arr == "w" or arr == "W":
+                    break
+
+                arrangements.append(arr)
+
+        else:
+            with arrangement_path.open("rt") as fp:
+                for line in fp:
+                    arr = line.strip()
+                    if arr:
+                        arrangements.append(arr)
+
+        # get the whole dict - we want to do some careful checks here.
+        json_dict = self._profiles[target].json_tree
+
+        changed = False
+        json_str = simplejson.dumps(json_dict).upper()
+        for arr in arrangements:
+            count = json_str.count(arr.upper())
+            if count == 0:
+                print(f"'{arr}' not found. Skipping.")
+
+            # make json_path dynamic as a workaround for mypy issue #4975
+            json_path: Any
+            for json_path in (
+                (ProfileKey.PLAY_NEXTS, ProfileKey.SONGS),  # cSpell: disable-line
+                (ProfileKey.SONGS,),
+                (ProfileKey.STATS, ProfileKey.SONGS),  # cSpell: disable-line
+                (ProfileKey.SONG_SA,),
+            ):
+                parent = json_dict
+                for key in json_path:
+                    parent = parent[key.value]
+                    data = parent.pop(arr, None)
+                    if data is not None:
+                        print(f"Deleted '{arr}' from {json_path}'.")
+                        count = count - 1
+                        changed = True
+
+            if json_dict["Achievements"]["SongStreakID"] == arr:
+                # This shouldn't happen often, so I'm not going to figure out a
+                # solution.
+                print(
+                    "\nWARNING: One of the arrangement ids you want to delete was the "
+                    "last song played."
+                    "\nThis is used for streak tracking, and I do not have a "
+                    "guaranteed safe way to fix this."
+                    "\nYour options are:"
+                    "\n\n    1) Play it safe. Exit the program, play a song that you "
+                    "are not deleting in Score Attack,"
+                    "\n       and then try again (Recommended)."
+                    "\n\n    2) Continue with the deletion."
+                    "\n       This will *probably* be fine, but isn't guaranteed."
+                    "\n"
+                )
+
+                if utils.yes_no_dialog(
+                    "'y' to take the safe option (exit), 'n' to continue with deletion."
+                ):
+                    raise RSProfileError("User aborted arrangement deletion.")
+                else:
+                    count = count - 1
+
+            if count != 0:
+                raise RSProfileError(
+                    f"Not all keys for '{arr}' deleted. {count} "
+                    f"keys in unknown/unexpected locations in profile."
+                    f"\nPlease raise an issue on the rsrtools github pages."
+                )
+
+        if changed:
+            self._profiles[target].mark_as_dirty()
+
+    def edit_play_counts(
+        self, target: str, play_count_file_path: Optional[Path]
+    ) -> None:
         """Set some arrangement play counts for a profile (very primitive).
 
         Arguments:
-            play_count_file_path {Path} -- Path to test file containing arrangement ids
-                and play counts.
+            target {str} -- The target profile.
+            play_count_file_path {Optional[Path]} -- Path to file. Will raise a
+                ValueError if missing (Optional required as it follows an interface
+                definition).
 
         Mostly intended for tidying up arrangements that have been played once only,
         and need resetting to zero. The method will use a command line menu to get
@@ -1997,16 +2105,48 @@ class RSProfileManager:
 
         This method expects the path to a file containing:
             <arrangement id>, <play count>
-        on each line. It has no error management, but only writes after processing the
-        entire file.
+        on each line.
+
+        """
+        if play_count_file_path is None:
+            raise ValueError("Invalid play count path (None).")
+
+        with play_count_file_path.open("rt") as fp:
+            for arr_line in fp:
+                arr_id, count = arr_line.split(",")
+                arr_id = arr_id.strip()
+                count = count.strip()
+                print(arr_id, count)
+                self.set_arrangement_play_count(target, arr_id, int(count))
+
+    def cl_edit_action(
+        self, edit_action: Callable, data_file_path: Optional[Path]
+    ) -> None:
+        """Select a profile and run an edit action on the profile.
+
+        Arguments:
+            edit_action {Callable}: A function with a signature matching
+                set_profile_play_counts and delete_profile_arrangements.
+                (e.g. self.set_profile_play_counts). This action will be called using
+                the selected profile and the supplied path. NOTE THAT THE EDIT ACTION
+                SHOULD NOT WRITE FILES!
+            data_file_path {Optional[Path} -- Path to file containing data for
+                the action.
+
+        This method has no error management, and only writes after performing the edit
+        action.
+
         """
         target = self.cl_choose_profile(
             no_action_text="Exit.",
-            header_text="Which profile do you want to apply play count changes to?",
+            header_text="Which profile do you want to apply changes to?",
         )
 
         if not target:
             return
+
+        # do the edit action - write won't occur until confirmation below
+        edit_action(target, data_file_path)
 
         if int(self.steam_account_id) > 0:
             dlg = (
@@ -2017,19 +2157,10 @@ class RSProfileManager:
             dlg = "\nand write these changes to the update directory."
 
         dlg = (
-            f"Please confirm that you want to apply arrangement count changes to "
-            f"profile '{target}'{dlg}"
+            f"Please confirm that you want to apply changes to profile '{target}'{dlg}"
         )
 
         if utils.yes_no_dialog(dlg):
-            with play_count_file_path.open("rt") as fp:
-                for arr_line in fp:
-                    arr_id, count = arr_line.split(",")
-                    arr_id = arr_id.strip()
-                    count = count.strip()
-                    print(arr_id, count)
-                    self.set_arrangement_play_count(target, arr_id, int(count))
-
             self.write_files()
             if int(self.steam_account_id) > 0:
                 self.move_updates_to_steam(self.steam_account_id)
@@ -2079,6 +2210,16 @@ def main() -> None:
         metavar="play_count_file_path",
     )
     group.add_argument(
+        "--delete-arrangements",
+        help="After interactive selection of Steam account and Rocksmith profile, "
+        "deletes arrangements. If the optional file path is specified, each line "
+        "in this file must be an arrangement id. If the file path is not specified, "
+        "the user will be prompted for arrangement ids interactively.",
+        nargs="?",
+        const="",
+        metavar="arrangements_file_path",
+    )
+    group.add_argument(
         "--dump-profile",
         help="After interactive selection of Steam account and Rocksmith profile, "
         "exports selected profile as a text JSON file in the working directory."
@@ -2096,7 +2237,17 @@ def main() -> None:
         pm.cl_clone_profile()
 
     elif args.set_play_counts is not None:
-        pm.cl_set_play_counts(Path(args.set_play_counts))
+        pm.cl_edit_action(pm.edit_play_counts, Path(args.set_play_counts))
+
+    elif args.delete_arrangements is not None:
+        if not args.delete_arrangements:
+            # This is an interactive run.
+            pm.cl_edit_action(pm.delete_profile_arrangements, None)
+        else:
+            # Path specified.
+            pm.cl_edit_action(
+                pm.delete_profile_arrangements, Path(args.delete_arrangements)
+            )
 
     elif args.dump_profile:
         target = pm.cl_choose_profile(
