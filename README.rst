@@ -1431,6 +1431,8 @@ TODO
 Changelog
 ==========
 
+**0.2.2beta 2019-05-08** Arrangement deletion cli.
+
 **0.2.1beta 2019-05-05** Minor bug fixes, added profile db path option to importrsm.
 
 **0.2.0beta 2019-05-01** 
