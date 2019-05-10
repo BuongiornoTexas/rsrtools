@@ -2214,7 +2214,10 @@ def main() -> None:
         help="After interactive selection of Steam account and Rocksmith profile, "
         "deletes arrangements. If the optional file path is specified, each line "
         "in this file must be an arrangement id. If the file path is not specified, "
-        "the user will be prompted for arrangement ids interactively.",
+        "the user will be prompted for arrangement ids interactively. NOTE: If you "
+        "want to run in interactive mode (no arrangements file), then this should "
+        "be the last argument specified. Otherwise, the argument will eat input it "
+        "shouldn't!",
         nargs="?",
         const="",
         metavar="arrangements_file_path",
