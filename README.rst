@@ -22,6 +22,8 @@ Rocksmith PSARC structure.
 News and Breaking Changes
 ==========================
 
+**Version 0.3.0** provides welder/welder.py for packing and unpacking PSARC files.
+
 As of version `2.1.3 <https://github.com/sandiz/rs-manager/releases/tag/v2.1.3>`_,  
 rs-manager integrates rsrtools support out of the box. This means you can install 
 rs-manager and rsrtools, and then export set lists/song list directly from rs-manager 
@@ -1416,20 +1418,41 @@ that you ensure any edits you apply to numeric values in the JSON dictionary als
 a Decimal type to ensure decimal precision is maintained in the profile (rsrtools
 implements this via the simplejson library, which has handles for Decimal objects).
 
+PSARC Handling
+================
+
+The entry point executable welder(.exe) supports the following PSARC functions:
+
+- Extract: extract single or multiple files from a PSARC archive.
+
+- List: List files in a PSARC.
+
+- Pack: Pack the contents of a directory into a PSARC file.
+
+- Unpack: Unpack a PSARC.
+
+- Verify: Verify a PSARC.
+
+For further options, run ``welder -h`` (many of the options relate to debugging and 
+verification). 
+
+In general, I would recommend using other tools for working with PSARC files (e.g. 
+the Rocksmith Custom Song Tool Kit). I implemented this module to allow scanning of
+PSARC files for metadata and out of curiosity about how the files work. I've done a
+reasonable amount of testing for my purposes, but this is probably insufficient for
+anybody who wants to work on CDLCs. 
+
 TODO
 =====
 - Convert major TODO items to issues.
-
-- Add whatever functionality is needed for rs-manager to use rsrtools as an
-  integration option. 
-
-- Complete PSARC scanner (welder.py).
 
 - Add more substantial documentation on profile manager (for Rocksmith file editing),
   database, and song lists (hooks for GUI implementations).
 
 Changelog
 ==========
+
+**0.3.0beta 2019-05-21** Welder module for PSARC packing/unpacking.
 
 **0.2.2beta 2019-05-08** Arrangement deletion cli.
 
