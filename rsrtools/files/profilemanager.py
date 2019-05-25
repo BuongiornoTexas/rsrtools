@@ -1005,7 +1005,7 @@ class RSFileSet:
 
     @property
     def m_time(self) -> str:
-        """Get data/time of most recently modified Rocksmith profile. Read only.
+        """Get date/time of most recently modified Rocksmith profile. Read only.
 
         Gets:
             str -- Returns the most recent modification date/time for all of the

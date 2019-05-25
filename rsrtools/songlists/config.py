@@ -55,6 +55,10 @@ class ListField(SQLField):
     ARTIST = "Artist"
     TITLE = "Title"
     ALBUM = "Album"
+    # Lead, Rhythm or Bass
+    PATH = "Path"
+    # Representative, Bonus or Alternate
+    SUB_PATH = "SubPath"
 
 
 class RangeField(SQLField):
@@ -77,3 +81,6 @@ class RangeField(SQLField):
     SA_MEDIUM_BADGES = "SAMediumBadges"
     SA_HARD_BADGES = "SAHardBadges"
     SA_MASTER_BADGES = "SAMasterBadges"
+    SONG_LENGTH = "SongLength"
+    # Modified time of the underlying psarc
+    LAST_MODIFIED = "LastModified"

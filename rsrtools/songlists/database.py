@@ -67,9 +67,13 @@ ARRANGEMENT_FIELDS: SQLTableDict = OrderedDict(
         (ListField.ALBUM, "text"),
         (RangeField.YEAR, "integer"),
         (RangeField.TEMPO, "integer"),
+        (ListField.PATH, "text"),
+        (ListField.SUB_PATH, "text"),
         (ListField.TUNING, "text"),
         (RangeField.PITCH, "real"),
         (RangeField.NOTE_COUNT, "integer"),
+        (RangeField.SONG_LENGTH, "real"),
+        (RangeField.LAST_MODIFIED, "real"),
     ]
 )
 
@@ -805,6 +809,12 @@ class ArrangementDB:
                 sql_values[ListField.ALBUM.value] = None
                 sql_values[RangeField.YEAR.value] = None
 
+            # And lastly, the elements we can't get from CFSM
+            sql_values[ListField.PATH.value] = "Not available (run scanner)"
+            sql_values[ListField.SUB_PATH.value] = "Not available (run scanner)"
+            sql_values[RangeField.LAST_MODIFIED.value] = -1
+            sql_values[RangeField.SONG_LENGTH.value] = 0
+
             # At this point we should have value entries for all fields in the table
             self._arrangements_sql.write_row(conn, sql_values)
 
@@ -985,7 +995,7 @@ class ArrangementDB:
         The validator lists created by this method are intended for use in creating song
         lists or UI drop down lists.
 
-        """ 
+        """
         if target is None:
             # Create validators for ALL list fields.
             validators = tuple(ListField)
@@ -1111,6 +1121,11 @@ class ArrangementDB:
             (
                 "Song Keys.         Report unique Rocksmith song keys.",
                 ListField.SONG_KEY,
+            ),
+            ("Path.              Report path types.", ListField.PATH),
+            (
+                "Sub-path type.     Report sub-path.",
+                ListField.SUB_PATH,
             ),
             (
                 "No player data. Diagnostic. Reports on song arrangements that have "

@@ -186,15 +186,16 @@ class SteamAccounts:
 
     def __init__(self) -> None:
         """Initialise steam account data for use."""
-        self._steam_path = self._get_steam_path()
+        try:
+            self._steam_path = self.get_steam_path()
+        except (FileNotFoundError, OSError):
+            self._steam_path = None
 
         self._account_info = self._find_info()
 
     @staticmethod
-    def _get_steam_path() -> Optional[Path]:
-        """Return Steam installation path as a string. Return None if not found."""
-        ret_val = None
-
+    def get_steam_path() -> Path:
+        """Return Steam installation path."""
         # At the moment, this is the only OS dependent code in the package
         if platform == "win32":
             try:
@@ -207,7 +208,7 @@ class SteamAccounts:
             except (OSError, FileNotFoundError):
                 # Looks like we have no steam installation?
                 # Up to the user to decide what to do here.
-                pass
+                raise
 
         elif platform == "darwin":
             # I believe this should work.
@@ -220,7 +221,7 @@ class SteamAccounts:
             except FileNotFoundError:
                 # Looks like we have no steam installation?
                 # Up to the user to decide what to do here.
-                pass
+                raise
 
         else:
             raise OSError(
