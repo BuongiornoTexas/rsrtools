@@ -12,6 +12,8 @@ For command line options (database setup, reporting), run
     'python rsrtools.songlists.database.py -h'.
 """
 
+# cSpell:ignore stat
+
 import sqlite3
 import argparse
 
@@ -38,6 +40,7 @@ from rsrtools.songlists.configclasses import Filter, RSFilterError, SQLClause
 from rsrtools.utils import choose
 from rsrtools.files.config import MAX_SONG_LIST_COUNT
 from rsrtools.files.profilemanager import RSProfileManager, JSON_path_type
+from rsrtools.songlists.scanner import Scanner
 
 # type aliases
 ListValidator = Dict[ListField, List[str]]
@@ -337,6 +340,7 @@ class SQLTable:
         self,
         conn: sqlite3.Connection,
         values: Dict[str, Optional[Union[float, int, str]]],
+        replace: bool = False,
     ) -> None:
         """Write a dictionary of values into a a row in the database.
 
@@ -358,10 +362,22 @@ class SQLTable:
 
                 The method will raise an exception if the primary key does not exist or
                 if the values dictionary does not contain value for the primary key.
+            replace {bool} -- If False (default), the SQL action will be an insert,
+                if True, the SQL action will be INSERT OR REPLACE (i.e. update
+                existing rows).
 
         As this routine should be called repeatedly, the caller is responsible for
         commit and close.
         """
+        if replace:
+            action = "INSERT OR REPLACE INTO"
+        else:
+            action = "INSERT INTO"
+
+        if not self._write_row_script.startswith(action):
+            # Clear cache if mode has changed.
+            self._write_row_script = ""
+
         if not self._write_row_script:
             if self._primary is None:
                 raise RSFilterError(
@@ -382,7 +398,7 @@ class SQLTable:
 
             # Property will raise exception if table name doesn't exist.
             self._write_row_script = (
-                f"INSERT INTO {self.table_name} ("
+                f"{action} {self.table_name} ("
                 f"\n{field_list}"
                 f")"
                 f"\n  VALUES ("
@@ -663,7 +679,10 @@ class ArrangementDB:
             database.
 
         load_cfsm_arrangements -- Replaces all song specific arrangement data with data
-            read from the cfsm xml file.
+            read from the cfsm xml file. Deprecated, due for deletion.
+
+        scan_arrangements -- Update song specific arrangement data with data scanned
+            from psarc files.
 
         load_player_profile -- Replaces all player specific arrangement data in the
             database with data read from the named profile in the profile_manager
@@ -762,6 +781,49 @@ class ArrangementDB:
         """Return True if the player profile table contains one or more records."""
         return self._table_has_data(self._profile_sql.table_name)
 
+    def scan_arrangements(
+        self, last_modified: Optional[float] = None, show_progress: bool = False
+    ) -> float:
+        """Load arrangement table with data scanned from psarc files.
+
+        Arguments:
+            last_modified {Optional[Float]} -- If specified as a float, the arrangements
+                table will be updated with data from files newer than last modified per
+                Path.stat().st_mtime (replacing any existing data). If the default
+                value of None is specified, the table will be dropped and rebuilt.
+            show_progress {bool} -- If True, prints summary progress to stdout every 10
+                arrangements scanned.
+
+        Returns:
+            {float} - The most recent modification time of the files scanned, or
+                0 if no files are scanned.
+
+        """
+        if last_modified is None:
+            self._arrangements_sql.rebuild_table(self.open_db())
+
+        mtime = 0.0
+
+        conn = self.open_db()
+        count = 1
+        for sql_values in Scanner().db_entries(last_modified=last_modified):
+
+            mtime = max(mtime, sql_values[RangeField.LAST_MODIFIED.value])
+            self._arrangements_sql.write_row(conn, sql_values, replace=True)
+
+            if show_progress:
+                if count % 10 == 0:
+                    print(
+                        f"Arrangement {count}, {sql_values[ListField.ARTIST.value]}, "
+                        f"{sql_values[ListField.TITLE.value]}"
+                    )
+                count = count + 1
+
+        conn.commit()
+        conn.close()
+
+        return mtime
+
     def load_cfsm_arrangements(self, cfsm_xml_file: Path) -> None:
         """Read CFSM arrangement file into arrangements table.
 
@@ -769,6 +831,8 @@ class ArrangementDB:
             cfsm_xml_file {pathlib.Path} -- Path to the CFSM ArrangementsGrid.xml file.
 
         Replaces any existing table.
+
+        Deprecated, due for deletion.
         """
         self._arrangements_sql.rebuild_table(self.open_db())
         # create file object from path to keep mypy happy
@@ -1123,10 +1187,7 @@ class ArrangementDB:
                 ListField.SONG_KEY,
             ),
             ("Path.              Report path types.", ListField.PATH),
-            (
-                "Sub-path type.     Report sub-path.",
-                ListField.SUB_PATH,
-            ),
+            ("Sub-path type.     Report sub-path.", ListField.SUB_PATH),
             (
                 "No player data. Diagnostic. Reports on song arrangements that have "
                 "no data in the player profile.",
@@ -1181,8 +1242,14 @@ def main() -> None:
 
     parser.add_argument(
         "--CFSMxml",
-        help="Loads arrangements from CFSM xml file (replaces all existing data).",
+        help="Loads arrangements from CFSM xml file (replaces all existing data). "
+        "This is a deprecated function due for deletion.",
         metavar="Filename",
+    )
+    parser.add_argument(
+        "--scan-songs",
+        help="Loads arrangements from psarc song files (replaces all existing data).",
+        action="store_true",
     )
     parser.add_argument(
         "--update-player-data",
@@ -1206,6 +1273,9 @@ def main() -> None:
 
     if args.CFSMxml is not None:
         db.load_cfsm_arrangements(Path(args.CFSMxml).resolve(True))
+
+    if args.scan_songs:
+        db.scan_arrangements(show_progress=True)
 
     if args.update_player_data:
         db.cl_update_player_data(db_dir)
