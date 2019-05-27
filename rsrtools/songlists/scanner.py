@@ -161,6 +161,8 @@ class Scanner:
 
     # Rocksmith install path
     _rs_path: Path
+    # The file being scanned by _arrangement_rows
+    _current_psarc: Path
 
     def __init__(self) -> None:
         """Get the Rocksmith directory for scanner iterator."""
@@ -283,17 +285,28 @@ class Scanner:
         for arr_id in sub_dict.keys():
             pass
 
-        sub_dict = sub_dict[arr_id]["Attributes"]
-
-        if arr_id != sub_dict["PersistentID"]:
-            raise ValueError("Inconsistent persistent id data in Arrangement file.")
         arrangement[ListField.ARRANGEMENT_ID.value] = arr_id
 
-        # Provide something modestly useful in case anyone goes digging.
-        try:
-            arrangement[ListField.SONG_KEY.value] = sub_dict["SongKey"]
-        except KeyError:
-            arrangement[ListField.SONG_KEY.value] = sub_dict["LessonKey"]
+        # Provide something modestly useful in song key, title in case anyone goes
+        # digging. Cross check arr_id.
+        if json["InsertRoot"].startswith("Static.SessionMode"):
+            # Session mode entries don't have a persistent ID, so can't cross check.
+            arrangement[ListField.SONG_KEY.value] = "Session Mode Entry"
+
+        else:
+            sub_dict = sub_dict[arr_id]["Attributes"]
+
+            if arr_id != sub_dict["PersistentID"]:
+                raise ValueError("Inconsistent persistent id data in Arrangement file.")
+
+            if json["InsertRoot"].startswith("Static.Guitars"):
+                arrangement[ListField.SONG_KEY.value] = "Guitar Entry"
+            else:
+                try:
+                    arrangement[ListField.SONG_KEY.value] = sub_dict["SongKey"]
+                except KeyError:
+                    arrangement[ListField.SONG_KEY.value] = sub_dict["LessonKey"]
+
         arrangement[ListField.TITLE.value] = arrangement[ListField.SONG_KEY.value]
 
         # Dummy entries from here - the goal is just to know if RS is
@@ -401,6 +414,7 @@ class Scanner:
             Iterator[Dict[str, Any]] -- Iterator of arrangement values - see db_entries.
 
         """
+        self._current_psarc = psarc_path
         last_modified = psarc_path.stat().st_mtime
         with Welder(psarc_path, "r") as psarc:
             for index in psarc:
@@ -490,10 +504,20 @@ class Scanner:
             ):
                 yield arrangement
 
-        # Finally, scan etudes
+        # Finally, scan etudes, guitars, session mode.
         if scan_all:
             for arrangement in self._arrangement_rows(
                 self._rs_path.joinpath("etudes.psarc"), True
+            ):
+                yield arrangement
+
+            for arrangement in self._arrangement_rows(
+                self._rs_path.joinpath("guitars.psarc"), True
+            ):
+                yield arrangement
+
+            for arrangement in self._arrangement_rows(
+                self._rs_path.joinpath("session.psarc"), True
             ):
                 yield arrangement
 
