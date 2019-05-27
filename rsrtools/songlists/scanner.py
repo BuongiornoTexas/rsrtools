@@ -96,6 +96,62 @@ tuning_db = {
 }
 
 
+def rocksmith_path() -> Path:
+    """Return the Rocksmith path."""
+    steam_path = SteamAccounts.get_steam_path()
+
+    try:
+        rs_path: Optional[Path] = steam_path.joinpath(ROCKSMITH_PATH).resolve(True)
+    except FileNotFoundError:
+        # So it's not in the default location.
+        rs_path = None
+
+    if rs_path is None:
+        try:
+            library_info: Optional[Dict[Any, Any]] = load_vdf(
+                steam_path.joinpath(LIBRARY_VDF), True
+            )
+        except FileNotFoundError:
+            library_info = None
+
+        if library_info is not None:
+            for i in range(1, 8):
+                path_str = library_info["LibraryFolders"].get(str(i), "")
+                try:
+                    rs_path = Path(path_str).joinpath(ROCKSMITH_PATH).resolve(True)
+                    break
+                except FileNotFoundError:
+                    pass
+
+    if rs_path is None:
+        raise FileNotFoundError("Can't find Rocksmith installation.")
+
+    return rs_path
+
+
+def newer_songs(last_modifed: float) -> bool:
+    """Check Rocksmith dlc against a timestamp and return True if new songs found.
+
+    Arguments:
+        last_modifed {float} -- The timestamp to check.
+
+    Returns:
+        bool -- True if at least one song file (psarc) has a timestamp newer than
+            last_modified.
+
+    """
+    if platform == "win32":
+        find_files = WIN_PSARC
+    elif platform == "darwin":
+        find_files = MAC_PSARC
+
+    for scan_path in rocksmith_path().joinpath(DLC_PATH).glob("**/*" + find_files):
+        if scan_path.stat().st_mtime > last_modifed:
+            return True
+
+    return False
+
+
 class Scanner:
     """Provide arrangement iterator for filling the arrangements table in ArrangementDB.
 
@@ -107,36 +163,8 @@ class Scanner:
     _rs_path: Path
 
     def __init__(self) -> None:
-        """Find the Rocksmith directory for scanner iterator."""
-        steam_path = SteamAccounts.get_steam_path()
-
-        try:
-            rs_path: Optional[Path] = steam_path.joinpath(ROCKSMITH_PATH).resolve(True)
-        except FileNotFoundError:
-            # So it's not in the default location.
-            rs_path = None
-
-        if rs_path is None:
-            try:
-                library_info: Optional[Dict[Any, Any]] = load_vdf(
-                    steam_path.joinpath(LIBRARY_VDF), True
-                )
-            except FileNotFoundError:
-                library_info = None
-
-            if library_info is not None:
-                for i in range(1, 8):
-                    path_str = library_info["LibraryFolders"].get(str(i), "")
-                    try:
-                        rs_path = Path(path_str).joinpath(ROCKSMITH_PATH).resolve(True)
-                        break
-                    except FileNotFoundError:
-                        pass
-
-        if rs_path is None:
-            raise FileNotFoundError("Can't find Rocksmith installation.")
-
-        self._rs_path = rs_path
+        """Get the Rocksmith directory for scanner iterator."""
+        self._rs_path = rocksmith_path()
 
     @staticmethod
     def _get_tuning(attributes: Dict[str, Any]) -> str:

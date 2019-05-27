@@ -22,9 +22,14 @@ Rocksmith PSARC structure.
 News and Breaking Changes
 ==========================
 
-**Version 0.3.0** provides welder/welder.py for packing and unpacking PSARC files.
+**0.3.0** Feature complete release (barring a GUI in the longer term future).
+The main feature added in this release is welder/welder.py for packing and unpacking 
+PSARC files, and the integration of the song scanner into the song list module. This
+means rsrtools can now operate in stand alone mode. This also allows improved 
+path (lead/rhythm/bass) filters for song list creation.
 
-As of version `2.1.3 <https://github.com/sandiz/rs-manager/releases/tag/v2.1.3>`_,  
+**0.2.0**  As of version 
+`2.1.3 <https://github.com/sandiz/rs-manager/releases/tag/v2.1.3>`_,  
 rs-manager integrates rsrtools support out of the box. This means you can install 
 rs-manager and rsrtools, and then export set lists/song list directly from rs-manager 
 into your Rocksmith profile.
@@ -36,27 +41,12 @@ export them to file, and then save them to a Rocksmith profile using rsrtools. U
 you have a particular desire to roll your own rsrtools filters, I'd suggest this as 
 a recommended use case. The documentation below provides further details on importrsm. 
 
-@sandiz is looking the possibility of integrating the rsrtools importer into rs-manager.
-Watch this space! Well actually, watch rs-manager! That's where the action will be.
-
-**0.1.2 to 0.2.0+** Breaking Changes:
-
-- Relocated steam.py, moved some Steam constants to steam.py.
-
-- Change in ArrangementDB.list_validator() signature.
-
-**0.1.0 to 0.1.1+** Terminology correction from Steam user id to Steam account id. 
-Probably the only effect for most people is to edit 'config.toml' and replace 
-steam_user_id with steam_account_id. All Steam functions moved to steam.py, some Windows
-registry functions for Steam removed and replaced with functions based on Steam vdf
-files.
-
 Warnings
 ========
 
 As this package is all about editing game saves, here are a couple of warnings.
 
-0. This package is late Alpha/early Beta. I've been using it for about a year, and
+0. This package is in Beta. I've been using it for more than a year, and
    it has been robust for my application. However, until this warning disappears,
    please assume that you are the second ever user and that you will find bugs.   
    Please report these to me via github issues so I can implement fixes.
@@ -66,7 +56,7 @@ As this package is all about editing game saves, here are a couple of warnings.
    (to date it has worked fine for me - YMMV, and it will definitely stop working if
    Ubisoft make any changes to the Rocksmith save file format). However, the package
    includes many self checks and tries to make backups of profiles before making
-   changes, so (hopefully) the risk of profile loss or corruption should be low.
+   changes, so the risk of profile loss or corruption should be low.
 
 2. This package is (obviously) not endorsed by Ubisoft - if you use this package and run
    into problems with your save files, Ubisoft will not be very interested in helping
@@ -93,7 +83,8 @@ Installation and Basic Set Up
 
 1. Install python 3.7.x (I'm on 3.7.3, and you will need some 3.7 features).
 
-2. Create a virtual environment. 
+2. Create a virtual environment (for easy step by step instructions, see 
+   `Installation and Set Up`_). 
 
 3. Install rsrtools into your virtual environment with::
 
@@ -125,8 +116,8 @@ Go to settings and check that the path to importrsm is correct. After that, you 
 be able to use the rs-manager export buttons to save set lists/song lists to a Rocksmith
 profile.
 
-Using importrsm
-------------------
+Running importrsm Stand Alone
+-------------------------------
 
 You can get help for the rs-manager importer by running either of::
 
@@ -146,16 +137,9 @@ can be automated and the logging silenced - refer to the help for more details.
 Using rsrtools
 ---------------
 
-If you'd like to use rsrtools filters, you will need to install Customs Forge Manger 
-so that you can get song arrangement data (hopefully this will become optional with the
-implementation of a PSARC scanner in the future).
+If you'd like to use rsrtools filters, the steps are:
 
-After this, the steps are:
-
-1. Create an ArrangementsGrid.xml file from Customs Forge Song Manger and copy or move
-   it into the working directory .
-
-2. Start your virtual environment and run the package (with appropriate substitution for
+1. Start your virtual environment and run the package (with appropriate substitution for
    ``<path_to_your_working_directory>``)::
 
         songlists <path_to_your_working_directory>
@@ -168,7 +152,7 @@ After this, the steps are:
 
     songlists .
 
-3. Try out the test filters, reports and song lists, and then move on to creating your
+2. Try out the test filters, reports and song lists, and then move on to creating your
    own in ``config.toml``. Remember to use your test profile!
 
 Python Entry Points
@@ -251,14 +235,14 @@ This package allows creation of song lists based on a variety of criteria, and a
 the criteria to be built up hierarchically. Here is an incomplete list of the type of 
 song lists you can create with this package.
 
-- All arrangements with E Standard tunings (not very exciting).
+- All lead arrangements with E Standard tunings (not very exciting).
 
 - All songs with E Standard tunings at 440 pitch (still not exciting).
 
-- All D standard 440 songs with a played count between 12 and 18 (getting somewhere
+- All lead D standard 440 songs with a played count between 12 and 18 (getting somewhere
   now).
 
-- All Eb standard 440 songs with a mastery between 40 and 65%.
+- All bass Eb standard 440 songs with a mastery between 40 and 65%.
 
 - All E standard songs that I have played at least once on score attack, but haven't got
   a platinum badge (yet).
@@ -266,15 +250,21 @@ song lists you can create with this package.
 - All easy E Standard songs that I haven't yet got a platinum badge for (OK. So it's a
   long list for me, but something to work on).
 
+- All rhythm songs with an alternative or bonus arrangement, but no songs that have no
+  alternative or bonus arrangement.
+
 I'm simplifying a bit here, but it gives an idea of the type of thing that this
-package is intended to do. Extending the above examples, the song lists could be created
-for songs or a specific arrangement type (Bass, Lead, Rhythm).
+package is intended to do. 
 
 Criteria that can be used for song list creation include:
 
 * List criteria:
 
   - Tuning
+
+  - Path (Lead, Rhythm, Bass)
+
+  - Sub-Path (Representative - the default track for a path, Bonus or Alternative)
 
   - ArrangementName (Bass, Lead, Lead1, Lead2, Lead3, Rhythm, Rhythm1, Rhythm2, Combo,
     Combo1, Combo2, Combo3)
@@ -311,6 +301,8 @@ Criteria that can be used for song list creation include:
 
   - SA Master Badges
 
+  - Song Length
+
   - and a few more.
 
 Filtering can be by inclusion or exclusion. A more complicated example would be: all 
@@ -326,7 +318,7 @@ functionality.
 Alternatives
 ============
 
-1. The Customs Forge Song Manager (CFSM) provides a different and better supported
+1. The Customs Forge Song Manager (CFSM) provides a different 
    mechanism for creating song lists based on moving files in and out of directories.
    My approach provides some of the same functionality, with the following variations:
 
@@ -363,9 +355,9 @@ Documentation and Tutorial
 The documentation provided here is fairly detailed. I've done this on the basis that
 a significant portion of users will be interested in using the system, but not 
 interested in the details of the python. Consequently, there is a lot of step by step
-detail included. If you know your way around python, programming and CFSM, you should
-be able to skim through a lot of the content very quickly (and you can modify the set up
-to match your own environment).
+detail included. If you know your way around python, you should be able to skim through
+a lot of the content very quickly (and you can modify the set up to match your own
+environment).
 
 This package provides:
 
@@ -493,6 +485,10 @@ environment first. As ever, adjust paths to reflect your own set up.
 
         . ~/Documents/RS_Stuff/Env/scripts/activate
         songlists ~/Documents/RS_Stuff/Working
+
+   If this is the first time you have run songlists, you will need to wait for a
+   a scan of your songs to complete (30 seconds to a couple of minutes depending on how
+   many songs you own and the speed of your computer).
 
    Select the 'Change/select Steam account id' menu option, and then select Steam
    account '12345678' for profile cloning.
@@ -624,38 +620,11 @@ Preliminaries
 
        D:\RS_Stuff\Working
 
-2. Download and install the Customs Forge Song Manager from: http://customsforge.com/
-
-   The rsrtools song list creator needs information about song arrangements. I plan to
-   add a song library scanner in the future, but in the interim, the easiest way to get
-   this information is from a CFSM report. The steps required are:
-
-   * Run CFSM.
-
-   * Go to Arrangement Analyzer.
-
-   * Go to Settings (check that the settings are for Arrangement Analyzer).
-      
-     - Tick 'Include RS2014 Base Songs'
-      
-     - Tick 'Include RS1 Compatibility Packs'
-
-   * Go Back to Arrangement Analyzer.
-
-   * Click the 'Rescan' button (this will take a while).
-
-   * Export to XML. This should create the ArrangementsGrid.xml file needed by rsrtools.
-
-   * Put the xml file somewhere easy to find.
-
-   I normally drop the xml file into my working directory - this allows automatic 
-   loading of the arrangement data into the database.
-
-3. Optional, but strongly recommended: Create a temporary/testing profile and clone your
+2. Optional, but strongly recommended: Create a temporary/testing profile and clone your
    main profile into it - see `Set up a Testing Profile!`_ and `Clone Profile`_ for 
    details.
 
-4. Because I'm lazy, at this point I put together a batch file in the working 
+3. Because I'm lazy, at this point I put together a batch file in the working 
    directory. Let's call it 'song_lists.bat' and put the following lines in it::
 
         echo on
@@ -678,22 +647,10 @@ Preliminaries
    chance to read anything). Once you are confident everything is working, you can run
    it with a double click.
 
-5. Skip this step if you have put the ArrangementsGrid.xml file in the working 
-   directory.
-
-   Otherwise you need to set up the core arrangement table in the database with the 
-   following commands in command shell, substituting in the path to your working 
-   folder and the path to the arrangements file (``<path_to_xml_file>``)::
-
-        Call "D:\RS_Stuff\Env\Scripts\Activate.bat"
-        songlists "D:\RS_Stuff\Working" --CFSMxml <path_to_xml_file>
-
-   When the menu comes up, choose 0 to exit the package, and then choose y to save the
-   configuration. (hit enter after making a choice). Then exit the command shell. For
-   Mac OS X users, make appropriate activation and path substitutions.
-
-6. Run the batch file to set up the default configuration. This should result in text 
-   menu something like the following::
+4. Run the batch file to set up the default configuration. If this is the first time
+   you have run songlists, you will need to wait 30s to a couple of minutes while it 
+   scans your song library. After this, you should see a text menu something like the
+   following::
 
       Rocksmith song list generator main menu.
 
@@ -779,7 +736,7 @@ and go straight to making your own.
 Run the batch file and check that the Steam account id and profile are as expected::
 
         Steam account id:     '12345678'
-        Rocksmith profile:   'Testing'
+        Rocksmith profile:    'Testing'
 
 Experiment with the reporting options:
 
@@ -804,7 +761,7 @@ in the profile (use a test profile for testing!).
 
 The default E Standard song list for lead players will create the following song lists:
 
-1. E Standard 440 leads that have been played 1-12 times in Learn a song.
+1. E Standard 440 leads that have been played 0-12 times in Learn a song.
 
 2. E Standard 440 leads that have been played 13-27 times in Learn a song.
 
@@ -813,7 +770,7 @@ The default E Standard song list for lead players will create the following song
 4. E Standard songs with an off concert pitch (i.e. not A440) that have been played 
    once.
 
-5. Will not be changed.
+5. E Standard lead tracks that have a bonus or alternative arrangement.
 
 6. All E Standard songs that you have played in easy score attack, but haven't 
    yet got a platinum pick.
@@ -887,13 +844,15 @@ Settings
 --------
 
 The settings section is the simplest of the three, describing the location of the CFSM 
-xml file (optional), the default Steam account id, and the default profile name::
+xml file (this will disappear in future), the default Steam account id, the default
+profile name, and the date of the most recent song dlc scanned::
 
       [settings]
       CFSM_file_path: "D:\\RS_Stuff\\Working\\ArrangementsGrid.xml"
       steam_account_id": "12345678"
       player_profile": "Testing"
       version = "x.x.x"
+      dlc_mtime = 1553292870.944582
 
 Version is for future functionality.
 
@@ -980,10 +939,12 @@ The list type sub-filter is of the form::
           Artist
           Title
           Album
+          Path
+          SubPath
    
-ArrangementId may be useful for building song lists of alternative/bonus arrangements.
-
 The utilities menu includes an option to list all of these field names.
+
+SubPath has three valid values: Representative, Alternative and Bonus.
 
 ``include`` must be ``true`` or ``false``. If ``true``, the filter will return the
 records for song arrangements whose field value matches any of the values in the list. If 
@@ -1029,6 +990,7 @@ The range type sub-filter is of the form::
         SAMediumBadges
         SAHardBadges
         SAMasterBadges
+        SongLength
 
 The utilities menu includes an option to list all of these field names.
 
@@ -1077,40 +1039,40 @@ filter features.
 
 First up, a filter for songs with (mostly) lead arrangements::
 
-        [filters."Not Bass, Rhythm"]
+        [filters."Lead-ish"]
         base = ""
         mode = "OR"
 
-        [filters."Not Bass, Rhythm".sub_filters.ArrangementName]
-        include = false
-        values = [ "Bass", "Bass2", "Rhythm", "Rhythm1", "Rhythm2",]
-
-        [filters."Not Bass, Rhythm".sub_filters.Title]
+        [filters."Lead-ish".sub_filters.Path]
         include = true
-        values = [ "Cissy Strut",]
+        values = [ "Lead", ]
+
+        [filters."Lead-ish".sub_filters.Title]
+        include = true
+        values = [ "Should I Stay or Should I Go", "Blister in the Sun",]
 
 This filter is interpreted as follows:
 
-- The filter is named "Not Bass, Rhythm".
+- The filter is named "Lead-ish".
 
 - It does not have a base filter, so it will apply the filter to the entire record set
   in the arrangement database.
 
-- There are two sub-filters. The first filter excludes all arrangements with bass or
-  rhythm types (this could have as easily been an include on all lead and combo types).
-  The second filter includes the arrangements for one song: Cissy Strut by The Meters.
+- There are two sub-filters. The first filter includes all arrangements that are on 
+  the lead path. The second filter includes the arrangements for two songs: Should I
+  Stay or Should I go by the Clash, and Blister in the Sun by the Violent Femmes.
 
 - The ``"OR"`` mode combines the results of the sub-filters. 
 
 In effect, this filter results in the records for all arrangements that are lead type
-along with the arrangements for Cissy Strut. This filter ensures that I can see all lead
-tracks and Cissy Strut, which only has bass and rhythm arrangements, but I still want it
-to appear in my song lists.
+along with the arrangements for the named songs. This filter ensures that I can see all
+lead tracks and the two named tracks, which only have bass and rhythm arrangements, but
+I still want them to appear in my song lists.
 
 The following filter narrows the lead-ish filter to E Standard tunings::
 
     [filters."E Standard"]
-    base = "Not Bass, Rhythm"
+    base = "Lead-ish"
     mode = "AND"
 
     [filters."E Standard".sub_filters.Tuning]
@@ -1118,7 +1080,7 @@ The following filter narrows the lead-ish filter to E Standard tunings::
     values = [ "E Standard",]
 
 This nested filter is interpreted as taking the records generated by the 
-"Not Bass, Rhythm" filter and keeping only those arrangements with an E Standard tuning.
+"Lead-ish" filter and keeping only those arrangements with an E Standard tuning.
 
 The final filter generates a list of E Standard tunings which are off concert pitch 
 (i.e. not A440 tunings)::
@@ -1163,9 +1125,9 @@ following sub-filters::
         base = ""
         mode = "AND"
 
-        [filters."One Step E Std Non Concert".sub_filters.ArrangementName]
-        include = false
-        values = [ "Bass", "Bass2", "Rhythm", "Rhythm1", "Rhythm2",]
+        [filters."One Step E Std Non Concert".sub_filters.Path]
+        include = true
+        values = [ "Lead",]
 
         [filters."One Step E Std Non Concert".sub_filters.Tuning]
         include = true
@@ -1180,7 +1142,7 @@ following sub-filters::
         ranges = [ [ 1.0, 5000.0,],]
 
 (This is something close, because it's not possible to build a one shot filter like this
-that also capture the Cissy Strut arrangements).
+that also capture the Clash and Violent Femmes arrangements).
 
 
 To date I have always found the most effective way to build the filters is to 
@@ -1377,7 +1339,8 @@ compresses and encrypts these objects before saving the profiles to disk (distin
 not human readable). 
 
 rsrtools includes facilities to export the JSON objects as text. The simplest method
-is to run the command line tool::
+is to do the export from the utilities menu of rsrtools. Alternatively, you can also
+run a command line tool::
 
         profilemanager --dump-profile <path_to_your_working_directory>
 
@@ -1444,6 +1407,9 @@ anybody who wants to work on CDLCs.
 
 TODO
 =====
+
+- Remove deprecated CFSM functions.
+
 - Convert major TODO items to issues.
 
 - Add more substantial documentation on profile manager (for Rocksmith file editing),
@@ -1452,7 +1418,8 @@ TODO
 Changelog
 ==========
 
-**0.3.0beta 2019-05-21** Welder module for PSARC packing/unpacking.
+**0.3.0beta 2019-05-21** Welder module for PSARC packing/unpacking. Scanner built into
+songlists.
 
 **0.2.2beta 2019-05-08** Arrangement deletion cli.
 

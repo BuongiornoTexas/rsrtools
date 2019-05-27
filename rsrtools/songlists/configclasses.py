@@ -41,7 +41,7 @@ DEFAULT_TOML = f"""\
   "E Std Mid Plays",
   "E Std High Plays",
   "E Std Non Concert",
-  "",
+  "E Std with Bonus or Alternate",
   "Easy E Std Plat Badge in progress",
 ]
 
@@ -65,7 +65,7 @@ DEFAULT_TOML = f"""\
 
 Testing = [
   "Artist test",
-  "Played Count of 1 to 15",
+  "Played Count of 0 to 15",
 ]
 
 "Recursive_2_test" = ["Recursive2A"]
@@ -117,8 +117,17 @@ Testing = [
 {CONFIG_INCLUDE} = true
 {CONFIG_RANGES} =  [ [ 5, 50] ]
 
+[{CONFIG_FILTERS}."E Std with Bonus or Alternate"]
+{CONFIG_BASE} = "E Standard"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."E Std with Bonus or Alternate".{CONFIG_SUB_FILTERS}\
+.{ListField.SUB_PATH.value}]
+{CONFIG_INCLUDE} = false
+{CONFIG_VALUES} = ["Representative"]
+
 [{CONFIG_FILTERS}."E Standard"]
-{CONFIG_BASE} = "Not Bass, Rhythm"
+{CONFIG_BASE} = "Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."E Standard".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -140,7 +149,7 @@ Testing = [
 [{CONFIG_FILTERS}."E Std Low Plays".{CONFIG_SUB_FILTERS}\
 .{RangeField.PLAYED_COUNT.value}]
 {CONFIG_INCLUDE} = true
-{CONFIG_RANGES} = [[1, 12]]
+{CONFIG_RANGES} = [[0, 12]]
 
 [{CONFIG_FILTERS}."E Std Mid Plays"]
 {CONFIG_BASE} = "E Standard 440"
@@ -171,10 +180,10 @@ Testing = [
 [{CONFIG_FILTERS}."E Std Non Concert".{CONFIG_SUB_FILTERS}\
 .{RangeField.PLAYED_COUNT.value}]
 {CONFIG_INCLUDE} = true
-{CONFIG_RANGES} = [[1,5000]]
+{CONFIG_RANGES} = [[0,5000]]
 
 [{CONFIG_FILTERS}."Drop D"]
-{CONFIG_BASE} = "Not Bass, Rhythm"
+{CONFIG_BASE} = "Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."Drop D".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -182,7 +191,7 @@ Testing = [
 {CONFIG_VALUES} = ["Drop D"]
 
 [{CONFIG_FILTERS}."Eb Standard"]
-{CONFIG_BASE} = "Not Bass, Rhythm"
+{CONFIG_BASE} = "Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."Eb Standard".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -190,7 +199,7 @@ Testing = [
 {CONFIG_VALUES} = ["Eb Standard"]
 
 [{CONFIG_FILTERS}."Eb Drop Db"]
-{CONFIG_BASE} = "Not Bass, Rhythm"
+{CONFIG_BASE} = "Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."Eb Drop Db".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -198,7 +207,7 @@ Testing = [
 {CONFIG_VALUES} = ["Eb Drop Db"]
 
 [{CONFIG_FILTERS}."D Standard"]
-{CONFIG_BASE} = "Not Bass, Rhythm"
+{CONFIG_BASE} = "Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."D Standard".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -206,7 +215,7 @@ Testing = [
 {CONFIG_VALUES} = ["D Standard"]
 
 [{CONFIG_FILTERS}."D Drop C"]
-{CONFIG_BASE} = "Not Bass, Rhythm"
+{CONFIG_BASE} = "Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."D Drop C".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -214,7 +223,7 @@ Testing = [
 {CONFIG_VALUES} = ["D Drop C"]
 
 [{CONFIG_FILTERS}."Other Tunings"]
-{CONFIG_BASE} = "Not Bass, Rhythm"
+{CONFIG_BASE} = "Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."Other Tunings".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -223,14 +232,14 @@ Testing = [
     "E Standard", "Drop D", "Eb Standard", "Eb Drop Db", "D Standard", "D Drop C"
 ]
 
-[{CONFIG_FILTERS}."Played Count of 1 to 15"]
+[{CONFIG_FILTERS}."Played Count of 0 to 15"]
 {CONFIG_BASE} = ""
 {CONFIG_MODE} = "AND"
 
-[{CONFIG_FILTERS}."Played Count of 1 to 15".{CONFIG_SUB_FILTERS}\
+[{CONFIG_FILTERS}."Played Count of 0 to 15".{CONFIG_SUB_FILTERS}\
 .{RangeField.PLAYED_COUNT.value}]
 {CONFIG_INCLUDE} = true
-{CONFIG_RANGES} = [[1, 15]]
+{CONFIG_RANGES} = [[0, 15]]
 
 [{CONFIG_FILTERS}."Artist test"]
 {CONFIG_BASE} = ""
@@ -240,20 +249,24 @@ Testing = [
 {CONFIG_INCLUDE} = true
 {CONFIG_VALUES} = ["The Rolling Stones", "Franz Ferdinand"]
 
-[{CONFIG_FILTERS}."Not Bass, Rhythm"]
+[{CONFIG_FILTERS}."Lead-ish"]
 {CONFIG_BASE} = ""
 {CONFIG_MODE} = "OR"
 
-[{CONFIG_FILTERS}."Not Bass, Rhythm".{CONFIG_SUB_FILTERS}\
-.{ListField.ARRANGEMENT_NAME.value}]
-{CONFIG_INCLUDE} = false
-{CONFIG_VALUES} = ["Bass", "Bass2", "Rhythm", "Rhythm1", "Rhythm2"]
+[{CONFIG_FILTERS}."Lead-ish".{CONFIG_SUB_FILTERS}\
+.{ListField.PATH.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_VALUES} = ["Lead"]
 
-# This captures a song that has Rhythm and Bass, but no lead arrangement
-[{CONFIG_FILTERS}."Not Bass, Rhythm".{CONFIG_SUB_FILTERS}\
+# This captures songs that have Rhythm and/or Bass, but no lead arrangement
+[{CONFIG_FILTERS}."Lead-ish".{CONFIG_SUB_FILTERS}\
 .{ListField.TITLE.value}]
 {CONFIG_INCLUDE} = true
-{CONFIG_VALUES} = ["Cissy Strut"]
+{CONFIG_VALUES} = [
+    "Should I Stay or Should I Go",
+    "What's Going On",
+    "Blister in the Sun"
+]
 
 # basic test filters for Bass, Rhythm.
 [{CONFIG_FILTERS}."Bass or Rhythm"]
@@ -261,9 +274,9 @@ Testing = [
 {CONFIG_MODE} = "OR"
 
 [{CONFIG_FILTERS}."Bass or Rhythm".{CONFIG_SUB_FILTERS}\
-.{ListField.ARRANGEMENT_NAME.value}]
+.{ListField.PATH.value}]
 {CONFIG_INCLUDE} = true
-{CONFIG_VALUES} = ["Bass", "Bass2", "Rhythm", "Rhythm1", "Rhythm2"]
+{CONFIG_VALUES} = ["Bass", "Rhythm"]
 
 [{CONFIG_FILTERS}."B or R E 440"]
 {CONFIG_BASE} = "Bass or Rhythm"
@@ -284,7 +297,7 @@ Testing = [
 [{CONFIG_FILTERS}."B or R E Low Plays".{CONFIG_SUB_FILTERS}\
 .{RangeField.PLAYED_COUNT.value}]
 {CONFIG_INCLUDE} = true
-{CONFIG_RANGES} = [[1, 12]]
+{CONFIG_RANGES} = [[0, 12]]
 
 [{CONFIG_FILTERS}."B or R E Mid Plays"]
 {CONFIG_BASE} = "B or R E 440"
@@ -377,12 +390,16 @@ class Settings:
 
     Public attributes:
         CFSM_file_path {str} -- The string form path the Customs Forge Song Manager
-            arrangements file, or the empty string if it has not been set.
+            arrangements file, or the empty string if it has not been set. Deprecated,
+            due for removal.
         steam_account_id {str} -- String representation of Steam account id, or
             the empty string if it has not been set yet.
         player_profile {str} -- The player profile name. Get returns the empty string if
             the player profile it has not been set yet.
         version {str} -- Future functionality for configuration changes.
+        dlc_mtime {float} -- The last modified time of the most recently modified dlc
+            found in the last scan for arrangement data. Used for checks for new dlc
+            and for scans to update (rather than rebuild) the database.
 
     Note: changes in attribute names should be reflected in default TOML.
     """
@@ -392,6 +409,7 @@ class Settings:
     steam_account_id: str = ""
     player_profile: str = ""
     version: str = ""
+    dlc_mtime: float = -1.0
 
 
 @dataclass

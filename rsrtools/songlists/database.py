@@ -1000,8 +1000,7 @@ class ArrangementDB:
         the warnings in the method for more detail.
         """
         print(
-            "WARNING. This is report is NOT useful in its current form (still under "
-            "development)."
+            "WARNING. This is report is still under development."
             "\n"
             "\nThis report summarises arrangements that appear in the player profile, "
             "but do not have any corresponding song"
@@ -1012,11 +1011,11 @@ class ArrangementDB:
             "\n    - DLC/Custom DLC has been removed from the library (and hence the "
             "song data is no longer present, while the player"
             "\n      history for the song arrangement is retained)."
-            "\nAs noted, this report is still under development. I do not recommend "
-            "using output of this report."
+            "\nAs noted, this report is still under development. Use with caution for "
+            "now!"
         )
 
-        input("Enter anything to run report ->")
+        input("Enter to run report ->")
 
         # readability variable.
         arrangements_name = self._arrangements_sql.table_name
@@ -1194,7 +1193,7 @@ class ArrangementDB:
                 self._no_player_data_report,
             ),
             (
-                "Missing song data. Do not use. Under development.",
+                "Missing song data. Under development. Use with extreme caution.",
                 self._missing_song_data_report,
             ),
         ]

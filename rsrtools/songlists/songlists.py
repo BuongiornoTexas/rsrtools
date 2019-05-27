@@ -17,8 +17,9 @@ from typing import Dict, List, Optional, TextIO, Union
 
 import rsrtools.utils as utils
 
+from rsrtools.songlists.scanner import newer_songs
 from rsrtools.files.config import ProfileKey, MAX_SONG_LIST_COUNT
-from rsrtools.songlists.config import  ListField, RangeField
+from rsrtools.songlists.config import ListField, RangeField
 from rsrtools.songlists.configclasses import (
     Configuration,
     Settings,
@@ -49,14 +50,16 @@ class SongListCreator:
             profile.
 
         load_cfsm_arrangements -- Loads arrangement data from the CFSM file defined in
-            self.cfsm_arrangement_file into the arrangements database.
+            self.cfsm_arrangement_file into the arrangements database. Deprecated, due
+            for deletion.
 
         save_config -- Saves the current song list generation configuration file.
 
         song_list_cli -- Runs the command line driven song list generator.
 
         cfsm_arrangement_file -- Read/write property. Path to a CFSM arrangement file
-            that can be used for setting up the arrangement database.
+            that can be used for setting up the arrangement database. Deprecated, due
+            for deletion.
 
         steam_account_id -- Read/write property. Steam account id (8 digit decimal
             number found under Steam user data folder) to use for Rocksmith saves. Can
@@ -137,6 +140,8 @@ class SongListCreator:
 
         The setter will raise an exception if the path does not point to a file, but
         but does not validate the file.
+
+        Deprecated, due for deletion.
 
         """
         check_path = self._settings.CFSM_file_path
@@ -279,6 +284,8 @@ class SongListCreator:
         The CFSM file is defined in the property self.cfsm_arrangement_file.
 
         This method replaces existing data in the database.
+
+        Deprecated, due for deletion.
         """
         if self.cfsm_arrangement_file:
             self._arr_db.load_cfsm_arrangements(Path(self.cfsm_arrangement_file))
@@ -547,20 +554,35 @@ class SongListCreator:
         if confirmed:
             self.create_song_lists(list_target, song_list_set, report_target)
 
+    def _cli_full_scan(self) -> None:
+        """Do a full scan of song data and rebuild the arrangements table."""
+        mtime = self._arr_db.scan_arrangements(last_modified=None, show_progress=True)
+        self._configuration.settings.dlc_mtime = mtime
+
+    def _cli_partial_scan(self) -> None:
+        """Do a partial scan of song data and update the arrangements table."""
+        mtime = self._configuration.settings.dlc_mtime
+        mtime = self._arr_db.scan_arrangements(last_modified=mtime, show_progress=True)
+        self._configuration.settings.dlc_mtime = mtime
+
     def song_list_cli(self) -> None:
         """Provide a command line menu for the song list generator routines."""
         if not self._arr_db.has_arrangement_data:
-            # check for CFSM file for now.
-            # In future, offer to scan song database.
-            check_xml = self._working_dir.joinpath(ARRANGEMENTS_GRID)
-            if check_xml.is_file():
-                self.cfsm_arrangement_file = fsdecode(check_xml)
-                self.load_cfsm_arrangements()
-            else:
-                raise RSFilterError(
-                    "Database has no song arrangement data. Re-run with --CFSMxml or "
-                    " song scan (if available) to load this data."
-                )
+            print("No arrangement data in database. Running full scan to load data.")
+            self._cli_full_scan()
+        elif newer_songs(self._configuration.settings.dlc_mtime):
+            choice = utils.choose(
+                options=[
+                    ("Recommended: Run a full database refresh", self._cli_full_scan),
+                    (
+                        "Scan for new songs only (faster, may not find all changes).",
+                        self._cli_partial_scan,
+                    ),
+                ],
+                header="It looks as though you have some new DLC.",
+            )
+            if choice is not None:
+                choice[0]()
 
         options = list()
         options.append(
@@ -766,12 +788,27 @@ class SongListCreator:
                     (
                         "Database numeric field names (for range type sub-filters).",
                         RangeField.report_field_values,
-                    ),                    
+                    ),
                     (
                         "Clone profile. Copies source profile data into target "
                         "profile. Replaces all target profile data."
                         "\n      - Reloads Steam user/profile after cloning.",
                         self._cli_clone_profile,
+                    ),
+                    (
+                        "Rescan all song data. The best way to add new songs to the "
+                        "database.",
+                        self._cli_full_scan,
+                    ),
+                    (
+                        "Update database with new song data. Mostly robust, but may "
+                        "sometimes miss songs"
+                        "\n      - Do a full scan if this happens.",
+                        self._cli_partial_scan,
+                    ),
+                    (
+                        "Export profile to JSON (readable text format).",
+                        self._export_json,
                     ),
                 ],
             )
@@ -788,6 +825,14 @@ class SongListCreator:
                 )
 
             action()
+
+    def _export_json(self) -> None:
+        """Dump the active profile to JSON text file."""
+        if self._profile_manager is not None:
+            self._profile_manager.export_json_profile(
+                self.player_profile,
+                self._working_dir.joinpath(self.player_profile + ".json"),
+            )
 
     def _cli_clone_profile(self) -> None:
         """Provide command line interface for cloning profiles."""
@@ -824,7 +869,8 @@ def main() -> None:
     parser.add_argument(
         "--CFSMxml",
         help="Loads database with song arrangement data from CFSM xml file (replaces "
-        "all existing data). Expects CFSM ArrangementsGrid.xml file structure.",
+        "all existing data). Expects CFSM ArrangementsGrid.xml file structure. "
+        "This is a deprecated function and will be removed in future.",
         metavar="CFSM_file_name",
     )
 

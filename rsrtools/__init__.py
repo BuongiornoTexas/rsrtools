@@ -1,3 +1,3 @@
-"""Tools for creating Rocksmith 2014 songlists and managing Rocksmith save files"""
+"""Tools for creating Rocksmith 2014 songlists and managing Rocksmith save files."""
 
-__version__ = '0.2.2'
+__version__ = '0.3.0'
