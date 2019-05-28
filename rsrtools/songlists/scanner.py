@@ -193,14 +193,10 @@ class Scanner:
             ]
         )
 
-        # if std_tuning:
-        #    if tuning == "000000":
-        #        return "E Standard"
-        # else:
         if tuning in tuning_db:
             return tuning_db[tuning]
-
-        raise ValueError(f"Invalid or unknown tuning: {tuning}.")
+        else:
+            return "Unknown Custom Tuning"
 
     @staticmethod
     def _get_sub_path(attributes: Dict[str, Any]) -> str:
@@ -485,27 +481,9 @@ class Scanner:
         elif platform == "darwin":
             find_files = MAC_PSARC
 
-        for scan_path in self._rs_path.joinpath(DLC_PATH).glob("**/*" + find_files):
-            if not scan_all:
-                if scan_path.name.startswith(RS_COMPATABILITY):
-                    # Only scan RS1 compatability on full scan.
-                    continue
-                elif scan_path.stat().st_mtime < last_modified:
-                    # skip anything older than last modified time.
-                    continue
-
-            for arrangement in self._arrangement_rows(scan_path, False):
-                yield arrangement
-
-        # Songs
         if scan_all:
-            for arrangement in self._arrangement_rows(
-                self._rs_path.joinpath("songs.psarc"), False
-            ):
-                yield arrangement
-
-        # Finally, scan etudes, guitars, session mode.
-        if scan_all:
+            # Scan etudes, guitars, session mode first - happy to have these
+            # overwritten by any actual song arrangements that clash.
             for arrangement in self._arrangement_rows(
                 self._rs_path.joinpath("etudes.psarc"), True
             ):
@@ -519,6 +497,24 @@ class Scanner:
             for arrangement in self._arrangement_rows(
                 self._rs_path.joinpath("session.psarc"), True
             ):
+                yield arrangement
+
+            # Scan the core songs.
+            for arrangement in self._arrangement_rows(
+                self._rs_path.joinpath("songs.psarc"), False
+            ):
+                yield arrangement
+
+        for scan_path in self._rs_path.joinpath(DLC_PATH).glob("**/*" + find_files):
+            if not scan_all:
+                if scan_path.name.startswith(RS_COMPATABILITY):
+                    # Only scan RS1 compatability on full scan.
+                    continue
+                elif scan_path.stat().st_mtime < last_modified:
+                    # skip anything older than last modified time.
+                    continue
+
+            for arrangement in self._arrangement_rows(scan_path, False):
                 yield arrangement
 
 
