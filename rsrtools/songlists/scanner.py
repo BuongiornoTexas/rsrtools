@@ -360,9 +360,12 @@ class Scanner:
         arrangement[ListField.ARRANGEMENT_ID.value] = arr_id
 
         if not sub_dict["FullName"].endswith(expect_name):
+            err_str = sub_dict["FullName"]
             raise ValueError(
-                "Arrangement FullName in JSON does not match JSON arrangement name "
-                "in file"
+                f"Arrangement FullName suffix in JSON does not match JSON arrangement"
+                "name in file."
+                f"\n   JSON FullName: {err_str}"
+                f"\n   Expected suffix: {expect_name}"
             )
         # This could be Lead[1-9], Rhythm[1-9], Bass[1-9] or Combo[1-9]
         arrangement[ListField.ARRANGEMENT_NAME.value] = expect_name
