@@ -103,6 +103,8 @@ SONG_LIST_FIELDS: SQLTableDict = OrderedDict(
         (ListField.SONG_KEY, ""),
         (ListField.ARRANGEMENT_ID, ""),
         (ListField.ARRANGEMENT_NAME, ""),
+        (ListField.PATH, ""),
+        (ListField.SUB_PATH, ""),
         (ListField.ARTIST, ""),
         (ListField.TITLE, ""),
         (ListField.ALBUM, ""),

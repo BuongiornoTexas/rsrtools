@@ -63,6 +63,24 @@ DEFAULT_TOML = f"""\
   "Easy Plat Badge in progress",
 ]
 
+"Standard Tunings" = [
+  "Standard Low Plays",
+  "Standard Mid Plays",
+  "Standard High Plays",
+  "Standard Off 440 Tunings",
+  "With Bonus or Alternate",
+  "Easy Plat Badge in progress",
+]
+
+"Drop Tunings" = [
+  "Drop Low Plays",
+  "Drop Mid Plays",
+  "Drop High Plays",
+  "Drop Off 440 Tunings",
+  "Non standard Tunings",
+  "Easy Plat Badge in progress",
+]
+
 Testing = [
   "Artist test",
   "Played Count of 0 to 15",
@@ -117,9 +135,23 @@ Testing = [
 {CONFIG_INCLUDE} = true
 {CONFIG_RANGES} =  [ [ 5, 50] ]
 
-[{CONFIG_FILTERS}."E Std with Bonus or Alternate"]
-{CONFIG_BASE} = "E Standard"
+[{CONFIG_FILTERS}."With Bonus or Alternate"]
+{CONFIG_BASE} = "Lead-ish"
 {CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."With Bonus or Alternate".{CONFIG_SUB_FILTERS}\
+.{ListField.SUB_PATH.value}]
+{CONFIG_INCLUDE} = false
+{CONFIG_VALUES} = ["Representative"]
+
+[{CONFIG_FILTERS}."E Std with Bonus or Alternate"]
+{CONFIG_BASE} = "Lead-ish"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."E Standard with Bonus or Alternate".{CONFIG_SUB_FILTERS}.\
+{ListField.TUNING.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_VALUES} = ["E Standard"]
 
 [{CONFIG_FILTERS}."E Std with Bonus or Alternate".{CONFIG_SUB_FILTERS}\
 .{ListField.SUB_PATH.value}]
@@ -127,7 +159,7 @@ Testing = [
 {CONFIG_VALUES} = ["Representative"]
 
 [{CONFIG_FILTERS}."E Standard"]
-{CONFIG_BASE} = "Lead-ish"
+{CONFIG_BASE} = "Representative Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."E Standard".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -183,7 +215,7 @@ Testing = [
 {CONFIG_RANGES} = [[0,5000]]
 
 [{CONFIG_FILTERS}."Drop D"]
-{CONFIG_BASE} = "Lead-ish"
+{CONFIG_BASE} = "Representative Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."Drop D".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -191,7 +223,7 @@ Testing = [
 {CONFIG_VALUES} = ["Drop D"]
 
 [{CONFIG_FILTERS}."Eb Standard"]
-{CONFIG_BASE} = "Lead-ish"
+{CONFIG_BASE} = "Representative Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."Eb Standard".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -199,7 +231,7 @@ Testing = [
 {CONFIG_VALUES} = ["Eb Standard"]
 
 [{CONFIG_FILTERS}."Eb Drop Db"]
-{CONFIG_BASE} = "Lead-ish"
+{CONFIG_BASE} = "Representative Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."Eb Drop Db".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -207,7 +239,7 @@ Testing = [
 {CONFIG_VALUES} = ["Eb Drop Db"]
 
 [{CONFIG_FILTERS}."D Standard"]
-{CONFIG_BASE} = "Lead-ish"
+{CONFIG_BASE} = "Representative Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."D Standard".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -215,7 +247,7 @@ Testing = [
 {CONFIG_VALUES} = ["D Standard"]
 
 [{CONFIG_FILTERS}."D Drop C"]
-{CONFIG_BASE} = "Lead-ish"
+{CONFIG_BASE} = "Representative Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."D Drop C".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -223,7 +255,7 @@ Testing = [
 {CONFIG_VALUES} = ["D Drop C"]
 
 [{CONFIG_FILTERS}."Other Tunings"]
-{CONFIG_BASE} = "Lead-ish"
+{CONFIG_BASE} = "Representative Lead-ish"
 {CONFIG_MODE} = "AND"
 
 [{CONFIG_FILTERS}."Other Tunings".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
@@ -231,6 +263,134 @@ Testing = [
 {CONFIG_VALUES} = [
     "E Standard", "Drop D", "Eb Standard", "Eb Drop Db", "D Standard", "D Drop C"
 ]
+
+# This all the standard (non-drop) starting at E Standard and dropping from there.
+# Good for use with a drop tuning pedal.
+[{CONFIG_FILTERS}."Standard Tunings"]
+{CONFIG_BASE} = "Representative Lead-ish"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Standard Tunings".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_VALUES} = [
+    "E Standard", "Eb Standard", "D Standard", "C# Standard", "C Standard",
+    "B Standard", "Bb Standard", "A Standard",
+]
+
+[{CONFIG_FILTERS}."Standard 440 Tunings"]
+{CONFIG_BASE} = "Standard Tunings"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Standard 440 Tunings".{CONFIG_SUB_FILTERS}.{RangeField.PITCH.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} = [ [439.5, 440.5 ] ]
+
+[{CONFIG_FILTERS}."Standard Off 440 Tunings"]
+{CONFIG_BASE} = "Standard Tunings"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Standard Off 440 Tunings".{CONFIG_SUB_FILTERS}.\
+{RangeField.PITCH.value}]
+{CONFIG_INCLUDE} = false
+{CONFIG_RANGES} = [ [439.5, 440.5 ] ]
+
+# This all the standard drop tunings starting at Drop D and dropping from there.
+# Good for use with a drop tuning pedal.
+[{CONFIG_FILTERS}."Drop Tunings"]
+{CONFIG_BASE} = "Representative Lead-ish"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Drop Tunings".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_VALUES} = [
+    "Drop D", "Eb Drop Db", "D Drop C", "C# Drop B", "C Drop A#", "B Drop A",
+    "Bb Drop Ab", "A Drop G",
+]
+
+[{CONFIG_FILTERS}."Drop 440 Tunings"]
+{CONFIG_BASE} = "Drop Tunings"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Drop 440 Tunings".{CONFIG_SUB_FILTERS}.{RangeField.PITCH.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} = [ [439.5, 440.5 ] ]
+
+[{CONFIG_FILTERS}."Drop Off 440 Tunings"]
+{CONFIG_BASE} = "Drop Tunings"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Drop Off 440 Tunings".{CONFIG_SUB_FILTERS}.{RangeField.PITCH.value}]
+{CONFIG_INCLUDE} = false
+{CONFIG_RANGES} = [ [439.5, 440.5 ] ]
+
+# This anything that doesn't fit the two "standard tunings above"
+# Good for use with a drop tuning pedal.
+[{CONFIG_FILTERS}."Non standard Tunings"]
+{CONFIG_BASE} = "Representative Lead-ish"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Non standard Tunings".{CONFIG_SUB_FILTERS}.{ListField.TUNING.value}]
+{CONFIG_INCLUDE} = false
+{CONFIG_VALUES} = [
+    "E Standard", "Eb Standard", "D Standard", "C# Standard", "C Standard",
+    "B Standard", "Bb Standard", "A Standard",    
+    "Drop D", "Eb Drop Db", "D Drop C", "C# Drop B", "C Drop A#", "B Drop A",
+    "Bb Drop Ab", "A Drop G",
+]
+
+[{CONFIG_FILTERS}."Standard Low Plays"]
+{CONFIG_BASE} = "Standard 440 Tunings"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Standard Low Plays".{CONFIG_SUB_FILTERS}\
+.{RangeField.PLAYED_COUNT.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} = [[0, 12]]
+
+[{CONFIG_FILTERS}."Standard Mid Plays"]
+{CONFIG_BASE} = "Standard 440 Tunings"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Standard Mid Plays".{CONFIG_SUB_FILTERS}\
+.{RangeField.PLAYED_COUNT.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} = [[13, 27]]
+
+[{CONFIG_FILTERS}."Standard High Plays"]
+{CONFIG_BASE} = "Standard 440 Tunings"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Standard High Plays".{CONFIG_SUB_FILTERS}\
+.{RangeField.PLAYED_COUNT.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} = [[28, 5000]]
+
+[{CONFIG_FILTERS}."Drop Low Plays"]
+{CONFIG_BASE} = "Drop 440 Tunings"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Drop Low Plays".{CONFIG_SUB_FILTERS}\
+.{RangeField.PLAYED_COUNT.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} = [[0, 12]]
+
+[{CONFIG_FILTERS}."Drop Mid Plays"]
+{CONFIG_BASE} = "Drop 440 Tunings"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Drop Mid Plays".{CONFIG_SUB_FILTERS}\
+.{RangeField.PLAYED_COUNT.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} = [[13, 27]]
+
+[{CONFIG_FILTERS}."Drop High Plays"]
+{CONFIG_BASE} = "Drop 440 Tunings"
+{CONFIG_MODE} = "AND"
+
+[{CONFIG_FILTERS}."Drop High Plays".{CONFIG_SUB_FILTERS}\
+.{RangeField.PLAYED_COUNT.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_RANGES} = [[28, 5000]]
 
 [{CONFIG_FILTERS}."Played Count of 0 to 15"]
 {CONFIG_BASE} = ""
@@ -267,6 +427,15 @@ Testing = [
     "What's Going On",
     "Blister in the Sun"
 ]
+
+[{CONFIG_FILTERS}."Representative Lead-ish"]
+{CONFIG_BASE} = "Lead-ish"
+{CONFIG_MODE} = "OR"
+
+[{CONFIG_FILTERS}."Representative Lead-ish".{CONFIG_SUB_FILTERS}\
+.{ListField.SUB_PATH.value}]
+{CONFIG_INCLUDE} = true
+{CONFIG_VALUES} = ["Representative"]
 
 # basic test filters for Bass, Rhythm.
 [{CONFIG_FILTERS}."Bass or Rhythm"]
@@ -598,21 +767,22 @@ class ListSubFilter(SubFilter):
         # Convert any constants to enum type.
         field_type = ListField(field_name)
 
-        if not self.values:
+        values: List[str] = list()
+
+        # Silently ignore invalid values (better then the old message of 
+        # failing unceremoniously)
+        for value in self.values:
+            if value in list_validator[field_type]:
+                values.append(value)
+
+        if not values:
             raise RSFilterError(
-                f"WHERE clause error: Empty value list for "
+                f"WHERE clause error: Empty value list or invalid entries for "
                 f"field type {field_type.value}."
             )
 
-        for value in self.values:
-            if value not in list_validator[field_type]:
-                raise RSFilterError(
-                    f"WHERE clause error: Invalid filter value ({value}) for "
-                    f"field type {field_type.value}."
-                )
-
-        if len(self.values) > 1:
-            q_marks = "?, " * (len(self.values) - 1)
+        if len(values) > 1:
+            q_marks = "?, " * (len(values) - 1)
         else:
             q_marks = ""
 
@@ -623,7 +793,7 @@ class ListSubFilter(SubFilter):
 
         sql_text = f"{field_type.value} {not_text}IN ({q_marks}?)"
 
-        return sql_text, self.values
+        return sql_text, values
 
 
 @dataclass(config=EnumConfig)  # type: ignore

@@ -196,7 +196,7 @@ class Scanner:
         if tuning in tuning_db:
             return tuning_db[tuning]
         else:
-            return "Unknown Custom Tuning"
+            return f"Unknown Custom Tuning ({tuning})"
 
     @staticmethod
     def _get_sub_path(attributes: Dict[str, Any]) -> str:
