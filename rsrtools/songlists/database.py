@@ -57,44 +57,47 @@ TEMP_TABLE_BASE = "RSRTempTable"
 # abbreviation here.
 ARRANGEMENT_NAME = ListField.ARRANGEMENT_NAME
 ARRANGEMENT_ID = ListField.ARRANGEMENT_ID
+TEXT_TYPE = "text"
+INTEGER_TYPE = "integer"
+REAL_TYPE = "real"
 
 # Arrangements and player profile table names, field definitions
 ARRANGEMENTS_TABLE = "Arrangements"
 ARRANGEMENT_FIELDS: SQLTableDict = OrderedDict(
     [
-        (ListField.ARRANGEMENT_ID, "text"),
-        (ListField.SONG_KEY, "text"),
-        (ListField.ARRANGEMENT_NAME, "text"),
-        (ListField.ARTIST, "text"),
-        (ListField.TITLE, "text"),
-        (ListField.ALBUM, "text"),
-        (RangeField.YEAR, "integer"),
-        (RangeField.TEMPO, "integer"),
-        (ListField.PATH, "text"),
-        (ListField.SUB_PATH, "text"),
-        (ListField.TUNING, "text"),
-        (RangeField.PITCH, "real"),
-        (RangeField.NOTE_COUNT, "integer"),
-        (RangeField.SONG_LENGTH, "real"),
-        (RangeField.LAST_MODIFIED, "real"),
+        (ListField.ARRANGEMENT_ID, TEXT_TYPE),
+        (ListField.SONG_KEY, TEXT_TYPE),
+        (ListField.ARRANGEMENT_NAME, TEXT_TYPE),
+        (ListField.ARTIST, TEXT_TYPE),
+        (ListField.TITLE, TEXT_TYPE),
+        (ListField.ALBUM, TEXT_TYPE),
+        (RangeField.YEAR, INTEGER_TYPE),
+        (RangeField.TEMPO, INTEGER_TYPE),
+        (ListField.PATH, TEXT_TYPE),
+        (ListField.SUB_PATH, TEXT_TYPE),
+        (ListField.TUNING, TEXT_TYPE),
+        (RangeField.PITCH, REAL_TYPE),
+        (RangeField.NOTE_COUNT, INTEGER_TYPE),
+        (RangeField.SONG_LENGTH, REAL_TYPE),
+        (RangeField.LAST_MODIFIED, REAL_TYPE),
     ]
 )
 
 PROFILE_TABLE = "PlayerProfile"
 PROFILE_FIELDS: SQLTableDict = OrderedDict(
     [
-        (ListField.ARRANGEMENT_ID, "text"),
-        (RangeField.PLAYED_COUNT, "integer"),
-        (RangeField.MASTERY_PEAK, "real"),
-        (RangeField.SA_PLAYED_COUNT, "integer"),
-        (RangeField.SA_EASY_COUNT, "integer"),
-        (RangeField.SA_MEDIUM_COUNT, "integer"),
-        (RangeField.SA_HARD_COUNT, "integer"),
-        (RangeField.SA_MASTER_COUNT, "integer"),
-        (RangeField.SA_EASY_BADGES, "integer"),
-        (RangeField.SA_MEDIUM_BADGES, "integer"),
-        (RangeField.SA_HARD_BADGES, "integer"),
-        (RangeField.SA_MASTER_BADGES, "integer"),
+        (ListField.ARRANGEMENT_ID, TEXT_TYPE),
+        (RangeField.PLAYED_COUNT, INTEGER_TYPE),
+        (RangeField.MASTERY_PEAK, REAL_TYPE),
+        (RangeField.SA_PLAYED_COUNT, INTEGER_TYPE),
+        (RangeField.SA_EASY_COUNT, INTEGER_TYPE),
+        (RangeField.SA_MEDIUM_COUNT, INTEGER_TYPE),
+        (RangeField.SA_HARD_COUNT, INTEGER_TYPE),
+        (RangeField.SA_MASTER_COUNT, INTEGER_TYPE),
+        (RangeField.SA_EASY_BADGES, INTEGER_TYPE),
+        (RangeField.SA_MEDIUM_BADGES, INTEGER_TYPE),
+        (RangeField.SA_HARD_BADGES, INTEGER_TYPE),
+        (RangeField.SA_MASTER_BADGES, INTEGER_TYPE),
     ]
 )
 
@@ -279,23 +282,48 @@ class SQLTable:
 
         return self._table_name
 
-    def field_list(self, prefix: str = "", new_table: bool = False) -> str:
+    def field_list(
+        self,
+        prefix: str = "",
+        new_table: bool = False,
+        exclude: List[SQLField] = [],
+        coalesce: bool = False,
+    ) -> str:
         """Generate a SQL string list of the field names, with one field per line.
 
         Keyword Arguments:
             prefix {str} -- Optional prefix on each line, which can be used for
                 indenting/pretty printing. (default: {""})
-            new_table {bool}: If true will generate the field list with type information
-                and primary key (primarily a utility for rebuild_table).
+            new_table {bool} -- If true will generate the field list with type
+                information and primary key (primarily a utility for rebuild_table).
+            exclude {List[SQLField]} -- Fields in this list will be excluded from the
+                SQL string (default: []).
+            coalesce {bool}: Intended for use in Select As statements (default: False).
+                If true, each line of the string will be of the form:
+
+                    Coalesce(<field name>, <default>) as <field name>
+
+                The default value is 0 for numeric types, and the empty string for
+                string types. Finally, coalesce and new_table cannot both be true
+                at the same time.
         """
-        if new_table and self._primary is None:
-            raise RSFilterError(
-                f"Can't generate a new table field list without a primary key."
-                f"\nTable named '{self._table_name}'' has no primary key."
-            )
+        if new_table:
+            if self._primary is None:
+                raise RSFilterError(
+                    f"Can't generate a new table field list without a primary key."
+                    f"\nTable named '{self._table_name}'' has no primary key."
+                )
+            if coalesce:
+                raise RSFilterError(
+                    f"Invalid call: new_table and coalesce cannot both be true."
+                )
 
         sql_text = ""
         for field, type_str in self._fields_dict.items():
+            if field in exclude:
+                # pass on this field.
+                continue
+
             primary = ""
             type_text = ""
             if new_table:
@@ -310,7 +338,17 @@ class SQLTable:
                 # first field
                 separator = ""
 
-            sql_text = f"{sql_text}{separator}{prefix}{field.value}{type_text}{primary}"
+            field_text = field.value
+            if coalesce:
+                if not type_str or type_str == TEXT_TYPE:
+                    # Fall back to text if undefined
+                    default = "''"
+                else:
+                    default = "0"
+
+                field_text = f"COALESCE({field_text}, {default}) AS {field_text}"
+
+            sql_text = f"{sql_text}{separator}{prefix}{field_text}{type_text}{primary}"
 
         return f"{sql_text}\n"
 
@@ -450,8 +488,8 @@ class SongListSQLGenerator:
         song_list_set: List[str],
         filter_definitions: Dict[str, Filter],
         list_validator: ListValidator,
-        arrangements_name: str,
-        profile_name: str,
+        arrangements_sql: SQLTable,
+        profile_sql: SQLTable,
     ) -> None:
         """Generate song list sql queries for a song list set and filter definitions.
 
@@ -490,12 +528,25 @@ class SongListSQLGenerator:
 
         self.tmp_table_sql.append((f"DROP TABLE IF EXISTS {self._root_table};", ()))
 
+        # Specify arrangement ID explicitly below
+        arrangement_fields = arrangements_sql.field_list(
+            prefix="    ", exclude=[ListField.ARRANGEMENT_ID]
+        )
+        profile_fields = profile_sql.field_list(
+            prefix="    ", exclude=[ListField.ARRANGEMENT_ID], coalesce=True
+        )
+
         # note that we exclude vocals here
         sql_text = (
-            f"CREATE TEMP TABLE {self._root_table} AS SELECT *"
-            f"\n  FROM {arrangements_name} LEFT JOIN {profile_name} ON"
-            f"\n    {arrangements_name}.{ARRANGEMENT_ID.value}"
-            f"\n      == {profile_name}.{ARRANGEMENT_ID.value}"
+            f"CREATE TEMP TABLE {self._root_table} AS SELECT"
+            f"\n    {arrangements_sql.table_name}.{ARRANGEMENT_ID.value} "
+            f"AS {ARRANGEMENT_ID.value},"
+            f"\n{arrangement_fields},"
+            f"\n{profile_fields}"
+            f"\n  FROM {arrangements_sql.table_name}"
+            f"\n    LEFT JOIN {profile_sql.table_name} ON"
+            f"\n      {arrangements_sql.table_name}.{ARRANGEMENT_ID.value}"
+            f"\n        == {profile_sql.table_name}.{ARRANGEMENT_ID.value}"
             f'\n  WHERE {ARRANGEMENT_NAME.value} != "Vocals";'
         )
 
@@ -1129,8 +1180,8 @@ class ArrangementDB:
             song_list_set,
             filter_definitions,
             self.list_validator(),
-            arrangements_name=ARRANGEMENTS_TABLE,
-            profile_name=PROFILE_TABLE,
+            arrangements_sql=self._arrangements_sql,
+            profile_sql=self._profile_sql,
         )
 
         conn = self.open_db()
