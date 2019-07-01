@@ -32,6 +32,8 @@ from rsrtools.files.profilemanager import RSProfileManager, RSFileSetError
 CONFIG_FILE = "config.toml"
 SONG_LIST_DEBUG_FILE = "RS_Song_Lists.txt"
 ARRANGEMENTS_GRID = "ArrangementsGrid.xml"
+# 100ms offset to deal with rounding in saved dlc_mtime
+DLC_MTIME_OFFSET = 0.01
 
 
 class SongListCreator:
@@ -557,13 +559,13 @@ class SongListCreator:
     def _cli_full_scan(self) -> None:
         """Do a full scan of song data and rebuild the arrangements table."""
         mtime = self._arr_db.scan_arrangements(last_modified=None, show_progress=True)
-        self._configuration.settings.dlc_mtime = mtime
+        self._configuration.settings.dlc_mtime = mtime + DLC_MTIME_OFFSET
 
     def _cli_partial_scan(self) -> None:
         """Do a partial scan of song data and update the arrangements table."""
         mtime = self._configuration.settings.dlc_mtime
         mtime = self._arr_db.scan_arrangements(last_modified=mtime, show_progress=True)
-        self._configuration.settings.dlc_mtime = mtime
+        self._configuration.settings.dlc_mtime = mtime + DLC_MTIME_OFFSET
 
     def song_list_cli(self) -> None:
         """Provide a command line menu for the song list generator routines."""

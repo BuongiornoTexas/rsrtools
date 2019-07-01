@@ -1418,6 +1418,10 @@ TODO
 Changelog
 ==========
 
+**0.3.5beta 2019-05-21** Song list filters will now pick up songs that have never
+been played (previously a song needed to have been played at least once for the database
+queries to fire). Fixed spurious detection of new DLC in songlists.
+
 **0.3.0beta 2019-05-21** Welder module for PSARC packing/unpacking. Scanner built into
 songlists.
 
