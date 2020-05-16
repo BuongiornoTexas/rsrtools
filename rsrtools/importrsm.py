@@ -116,11 +116,15 @@ def validate_song_keys(song_lists_dict: Dict[str, List[str]], working: Path) -> 
 
     if key_list is None:
         # do the most basic checks possible
+        # create translation dictionary of allowed non-alphanumeric characters
+        # allows easy extension if needed
+        allowed = str.maketrans({"_": None, "-": None})
+
         for id, song_list in song_lists_dict.items():
-            failed = [x for x in song_list if not x.isalnum()]
+            failed = [x for x in song_list if not x.translate(allowed).isalnum()]
             if failed:
                 raise ValueError(
-                    f"Song Key(s) for song list '{id}' are not alphanumeric."
+                    f"Song Key(s) for song list '{id}' contain invalid characters."
                     f"\n    {failed}"
                 )
 
@@ -425,9 +429,9 @@ def main() -> None:
         help="If specified, the importer will not check the song keys in the import "
         "file. Otherwise the importer will check the song keys against either: an "
         "arrangement database (if available), or against a basic character pattern "
-        "(currently a-zA-Z0-9). This may be useful if you have CDLC that has accented "
-        " characters or other characters outside the character pattern (if so, please "
-        "raise a github issue or PR so we can update the pattern).",
+        "(currently a-zA-Z0-9_-). This may be useful if you have CDLC that has "
+        "accented characters or other characters outside the character pattern (if "
+        "so, please raise a github issue or PR so we can update the pattern).",
         action="store_true",
     )
 

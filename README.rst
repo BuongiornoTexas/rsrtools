@@ -1418,6 +1418,11 @@ TODO
 Changelog
 ==========
 
+**1.0.0** First full release based on no issues being reported for a significant period.
+Includes a minor update to allow underscore and dash characters in importrsm song list
+names (this addresses a bug identified in
+`rs-manager issue 68 <https://github.com/sandiz/rs-manager/issues/68#issuecomment-604780122>`_).
+
 **0.3.5beta 2019-05-21** Song list filters will now pick up songs that have never
 been played (previously a song needed to have been played at least once for the database
 queries to fire). Fixed spurious detection of new DLC in songlists.
