@@ -22,6 +22,8 @@ Rocksmith PSARC structure.
 News and Breaking Changes
 ==========================
 
+**1.0.0** First full release. No major changes from 0.3.5.
+
 **0.3.0** Feature complete release (barring a GUI in the longer term future).
 The main feature added in this release is welder/welder.py for packing and unpacking 
 PSARC files, and the integration of the song scanner into the song list module. This
