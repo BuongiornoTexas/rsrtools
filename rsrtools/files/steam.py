@@ -68,8 +68,8 @@ def load_vdf(vdf_path: Path, strip_quotes: bool = False) -> Dict[Any, Any]:
     node: Dict[Any, Any] = vdf_dict
     section_label = ""
     branches = list()
-    with vdf_path.open("rt") as fh:
-        for line in fh:
+    with vdf_path.open("rt") as file_handle:
+        for line in file_handle:
             line_str = line.strip()
             try:
                 (key, value) = line_str.split()
@@ -153,8 +153,8 @@ def save_vdf(
                 value = double_quote(value)
             file_lines.append(f"{indent}{key}{VDF_SEPARATOR}{value}\n")
 
-    with vdf_path.open("wt") as fh:
-        fh.writelines(file_lines)
+    with vdf_path.open("wt") as file_handle:
+        file_handle.writelines(file_lines)
 
 
 class SteamAccountInfo(NamedTuple):
@@ -171,7 +171,7 @@ class SteamAccounts:
     """Provide data on Steam user accounts on the local machine.
 
     Public methods:
-        account_ids --  Return a list Steam account ids in string form (8 digit
+        account_ids --  Return a list Steam account ids in string form (integer
             account ids as strings).
         account_info -- Return a SteamAccountInfo named tuple for a specific account.
     """
@@ -208,6 +208,7 @@ class SteamAccounts:
             except (OSError, FileNotFoundError):
                 # Looks like we have no steam installation?
                 # Up to the user to decide what to do here.
+                print("I can't find the Steam installation path.")
                 raise
 
         elif platform == "darwin":
@@ -221,6 +222,7 @@ class SteamAccounts:
             except FileNotFoundError:
                 # Looks like we have no steam installation?
                 # Up to the user to decide what to do here.
+                print("I can't find the Steam installation path.")
                 raise
 
         else:
@@ -323,8 +325,12 @@ class SteamAccounts:
             if users_dir.is_dir():
                 for child in users_dir.iterdir():
                     if child.is_dir():
-                        if len(child.name) == 8 and child.name.isdigit():
-                            # Expecting an 8 digit integer account id.
+                        if child.name.isdigit():
+                            # Expecting an integer account id.
+                            # Removed 8 digit check as issue #15 confirms ids can be
+                            # longer. Changing this for normal use should not be an
+                            # issue, as rsrtools requires both a valid account and
+                            # a valid folder before modifying data.
                             ret_val[child.name] = child
 
         return ret_val
@@ -340,11 +346,11 @@ class SteamAccounts:
                 (default: {True})
 
         Returns:
-            List[str] -- A list of 8 digit account ids in string form.
+            List[str] -- A list of integer account ids in string form.
 
         """
         if only_valid:
-            ids = [x for x in self._account_info.keys() if self._account_info[x].valid]
+            ids = [x for x, account in self._account_info.items() if account.valid]
         else:
             ids = list(self._account_info.keys())
 
@@ -354,7 +360,7 @@ class SteamAccounts:
         """Return the account info for the specified Steam account id.
 
         Arguments:
-            account_id {str} -- An 8 digit steam id in string form.
+            account_id {str} -- An integer steam id in string form.
 
         Raises:
             KeyError -- If account_id doesn't exist.
@@ -366,7 +372,7 @@ class SteamAccounts:
         return self._account_info[account_id]
 
     def find_account_id(self, test_value: str, only_valid: bool = True) -> str:
-        """Convert test value into an 32 bit (8 digit) Steam account id.
+        """Convert test value into an 32 bit Steam account id.
 
         Arguments:
             test_value {str} -- This may be a 32 bit Steam ID, an 32 bit steam account
@@ -382,7 +388,7 @@ class SteamAccounts:
                 a partial record is found and only_valid is True.
 
         Returns:
-            str -- A 32 bit/8 digit Steam account id.
+            str -- A 32 bit Steam account id.
 
         """
         if not test_value:
