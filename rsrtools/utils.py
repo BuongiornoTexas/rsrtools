@@ -136,9 +136,9 @@ def yes_no_dialog(prompt: str) -> bool:
         print(prompt)
         print()
 
-        s = input("Y/n to confirm, N/n to reject >")
-        if s in ("Y", "y"):
+        response = input("Y/n to confirm, N/n to reject >")
+        if response in ("Y", "y"):
             return True
 
-        if s in ("N", "n"):
+        if response in ("N", "n"):
             return False
