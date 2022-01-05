@@ -18,14 +18,21 @@ from os import fsdecode
 from pathlib import Path
 from types import TracebackType
 from typing import Any, BinaryIO, Iterator, List, Optional, TextIO, Tuple, Type, cast
+from typing import TYPE_CHECKING
+from dataclasses import field
+from typing_extensions import Literal
 
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
-from dataclasses import field
-from pydantic.dataclasses import dataclass
 
 from rsrtools.files.exceptions import RSFileFormatError
 from rsrtools.utils import rsrpad
+
+# workaround for mypy checking. See https://github.com/python/mypy/issues/6239
+if TYPE_CHECKING:
+    from dataclasses import dataclass
+else:
+    from pydantic.dataclasses import dataclass
 
 # Header (and presumably  the rest of the file) is big endian
 SUFFIX = ".psarc"
@@ -70,7 +77,7 @@ WIN_KEY = bytes.fromhex(
 )
 
 
-@dataclass
+@dataclass  # pylint: disable=used-before-assignment
 class TocEntry:
     """Table of contents dataclass entry."""
 
@@ -269,7 +276,10 @@ class Welder:
             self._path = self._path.parent.joinpath(self._path.name + SUFFIX)
             # mypy doesn't have enough information to work out this is a binary mode
             # file.
-            self._fd = cast(BinaryIO, open(self._path, mode + "b"))
+            self._fd = cast(
+                BinaryIO,
+                open(self._path, mode + "b"),  # pylint: disable=unspecified-encoding
+            )
             # Packing is the only place an alternate manifest will be used.
             self._pack(pack_dir, odlc_wem=odlc_wem, use_manifest=use_manifest)
 
@@ -285,7 +295,7 @@ class Welder:
         exc_type: Optional[Type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
-    ) -> bool:
+    ) -> Literal[False]:
         """Clean up for context manager."""
         self.close()
         # Don't suppress exceptions
@@ -526,11 +536,11 @@ class Welder:
         arc_dir = Path(".").resolve().joinpath(self._path.stem)
         try:
             arc_dir.mkdir(parents=False, exist_ok=False)
-        except FileExistsError:
+        except FileExistsError as f_e:
             raise FileExistsError(
                 f"Cannot unpack archive into a directory that already exists:"
                 f"\n  {fsdecode(arc_dir)}."
-            )
+            ) from f_e
 
         for index in self:
             file = self._toc_entries[index]
@@ -631,7 +641,8 @@ class Welder:
                     self._verify_log("    For perfect rebuild, use CDLC md5.")
                 else:
                     self._verify_log(
-                        f"Unexpected manifest md5 entry {self._toc_entries[index].md5}",
+                        f"Unexpected manifest md5 entry "
+                        f"0x{self._toc_entries[index].md5.hex()}",
                         "WARNING",
                     )
 
@@ -716,8 +727,8 @@ class Welder:
             manifest = [x.path for x in self._toc_entries[1:]]
 
             # Expect ubisoft dlc to be in reverse alpha order.
-            tl = sorted(manifest, reverse=True)
-            if manifest != tl:
+            temp_list = sorted(manifest, reverse=True)
+            if manifest != temp_list:
                 self._verify_log(
                     "Manifest is not in reverse alphabetical order. Possibly custom "
                     "dlc?",
@@ -786,6 +797,7 @@ class Welder:
         file_stream.close()
 
         arc_data = arc_stream.getvalue()
+        # This is throwing a pylint error, but not sure why. Leaving for now.
         arc_stream.close
 
         return arc_data, block_lengths
@@ -815,6 +827,7 @@ class Welder:
         if self._verify:
             # Find the index for the file we are checking.
             check_index = -1
+            arc_path = ""
             for idx, arc_path in enumerate(manifest):
                 if arc_path.casefold() == toc_entry.path.casefold():
                     check_index = idx
@@ -869,8 +882,8 @@ class Welder:
                     "WARNING",
                 )
                 self._verify_log(
-                    f"  This is probably an older CDLC that uses a non-standard "
-                    f"compression level/method."
+                    "  This is probably an older CDLC that uses a non-standard "
+                    "compression level/method."
                 )
                 self._verify_log(
                     "  Continuing tests using original TOC and contents for this file."
@@ -1095,21 +1108,21 @@ class Welder:
     # 0x0L's rs-utils and rocksmith packages on github.
     # Still haven't figure out how to handle typing on pycryptodome yet.
     @staticmethod
-    def _sng_cipher(key: bytes, i_vector: bytes) -> Any:
+    def _sng_cipher(key: bytes, b_init_vector: bytes) -> Any:
         """Return cipher object for decrypting SNG data.
 
         Arguments:
             key {bytes} -- Decryption key.
-            i_vector {bytes} -- Initialisation vector.
+            b_init_vector {bytes} -- Initialisation vector.
 
         Returns:
             Any -- AES CTR mode cipher.
 
         """
-        iv = int.from_bytes(i_vector, "big")
+        int_init_vector = int.from_bytes(b_init_vector, "big")
         # I'm taking 0x0Ls word here. From the docs, this is a 16 byte counter
         # that starts at whatever iv is (which I suspect to be 0 from 0x0Ls encrypt?)
-        ctr = Counter.new(128, initial_value=iv, allow_wraparound=False)
+        ctr = Counter.new(128, initial_value=int_init_vector, allow_wraparound=False)
         return AES.new(key, mode=AES.MODE_CTR, counter=ctr)
 
     @staticmethod
@@ -1133,23 +1146,23 @@ class Welder:
         if header != SNG_HEADER:
             raise RSFileFormatError(
                 f"Unexpected header in '.SNG' file. Expected "
-                f"{SNG_HEADER}', got '{header}'."
+                f"'0x{SNG_HEADER.hex()}', got '0x{header.hex()}'."
             )
 
-        iv = data[SNG_IV_OFFSET:SNG_ENC_PAYLOAD_OFFSET]
+        b_init_vector = data[SNG_IV_OFFSET:SNG_ENC_PAYLOAD_OFFSET]
         # Remember to add 56 bytes of zeros to payload as signature when writing!
         # This is padding to replace the digital signature attached to the file.
         # The Customs Forge dll bypasses the DSA check, so the value doesn't matter.
         # Follow CFSM convention of 56 bytes of zeros.
         payload = data[SNG_ENC_PAYLOAD_OFFSET:SNG_SIG_OFFSET]
 
-        cipher = Welder._sng_cipher(key, iv)
+        cipher = Welder._sng_cipher(key, b_init_vector)
         payload = cipher.decrypt(rsrpad(payload, 16))
         length = struct.unpack("<L", payload[0:SNG_DEC_PAYLOAD_OFFSET])[0]
         payload = zlib.decompress(payload[SNG_DEC_PAYLOAD_OFFSET:])
 
         if length != len(payload):
-            raise RSFileFormatError(f"Unexpected payload size in SNG file.")
+            raise RSFileFormatError("Unexpected payload size in SNG file.")
 
         return payload
 
@@ -1175,16 +1188,16 @@ class Welder:
         payload = length + zlib.compress(data, zlib.Z_BEST_COMPRESSION)
 
         # Using 16 zero bytes as IV, in line with other rs decrypt/encrypt utilities
-        iv = bytes(16)
-        cipher = Welder._sng_cipher(key, iv)
+        b_init_vector = bytes(16)
+        cipher = Welder._sng_cipher(key, b_init_vector)
 
         # encrypt and chop off padding
-        e_payload = cipher.encrypt(rsrpad(payload, 16))[:len(payload)]
+        e_payload = cipher.encrypt(rsrpad(payload, 16))[: len(payload)]
         # Add 56 bytes of zeros to payload as signature when writing!
         # This is padding to replace the digital signature attached to the file.
         # The Customs Forge dll bypasses the DSA check, so the value doesn't matter.
         # Follow CFSM convention of 56 bytes of zeros.
-        e_payload = SNG_HEADER + iv + e_payload + bytes(56)
+        e_payload = SNG_HEADER + b_init_vector + e_payload + bytes(56)
 
         return e_payload
 

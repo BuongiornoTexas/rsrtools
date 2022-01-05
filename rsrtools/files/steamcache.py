@@ -131,7 +131,7 @@ class SteamMetadata:
             # this really, really shouldn't happen implies a corrupt Steam cache
             # file/file with missing keys.
             # Actually, not quite true - Steam can be a bit inconsistent on keyword
-            # casing - if this error is thrown, it should be the first thing to 
+            # casing - if this error is thrown, it should be the first thing to
             # investigate. However, I've sampled about 15 remotecache.vdf files
             # and they do all seem to use lower case keys. So for now, I'm
             # just going to assume this will keep working.
@@ -237,11 +237,11 @@ class SteamMetadata:
 
         hasher = sha1()
         if data is None:
-            with file_path.open("rb") as fh:
-                buffer = fh.read(BLOCK_SIZE)
+            with file_path.open("rb") as file_handle:
+                buffer = file_handle.read(BLOCK_SIZE)
                 while buffer:
                     hasher.update(buffer)
-                    buffer = fh.read(BLOCK_SIZE)
+                    buffer = file_handle.read(BLOCK_SIZE)
 
             # st_size works on windows
             file_size = file_path.stat().st_size  # cSpell:disable-line
@@ -369,7 +369,7 @@ def self_test() -> None:
     remote_cache = load_vdf(test_path.joinpath(REMOTE_CACHE_NAME), strip_quotes=False)
 
     test_passed = True
-    for app_id in remote_cache.keys():
+    for app_id in remote_cache:  # pylint: disable=consider-using-dict-items
         print(f"\nTesting steam app: {app_id}.")
         for cachefile in remote_cache[app_id].keys():
             print(f"\n  Test results for file: {cachefile}.")
@@ -380,7 +380,9 @@ def self_test() -> None:
             else:
                 metadata.update_metadata_set(app_id, filepath)
 
-                # reach into object for updated data set.
+                # reach into object for updated data set - break protection for
+                # self test.
+                # pylint: disable-next=protected-access
                 calculated_metadata = metadata._cloud_file_metadata_set(
                     app_id, filepath
                 )

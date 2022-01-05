@@ -99,7 +99,7 @@ class RSSaveFile:
     _header: bytes
     # too hard to figure out how factory annotation works today.
     # for now make _cipher explicitly dynamic with an Any type
-    # TODO: more reading another time.
+    # TODO: more reading another time. # pylint: disable=fixme
     _cipher: Any
     _debug_z_payload: bytes  # compressed payload
     _debug_payload: bytes  # null terminated payload
@@ -300,8 +300,8 @@ class RSSaveFile:
         """
         file_data = self._generate_file_data(self_check=False)
 
-        with save_path.open(mode) as fh:
-            fh.write(file_data)
+        with save_path.open(mode) as file_handle:
+            file_handle.write(file_data)
 
     def overwrite_original(self) -> None:
         """Overwrite original save file with instance data."""
@@ -319,9 +319,9 @@ class RSSaveFile:
 
     def _load_file(self) -> None:
         """Load save file into memory and perform preliminary integrity checks."""
-        with self._file_path.open("rb") as f:
+        with self._file_path.open("rb") as file_handle:
             # discard self._original_file_data after validation at end of __init__
-            self._original_file_data = f.read()
+            self._original_file_data = file_handle.read()
 
         self._header = self._original_file_data[0:HEADER_BYTES]
 
@@ -420,8 +420,8 @@ class RSSaveFile:
         if self._json_debug_path is not None:
             # Note: this is the raw json as loaded, not reconstructed.
             # See save_json_file for reconstructed json file
-            with self._json_debug_path.open("xt") as fh:
-                fh.write(payload.decode())
+            with self._json_debug_path.open("xt", encoding='locale') as file_handle:
+                file_handle.write(payload.decode())
 
         # we use simplejson because it understands decimals and will preserve number
         # formats in the file (required for reconstructability checks).
@@ -436,8 +436,8 @@ class RSSaveFile:
         Useful for debugging and working out changes in file formats.
         """
         payload = self._generate_json_string()
-        with file_path.open("xt") as fh:
-            fh.write(payload)
+        with file_path.open("xt") as file_handle:
+            file_handle.write(payload)
 
 
 def self_test() -> None:
@@ -452,6 +452,8 @@ def self_test() -> None:
     I'd strongly recommend you **do not** run this script on any of your steam
     directories.
     """
+    # This test deliberately breaks several style rules and has disables sprinkled
+    # liberally throughout.
     parser = argparse.ArgumentParser(
         description="Runs a self test of RSSaveFile on a specified directory."
     )
@@ -470,7 +472,7 @@ def self_test() -> None:
                 print(
                     f"Successfully loaded and validated save file '{fsdecode(child)}'."
                 )
-            except Exception as exc:
+            except Exception as exc:  # pylint: disable=broad-except
                 # probably not a save file. Provide a message and move on.
                 print(
                     f"Failed to load and validate file '{fsdecode(child)}'."
@@ -481,7 +483,7 @@ def self_test() -> None:
                 print(exc)
 
     if keep_save_file is not None:
-        test_path = keep_save_file._file_path
+        test_path = keep_save_file._file_path  # pylint: disable=protected-access
         test_path = test_path.with_suffix(test_path.suffix + ".test.tmp")
 
         if test_path.exists():
@@ -497,7 +499,7 @@ def self_test() -> None:
                 try:
                     keep_save_file = RSSaveFile(test_path)
                     print("  Reloaded and validated test file.")
-                except Exception as exc:
+                except Exception as exc:  # pylint: disable=broad-except
                     print(
                         "  Failed to reload and validate test file. Error details "
                         "follow."
@@ -507,7 +509,7 @@ def self_test() -> None:
                 # clean up
                 test_path.unlink()
 
-            except Exception as exc:
+            except Exception as exc:  # pylint: disable=broad-except
                 print(
                     f"Failed to save test file '{fsdecode(test_path)}'.\nThere "
                     f"may be a problem with with the RSSaveFile class. Error details "
