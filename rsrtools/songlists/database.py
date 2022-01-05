@@ -277,7 +277,7 @@ class SQLTable:
     @property
     def table_name(self) -> str:
         """Return the string table name, or an exception if not defined."""
-        if not (self._table_name):
+        if not self._table_name:
             raise RSFilterError("Table name is not defined (maybe only a field list?).")
 
         return self._table_name
@@ -286,7 +286,7 @@ class SQLTable:
         self,
         prefix: str = "",
         new_table: bool = False,
-        exclude: List[SQLField] = [],
+        exclude: Union[List[SQLField], None] = None,
         coalesce: bool = False,
     ) -> str:
         """Generate a SQL string list of the field names, with one field per line.
@@ -296,8 +296,8 @@ class SQLTable:
                 indenting/pretty printing. (default: {""})
             new_table {bool} -- If true will generate the field list with type
                 information and primary key (primarily a utility for rebuild_table).
-            exclude {List[SQLField]} -- Fields in this list will be excluded from the
-                SQL string (default: []).
+            exclude {Union[List[SQLField], None]} -- Fields in this list will be
+                excluded from the SQL string (default: None).
             coalesce {bool}: Intended for use in Select As statements (default: False).
                 If true, each line of the string will be of the form:
 
@@ -315,12 +315,12 @@ class SQLTable:
                 )
             if coalesce:
                 raise RSFilterError(
-                    f"Invalid call: new_table and coalesce cannot both be true."
+                    "Invalid call: new_table and coalesce cannot both be true."
                 )
 
         sql_text = ""
         for field, type_str in self._fields_dict.items():
-            if field in exclude:
+            if exclude and field in exclude:
                 # pass on this field.
                 continue
 
@@ -426,11 +426,11 @@ class SQLTable:
 
             try:
                 values[self._primary.value]
-            except KeyError:
+            except KeyError as k_e:
                 raise RSFilterError(
                     f"There is no key/value for primary key {self._primary} in "
                     f"table named '{self._table_name}'."
-                )
+                ) from k_e
 
             # create and cache the script.
             field_list = self.field_list(prefix="  ")
@@ -709,7 +709,9 @@ class SongListSQLGenerator:
                 self._list_validator
             )
         except RSFilterError as exc:
-            raise RSFilterError(f"WHERE clause error for filter {filter_name}.\n{exc}")
+            raise RSFilterError(
+                f"WHERE clause error for filter {filter_name}.\n{exc}"
+            ) from exc
 
         return clause, values
 
@@ -890,8 +892,8 @@ class ArrangementDB:
         self._arrangements_sql.rebuild_table(self.open_db())
         # create file object from path to keep mypy happy
         # (e-tree seems to grok pathlikes, but annotations don't reflect this)
-        with cfsm_xml_file.open("rt") as fp:
-            tree = eTree.parse(fp)
+        with cfsm_xml_file.open("rt") as file_handle:
+            tree = eTree.parse(file_handle)
 
         root = tree.getroot()
 
@@ -967,9 +969,9 @@ class ArrangementDB:
             for key, item in PLAYER_PROFILE_MAP.items():
                 json_path = list(item[0])
 
-                for i in range(
+                for i in range(  # pylint: disable=consider-using-enumerate
                     len(json_path)
-                ):  # pylint: disable=consider-using-enumerate
+                ):
                     if json_path[i] == ":a_id":
                         json_path[i] = a_id
 
@@ -1321,19 +1323,19 @@ def main() -> None:
 
     db_dir = Path(args.db_directory).resolve(True)
 
-    db = ArrangementDB(db_dir)
+    arr_db = ArrangementDB(db_dir)
 
     if args.CFSMxml is not None:
-        db.load_cfsm_arrangements(Path(args.CFSMxml).resolve(True))
+        arr_db.load_cfsm_arrangements(Path(args.CFSMxml).resolve(True))
 
     if args.scan_songs:
-        db.scan_arrangements(show_progress=True)
+        arr_db.scan_arrangements(show_progress=True)
 
     if args.update_player_data:
-        db.cl_update_player_data(db_dir)
+        arr_db.cl_update_player_data(db_dir)
 
     if args.reports:
-        db.run_cl_reports()
+        arr_db.run_cl_reports()
 
 
 if __name__ == "__main__":
