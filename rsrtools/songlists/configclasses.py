@@ -4,14 +4,14 @@
 
 # cSpell: ignore pydantic
 
-import toml
-
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
 from dataclasses import field, asdict, replace  # cSpell: disable-line
 from pydantic.dataclasses import dataclass
+
+import toml
 
 from rsrtools import __version__ as RSRTOOLS_VERSION
 from rsrtools.songlists.config import RangeField, ListField, SQLField
@@ -333,7 +333,7 @@ Testing = [
 {CONFIG_INCLUDE} = false
 {CONFIG_VALUES} = [
     "E Standard", "Eb Standard", "D Standard", "C# Standard", "C Standard",
-    "B Standard", "Bb Standard", "A Standard",    
+    "B Standard", "Bb Standard", "A Standard",
     "Drop D", "Eb Drop Db", "D Drop C", "C# Drop B", "C Drop A#", "B Drop A",
     "Bb Drop Ab", "A Drop G",
 ]
@@ -574,7 +574,7 @@ class Settings:
     """
 
     # instance variables
-    CFSM_file_path: str = ""
+    CFSM_file_path: str = ""  # pylint: disable=invalid-name
     steam_account_id: str = ""
     player_profile: str = ""
     version: str = ""
@@ -769,7 +769,7 @@ class ListSubFilter(SubFilter):
 
         values: List[str] = list()
 
-        # Silently ignore invalid values (better then the old message of 
+        # Silently ignore invalid values (better then the old message of
         # failing unceremoniously)
         for value in self.values:
             if value in list_validator[field_type]:
@@ -854,12 +854,12 @@ class Filter:
                 if isinstance(sub_filter, RangeSubFilter):
                     try:
                         field_type = RangeField(field_name)
-                    except ValueError:
+                    except ValueError as v_e:
                         raise RSFilterError(
                             f"WHERE clause error: Invalid field type ({field_name}) "
                             f"for range type sub-filter.\nThis should be a member of "
                             f"RangeField Enum. "
-                        )
+                        ) from v_e
 
                     sub_text, range_list = sub_filter.range_clause(field_type)
                     where_values.extend(range_list)
@@ -868,12 +868,12 @@ class Filter:
                 elif isinstance(sub_filter, ListSubFilter):
                     try:
                         field_type = ListField(field_name)
-                    except ValueError:
+                    except ValueError as v_e:
                         raise RSFilterError(
                             f"WHERE clause error: Invalid field type ({field_name}) "
                             f"for list type sub-filter.\nThis should be a member of "
                             f"ListField Enum."
-                        )
+                        ) from v_e
 
                     sub_text, value_list = sub_filter.list_clause(
                         field_type, list_validator
@@ -891,15 +891,15 @@ class Filter:
             except RSFilterError as exc:
                 raise RSFilterError(
                     f"WHERE clause error for sub filter {field_name}.\n{exc}"
-                )
+                ) from exc
 
         try:
             mode_text = FilterMode(self.mode).value
-        except ValueError:
+        except ValueError as v_e:
             raise RSFilterError(
                 f"WHERE clause error: Invalid mode '{self.mode}''. Should be a member "
                 f"of FilterMode Enum."
-            )
+            ) from v_e
 
         # This is clumsy, but allows dumping of SQL for debugging.
         where_text = f"\n    {mode_text} "
@@ -941,8 +941,8 @@ class Configuration:
         the file.
         """
         try:
-            with toml_path.open("rt") as fp:
-                data_dict = toml.load(fp)
+            with toml_path.open("rt") as file_handle:
+                data_dict = toml.load(file_handle)
         except FileNotFoundError:
             data_dict = dict()
 
@@ -968,15 +968,15 @@ class Configuration:
         Arguments:
             toml_path {Path} -- Path to the toml file.
         """
-        with toml_path.open("wt") as fp:
+        with toml_path.open("wt") as file_handle:
             for key, item in asdict(self).items():  # cSpell: disable-line
                 if key != "filters":
-                    toml.dump({key: item}, fp)
-                    fp.write("\n")
+                    toml.dump({key: item}, file_handle)
+                    file_handle.write("\n")
                 else:
                     # force toml to keep filter structures together
                     sub_dict = {}
                     for sub_key, sub_item in item.items():
                         sub_dict["filters"] = {sub_key: sub_item}
-                        toml.dump(sub_dict, fp)
-                        fp.write("\n")
+                        toml.dump(sub_dict, file_handle)
+                        file_handle.write("\n")

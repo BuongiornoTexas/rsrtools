@@ -5,18 +5,20 @@
 # cSpell:ignore steamapps, stat, rpartition, isdigit, CGCGGE, CGCGBE, firekorn
 # cSpell:ignore CACGCE, EADG, etudes
 
-import simplejson
-
 from sys import platform
 
 from pathlib import Path
 from typing import Any, Dict, Iterator, Optional
+
+import simplejson
 
 from rsrtools.songlists.config import ListField, RangeField
 from rsrtools.files.steam import SteamAccounts, load_vdf
 from rsrtools.files.welder import Welder
 
 LIBRARY_VDF = "steamapps/libraryfolders.vdf"
+LIBRARY_FOLDERS = "libraryfolders"
+LIBRARY_PATH = "path"
 ROCKSMITH_PATH = "steamapps/common/Rocksmith2014"
 DLC_PATH = "dlc"
 MAC_PSARC = "_m.psarc"
@@ -115,13 +117,17 @@ def rocksmith_path() -> Path:
             library_info = None
 
         if library_info is not None:
-            for i in range(1, 8):
-                path_str = library_info["LibraryFolders"].get(str(i), "")
-                try:
-                    rs_path = Path(path_str).joinpath(ROCKSMITH_PATH).resolve(True)
-                    break
-                except FileNotFoundError:
-                    pass
+            for data_value in library_info[LIBRARY_FOLDERS].values():
+                path_str = ""
+                if isinstance(data_value, dict):
+                    path_str = data_value.get(LIBRARY_PATH, "")
+
+                if path_str:
+                    try:
+                        rs_path = Path(path_str).joinpath(ROCKSMITH_PATH).resolve(True)
+                        break
+                    except FileNotFoundError:
+                        pass
 
     if rs_path is None:
         raise FileNotFoundError("Can't find Rocksmith installation.")
@@ -278,8 +284,8 @@ class Scanner:
                 "Arrangement file with no or multiple Entries (must have one only)."
             )
 
-        for arr_id in sub_dict.keys():
-            pass
+        # Use iterator to grab first key
+        arr_id = next(iter(sub_dict.keys()))
 
         arrangement[ListField.ARRANGEMENT_ID.value] = arr_id
 
@@ -350,8 +356,8 @@ class Scanner:
                 "Arrangement file with no or multiple Entries (must have one only)."
             )
 
-        for arr_id in sub_dict.keys():
-            pass
+        # Use iterator to grab first key
+        arr_id = next(iter(sub_dict.keys()))
 
         sub_dict = sub_dict[arr_id]["Attributes"]
 
@@ -424,9 +430,7 @@ class Scanner:
 
                     if internal:
                         # Cut out the middleman, fill an internal entry
-                        yield self._internal_data(
-                            psarc.arc_data(index), last_modified
-                        )
+                        yield self._internal_data(psarc.arc_data(index), last_modified)
                     elif name in INTERNAL_SONGS:
                         # There are a couple of internal tracks in songs.psarc.
                         # This traps them.
@@ -434,8 +438,8 @@ class Scanner:
 
                     else:
                         name = name.replace(".json", "")
-                        for sep in track_types.keys():
-                            base, found, suffix = name.rpartition(sep)
+                        for sep in track_types:
+                            _unused, found, suffix = name.rpartition(sep)
                             if found and (not suffix or suffix.isdigit()):
                                 # We are looking for a successful partition and either
                                 # no suffix or digit only suffix
@@ -476,7 +480,6 @@ class Scanner:
             last_modified = -1
         else:
             scan_all = False
-        pass
 
         # Gather paths to files we will scan for songs
         if platform == "win32":

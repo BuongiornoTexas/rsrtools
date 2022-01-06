@@ -8,7 +8,7 @@ For command line options (database setup, reporting), run:
     'python -m rsrtools.files.profilemanager -h'
 """
 
-# cSpell:ignore shutil, PRFLDB, mkdir, strftime, nargs
+# cSpell:ignore shutil, PRFLDB, mkdir, strftime, nargs, fstring
 
 import argparse
 import copy
@@ -62,7 +62,7 @@ LP_UNIQUE_ID = "UniqueID"
 LP_LAST_MODIFIED = "LastModified"
 
 # type alias
-JSON_path_type = Sequence[Union[int, str, ProfileKey]]
+JSON_path_type = Sequence[Union[int, str, ProfileKey]]  # pylint: disable=invalid-name
 
 
 class RSFileSetError(Exception):
@@ -317,6 +317,7 @@ class RSSaveWrapper:
         Refer to get/set_json_subtree for usage.
 
         """
+        path_item: Union[str, int]
         node = self.json_tree
         prev_node = node
 
@@ -332,10 +333,10 @@ class RSSaveWrapper:
                 if isinstance(node, dict):
                     try:
                         node = node[path_item]
-                    except KeyError:
+                    except KeyError as f_e:
                         raise KeyError(
                             f"Invalid key {path_item} in JSON path {json_path}."
-                        )
+                        ) from f_e
                 else:
                     raise KeyError(
                         f"Key {path_item} supplied in JSON path {json_path}, but JSON "
@@ -345,10 +346,10 @@ class RSSaveWrapper:
                 if isinstance(node, list):
                     try:
                         node = node[path_item]
-                    except IndexError:
+                    except IndexError as i_e:
                         raise IndexError(
                             f"Invalid index {path_item} in JSON path {json_path}."
-                        )
+                        ) from i_e
                 else:
                     raise IndexError(
                         f"Index {path_item} supplied in JSON path {json_path}, but "
@@ -664,7 +665,9 @@ class RSProfileDB(RSSaveWrapper):
                     "either ProfileKey.FAVORITES_LIST or ProfileKey.SONG_LISTS"
                 )
 
-            if not (0 <= list_index <= MAX_SONG_LIST_COUNT - 1):
+            if not (
+                0 <= list_index <= MAX_SONG_LIST_COUNT - 1
+            ):  # pylint: disable=superfluous-parens
                 raise RSProfileError(
                     f"List index must be in the range 0 to 5 for SONG_LISTS. "
                     f"Got {list_index}."
@@ -774,7 +777,7 @@ class RSFileSet:
         resolved_path = remote_path.resolve()
         dir_name = resolved_path.name
         if dir_name != STEAM_REMOTE_DIR:
-            logging.warning(
+            logging.warning(  # pylint: disable=logging-fstring-interpolation
                 f"Rocksmith profiles should be in a directory named:"
                 f"\n    {STEAM_REMOTE_DIR}\nRocksmith file set constructor (__init__) "
                 f"called on directory named:\n    {dir_name}"
@@ -792,7 +795,7 @@ class RSFileSet:
         try:
             self._fs_local_profiles = RSLocalProfiles(resolved_path)
         except FileNotFoundError as exc:
-            logging.warning(
+            logging.warning(  # pylint: disable=logging-fstring-interpolation
                 f"Rocksmith local profiles file expected but not found:"
                 f"\n   {str(exc)}"
             )
@@ -848,7 +851,7 @@ class RSFileSet:
 
         if not self._fs_profiles:
             consistent = False
-            logging.warning(
+            logging.warning(  # pylint: disable=logging-fstring-interpolation
                 f"Warning: No Rocksmith save files ({PROFILE_DB_STR}) found in:"
                 f"\n    {fsdecode(remote_path)}."
             )
@@ -856,7 +859,7 @@ class RSFileSet:
         for rs_profile in self._fs_profiles.values():
             if not rs_profile.player_name:
                 consistent = False
-                logging.warning(
+                logging.warning(  # pylint: disable=logging-fstring-interpolation
                     f"Rocksmith save file has no player name:"
                     f"\n   {fsdecode(rs_profile.file_path)}"
                 )
@@ -873,7 +876,7 @@ class RSFileSet:
                     RS_APP_ID, rs_save.file_path
                 ):
                     consistent = False
-                    logging.warning(
+                    logging.warning(  # pylint: disable=logging-fstring-interpolation
                         f"Steam cache contains no data for file:"
                         f"\n   {fsdecode(rs_save.file_path)}"
                     )
@@ -1252,7 +1255,7 @@ class RSProfileManager:
         if chosen_file_set.steam_metadata is None:
             # Really shouldn't be possible.
             raise RSFileSetError(
-                f"Very unexpected: undefined Steam metadata for chosen fileset."
+                "Very unexpected: undefined Steam metadata for chosen fileset."
             )
         self._steam_metadata = chosen_file_set.steam_metadata
 
@@ -1465,7 +1468,7 @@ class RSProfileManager:
             if file_set.consistent:
                 steam_file_sets[account_id] = file_set
             else:
-                logging.warning(
+                logging.warning(  # pylint: disable=logging-fstring-interpolation
                     f"Discarding inconsistent Rocksmith save file set for Steam user:"
                     f"\n    {self.steam_description(account_id)}"
                     f"\nRefer to previous warnings for details ."
@@ -2021,8 +2024,8 @@ class RSProfileManager:
                 arrangements.append(arr)
 
         else:
-            with arrangement_path.open("rt") as fp:
-                for line in fp:
+            with arrangement_path.open("rt") as file_handle:
+                for line in file_handle:
                     arr = line.strip()
                     if arr:
                         arrangements.append(arr)
@@ -2111,8 +2114,8 @@ class RSProfileManager:
         if play_count_file_path is None:
             raise ValueError("Invalid play count path (None).")
 
-        with play_count_file_path.open("rt") as fp:
-            for arr_line in fp:
+        with play_count_file_path.open("rt") as file_handle:
+            for arr_line in file_handle:
                 arr_id, count = arr_line.split(",")
                 arr_id = arr_id.strip()
                 count = count.strip()
@@ -2179,10 +2182,11 @@ class RSProfileManager:
 
 def main() -> None:
     """Provide basic command line main."""
-    # TODO Maybe in future add functionality to delete arrangement data. Need more
-    #       confidence on what is/isn't useful data (target player arrangement data
-    #       where the is no corresponding song arrangement data - but need to eliminate
-    #       lesson/practice tracks first - and for this, need a ps arc extractor!).
+    # TODO Maybe in future add functionality to delete # pylint: disable=fixme
+    #        arrangement data. Need more confidence on what is/isn't useful data
+    #       (target player arrangement data where there is no corresponding song
+    #       arrangement data - but need to eliminate lesson/practice tracks first
+    #       - and for this, need a ps arc extractor!).
 
     parser = argparse.ArgumentParser(
         description="Command line interface for Rocksmith profile manager utilities."
@@ -2234,31 +2238,33 @@ def main() -> None:
     args = parser.parse_args()
 
     working = Path(args.working_dir).resolve(True)
-    pm = RSProfileManager(working)
+    profile_mgr = RSProfileManager(working)
 
     if args.clone_profile:
-        pm.cl_clone_profile()
+        profile_mgr.cl_clone_profile()
 
     elif args.set_play_counts is not None:
-        pm.cl_edit_action(pm.edit_play_counts, Path(args.set_play_counts))
+        profile_mgr.cl_edit_action(
+            profile_mgr.edit_play_counts, Path(args.set_play_counts)
+        )
 
     elif args.delete_arrangements is not None:
         if not args.delete_arrangements:
             # This is an interactive run.
-            pm.cl_edit_action(pm.delete_profile_arrangements, None)
+            profile_mgr.cl_edit_action(profile_mgr.delete_profile_arrangements, None)
         else:
             # Path specified.
-            pm.cl_edit_action(
-                pm.delete_profile_arrangements, Path(args.delete_arrangements)
+            profile_mgr.cl_edit_action(
+                profile_mgr.delete_profile_arrangements, Path(args.delete_arrangements)
             )
 
     elif args.dump_profile:
-        target = pm.cl_choose_profile(
+        target = profile_mgr.cl_choose_profile(
             no_action_text="Exit.",
             header_text="Which profile do you want to export as a JSON file?",
         )
         if target:
-            pm.export_json_profile(target, working.joinpath(target + ".json"))
+            profile_mgr.export_json_profile(target, working.joinpath(target + ".json"))
             print(f"Profile exported as '{target}.json'.")
         else:
             print("No profile selected, no data exported.")

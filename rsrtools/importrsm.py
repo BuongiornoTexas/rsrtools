@@ -69,10 +69,11 @@ def find_paths(definitions: List[List[str]], working: Path) -> Dict[str, Path]:
     """
     paths: Dict[str, Path] = dict()
 
-    for id, file_name in definitions:
-        if id not in ("1", "2", "3", "4", "5", "6", "F"):
+    for song_list_id, file_name in definitions:
+        if song_list_id not in ("1", "2", "3", "4", "5", "6", "F"):
             raise ValueError(
-                f"Undefined list id '{id}', should be a number from '1' to '6' or 'F'."
+                f"Undefined list id '{song_list_id}', should be a number from '1' to "
+                f"'6' or 'F'."
             )
 
         try:
@@ -81,13 +82,14 @@ def find_paths(definitions: List[List[str]], working: Path) -> Dict[str, Path]:
             # try again, but allow a fail on this one
             song_file = Path(file_name).resolve(True)
 
-        if id in paths:
+        if song_list_id in paths:
             logger.log_this(
-                f"WARNING: You have specified song list '{id}' more than once."
-                "\n  Are you sure you meant to to this?"
+                f"WARNING: You have specified song list '{song_list_id}' more than "
+                f"once."
+                f"\n  Are you sure you meant to to this?"
             )
-        paths[id] = song_file
-        logger.log_this(f"Found json file for song list '{id}'")
+        paths[song_list_id] = song_file
+        logger.log_this(f"Found json file for song list '{song_list_id}'")
 
     return paths
 
@@ -120,21 +122,22 @@ def validate_song_keys(song_lists_dict: Dict[str, List[str]], working: Path) -> 
         # allows easy extension if needed
         allowed = str.maketrans({"_": None, "-": None})
 
-        for id, song_list in song_lists_dict.items():
+        for song_list_id, song_list in song_lists_dict.items():
             failed = [x for x in song_list if not x.translate(allowed).isalnum()]
             if failed:
                 raise ValueError(
-                    f"Song Key(s) for song list '{id}' contain invalid characters."
+                    f"Song Key(s) for song list '{song_list_id}' contain invalid "
+                    f"characters."
                     f"\n    {failed}"
                 )
 
     else:
-        for id, song_list in song_lists_dict.items():
+        for song_list_id, song_list in song_lists_dict.items():
             failed = [x for x in song_list if x not in key_list]
             if failed:
                 raise ValueError(
-                    f"Song Key(s) for song list '{id}' are not in the arrangement "
-                    f"database."
+                    f"Song Key(s) for song list '{song_list_id}' are not in the "
+                    f"arrangement database."
                     f"\n    {failed}"
                 )
 
@@ -153,11 +156,13 @@ def read_lists(paths: Dict[str, Path]) -> Dict[str, List[str]]:
 
     """
     sl_dict: Dict[str, List[str]] = dict()
-    for id, file_path in paths.items():
-        logger.log_this(f"Reading file '{file_path.name}'' for song list '{id}'.")
+    for song_list_id, file_path in paths.items():
+        logger.log_this(
+            f"Reading file '{file_path.name}'' for song list '{song_list_id}'."
+        )
 
-        with open(file_path, "rt") as fp:
-            song_list = simplejson.load(fp)
+        with open(file_path, "rt", encoding="locale") as file_handle:
+            song_list = simplejson.load(file_handle)
 
         # structure checks - could have used a schema for this.
         # because I'm a bit lazy here, might also fail if a song key
@@ -181,7 +186,7 @@ def read_lists(paths: Dict[str, Path]) -> Dict[str, List[str]]:
         # just to be sure, clean out white space and empty strings silently.
         song_list = [x for x in song_list if x.strip() != ""]
 
-        sl_dict[id] = song_list
+        sl_dict[song_list_id] = song_list
 
     logger.log_this("All song list files passed structure tests.")
     return sl_dict
@@ -213,26 +218,28 @@ def get_profile_manager(
 
         else:
             # select account interactively
-            pm = RSProfileManager(working, auto_setup=True, flush_working_set=True)
-            account_id = pm.steam_account_id
+            profile_mgr = RSProfileManager(
+                working, auto_setup=True, flush_working_set=True
+            )
+            account_id = profile_mgr.steam_account_id
 
     else:
         # Find the steam account and load a profile manager, throwing exceptions
         # as we run into problems.
-        sa = SteamAccounts()
-        account_id = sa.find_account_id(user_id)
-        pm = RSProfileManager(
+        accounts = SteamAccounts()
+        account_id = accounts.find_account_id(user_id)
+        profile_mgr = RSProfileManager(
             working,
             steam_account_id=account_id,
             auto_setup=True,
             flush_working_set=True,
         )
 
-    return pm
+    return profile_mgr
 
 
 def select_profile(
-    pm: RSProfileManager, input_profile: Optional[str], no_interactive: bool
+    profile_mgr: RSProfileManager, input_profile: Optional[str], no_interactive: bool
 ) -> str:
     """Select the Rocksmith profile for profile updates.
 
@@ -255,7 +262,7 @@ def select_profile(
 
         else:
             # select account interactively
-            profile = pm.cl_choose_profile(
+            profile = profile_mgr.cl_choose_profile(
                 header_text="Select the target profile for song list importing.",
                 no_action_text="To exit without applying updates (raises error).",
             )
@@ -263,20 +270,20 @@ def select_profile(
                 raise ValueError("No profile name selected for song list import.")
 
     else:
-        if input_profile in pm.profile_names():
+        if input_profile in profile_mgr.profile_names():
             profile = input_profile
 
         else:
             raise ValueError(
                 f"'{input_profile}' is not a valid profile name for' Steam "
-                f"account '{pm.steam_account_id}'"
+                f"account '{profile_mgr.steam_account_id}'"
             )
 
     return profile
 
 
 def import_faves_by_replace(
-    pm: RSProfileManager, profile: str, song_list_dict: Dict[str, List[str]]
+    profile_mgr: RSProfileManager, profile: str, song_list_dict: Dict[str, List[str]]
 ) -> None:
     """Replace favorites song list in profile.
 
@@ -298,11 +305,13 @@ def import_faves_by_replace(
         # by product, set_json_subtree marks the profile as dirty for saving.
         # From a python object perspective, this corresponds to the following statement:
         #   profile_json["FavoritesListRoot"]["Favorites"] = song_list
-        pm.set_json_subtree(profile, ("FavoritesListRoot", "FavoritesList"), song_list)
+        profile_mgr.set_json_subtree(
+            profile, ("FavoritesListRoot", "FavoritesList"), song_list
+        )
 
 
 def import_song_lists_by_mutable(
-    pm: RSProfileManager, profile: str, song_list_dict: Dict[str, List[str]]
+    profile_mgr: RSProfileManager, profile: str, song_list_dict: Dict[str, List[str]]
 ) -> None:
     """Replace one or more of song lists 1 to 6 in profile.
 
@@ -317,7 +326,9 @@ def import_song_lists_by_mutable(
     but doesn't save or move the profiles.
 
     """
-    list_of_song_lists = pm.get_json_subtree(profile, ("SongListsRoot", "SongLists"))
+    list_of_song_lists = profile_mgr.get_json_subtree(
+        profile, ("SongListsRoot", "SongLists")
+    )
     for key, song_list in song_list_dict.items():
         if key.isdigit() and 1 <= int(key) <= 6:
             # We have a song list to update, so let's do it!
@@ -332,7 +343,7 @@ def import_song_lists_by_mutable(
 
             # While we know we have modified the instance data, the profile manager
             # doesn't. So we tell it explicitly.
-            pm.mark_as_dirty(profile)
+            profile_mgr.mark_as_dirty(profile)
 
 
 def parse_prfldb_path(raw_path: str) -> Tuple[str, str]:
@@ -361,14 +372,14 @@ def parse_prfldb_path(raw_path: str) -> Tuple[str, str]:
     logger.log_this(f"Found unique id '{unique_id}' from path.")
 
     path = path.parent
-    for id in (STEAM_REMOTE_DIR, RS_APP_ID):
-        if path.name.upper() == id.upper():
+    for test_id in (STEAM_REMOTE_DIR, RS_APP_ID):
+        if path.name.upper() == test_id.upper():
             path = path.parent
         else:
             raise ValueError(
                 f"Path to profile id must have the following elements:"
                 f"<Steam account id>\\{RS_APP_ID}\\{STEAM_REMOTE_DIR}\\<profile name>."
-                f"\nFailed on element '{id}'."
+                f"\nFailed on element '{test_id}'."
             )
 
     account_id = path.name
@@ -469,7 +480,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # Share the logger everywhere.
-    global logger
+    global logger  # pylint: disable=global-statement disable=invalid-name
     logger = SimpleLog(args.silent)
 
     if args.song_list is None:
@@ -505,35 +516,39 @@ def main() -> None:
         account_id = args.account_id
         unique_id = ""
 
-    pm = get_profile_manager(account_id, args.silent, working)
+    profile_mgr = get_profile_manager(account_id, args.silent, working)
 
     if unique_id:
-        profile = pm.unique_id_to_profile(unique_id)
+        profile = profile_mgr.unique_id_to_profile(unique_id)
         logger.log_this(f"Unique id '{unique_id}' corresponds to profile '{profile}'.")
     else:
-        profile = select_profile(pm, args.profile, args.silent)
+        profile = select_profile(profile_mgr, args.profile, args.silent)
 
-    logger.log_this(f"Loaded Steam account {pm.steam_description(pm.steam_account_id)}")
+    logger.log_this(
+        f"Loaded Steam account "
+        f"{profile_mgr.steam_description(profile_mgr.steam_account_id)}"
+    )
     logger.log_this(f"Selected profile '{profile}' for song list updates.")
 
     # and now we can write the updates.
     # This could all be done in the one routine, but I wanted to demonstrate
     # the two different ways of writing data to a profile
 
-    import_faves_by_replace(pm, profile, song_list_dict)
+    import_faves_by_replace(profile_mgr, profile, song_list_dict)
 
-    import_song_lists_by_mutable(pm, profile, song_list_dict)
+    import_song_lists_by_mutable(profile_mgr, profile, song_list_dict)
 
     # Save the files into the update folder in the working directory
     # and then move them to the Steam account
     dialog = (
         f"Please confirm that you want to update song lists in profile '{profile}' of "
-        f"Steam account:\n{pm.steam_description(pm.steam_account_id)}"
+        f"Steam account:"
+        f"\n{profile_mgr.steam_description(profile_mgr.steam_account_id)}"
     )
 
     if args.silent or yes_no_dialog(dialog):
-        pm.write_files()
-        pm.move_updates_to_steam(pm.steam_account_id)
+        profile_mgr.write_files()
+        profile_mgr.move_updates_to_steam(profile_mgr.steam_account_id)
 
 
 if __name__ == "__main__":

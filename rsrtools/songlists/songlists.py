@@ -539,7 +539,7 @@ class SongListCreator:
             # extended else clause, as we have checked previously for invalid
             # list_target
             # pylint doesn't grok dataclasses propertly yet.
-            song_list_set = self._song_list_sets[  # pylint: disable=unsubscriptable-object
+            song_list_set = self._song_list_sets[
                 key
             ]
 
@@ -739,9 +739,9 @@ class SongListCreator:
         if isinstance(debug_target, Path):
             # Using open rather than path.open() gives a TextIO type
             # (Path.open() has type IO[Any], which is not what we want).
-            with open(debug_target, "wt") as fp:
+            with open(debug_target, "wt", encoding='locale') as file_handle:
                 song_lists = self._arr_db.generate_song_lists(
-                    use_set, self._filter_dict, fp
+                    use_set, self._filter_dict, file_handle
                 )
 
         else:
@@ -878,15 +878,15 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    main = SongListCreator(Path(args.working_dir).resolve(True))
+    creator = SongListCreator(Path(args.working_dir).resolve(True))
 
     if args.CFSMxml is not None:
         # String path by definition here.
-        main.cfsm_arrangement_file = args.CFSMxml
-        main.load_cfsm_arrangements()
+        creator.cfsm_arrangement_file = args.CFSMxml
+        creator.load_cfsm_arrangements()
 
     # run the command line interface.
-    main.song_list_cli()
+    creator.song_list_cli()
 
 
 if __name__ == "__main__":
