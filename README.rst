@@ -22,6 +22,15 @@ Rocksmith PSARC structure.
 News and Breaking Changes
 ==========================
 
+**1.0.1** Minor update for changes in steam ``libraryfolder.vdf`` configuration,
+minor bugfixes and linting. For anybody who is looking for a method to merge
+Rocksmith profiles, I've also put together a rough script as a gist - 
+`profilemerge.py 
+<https://gist.github.com/BuongiornoTexas/c781d28b35ebdfd0ba7f6d906b0cad4a>`_
+Be extremely careful using this script - minimal error check and review. 
+I'd suggest creating a test profile, clone data into it, and then merge data 
+into that.
+
 **1.0.0** First full release. No major changes from 0.3.5.
 
 **0.3.0** Feature complete release (barring a GUI in the longer term future).
