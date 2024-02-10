@@ -2,16 +2,17 @@
 
 """Provide song list creator configuration dataclasses and supporting elements."""
 
-# cSpell: ignore pydantic
+# cSpell: ignore pydantic, parameterise
 
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Optional
+import tomllib
 
 from dataclasses import field, asdict, replace  # cSpell: disable-line
 from pydantic.dataclasses import dataclass
 
-import toml
+import tomli_w
 
 from rsrtools import __version__ as RSRTOOLS_VERSION
 from rsrtools.songlists.config import RangeField, ListField, SQLField
@@ -31,8 +32,8 @@ CONFIG_RANGES = "ranges"
 CONFIG_VALUES = "values"
 
 # Set up the default TOML. In this format for readability and to test the toml loader.
-# Note the substutions which are intended as helpers in case of future field renaming.
-# pylint directive because of issue with subclassed enums.
+# Note the substitutions which are intended as helpers in case of future field renaming.
+# pylint directive because of issue with sub-classed enums.
 # pylint: disable=no-member
 DEFAULT_TOML = f"""\
 [{CONFIG_SONG_LISTS}]
@@ -533,7 +534,7 @@ Testing = [
 class RSFilterError(Exception):
     """Provide base exception for song list filtering/SQL classes."""
 
-    def __init__(self, message: str = None) -> None:
+    def __init__(self, message: Optional[str] = None) -> None:
         """Provide base exception for song list filtering/SQL classes."""
         if message is None:
             message = "An unspecified Rocksmith Filter Error has occurred."
@@ -541,7 +542,7 @@ class RSFilterError(Exception):
 
 
 class FilterMode(Enum):
-    """Logical mode for combining subfilters in a filter."""
+    """Logical mode for combining sub-filters in a filter."""
 
     AND = "AND"
     OR = "OR"
@@ -583,7 +584,7 @@ class Settings:
 
 @dataclass
 class SubFilter:
-    """Super class for SubFilters. This should not be instantiated.
+    """Super class for sub-filters. This should not be instantiated.
 
     Public attributes:
         include {bool} -- Inclusion/exclusion criteria for filters. See subclasses for
@@ -598,7 +599,7 @@ class SubFilter:
 
 @dataclass
 class RangeSubFilter(SubFilter):
-    """Range list for a range subfilter.
+    """Range list for a range sub-filter.
 
     Public attributes/methods:
         ranges {List[List[float]]} -- A list of low/high value range pairs of the form:
@@ -642,7 +643,7 @@ class RangeSubFilter(SubFilter):
 
         Returns:
             Tuple[str, List[Union[float, int]]] -- The text of the SQL clause and the
-                list of values to be subsituted into the clause.
+                list of values to be substituted into the clause.
 
         For example, for the field PLAYED_COUNT and ranges [[1,10], [25, 20]], and
         include of True, the clause will be:
@@ -720,7 +721,7 @@ class RangeSubFilter(SubFilter):
 
 @dataclass
 class ListSubFilter(SubFilter):
-    """Value list for a value subfilter.
+    """Value list for a value sub-filter.
 
     Public attributes/methods:
         values {List[str} -- A list of string values that will be used to build the
@@ -807,8 +808,8 @@ class Filter:
                 {RangeField: RangeSubFilter} or
                 {ListField: ListSubFilter}
 
-            The is the target database field for the subfilter (query), and the value
-            provides the subfilter parameters (logic and values).
+            The is the target database field for the sub-filter (query), and the value
+            provides the sub-filter parameters (logic and values).
 
         base {str} -- The name of another named filter that will provides the base data
             for this filter.
@@ -816,7 +817,7 @@ class Filter:
         mode {FilterMode} -- Defines the logic for combining sub_filters. For
             FilterMode.AND, the filter will return only records that match all of the
             the sub-filters, while FilterMode.OR will return all records that match any
-            of the subfilters.
+            of the sub-filters.
 
     Note: changes in attribute names should be reflected in default TOML.
     """
@@ -941,8 +942,9 @@ class Configuration:
         the file.
         """
         try:
-            with toml_path.open("rt") as file_handle:
-                data_dict = toml.load(file_handle)
+            # tomllib, tomli-w require binary file open/close for utf-8
+            with toml_path.open("rb") as file_handle:
+                data_dict = tomllib.load(file_handle)
         except FileNotFoundError:
             data_dict = dict()
 
@@ -958,7 +960,8 @@ class Configuration:
         if not configuration.filters and not configuration.song_list_sets:
             # No filter configurations, so set up a default set.
             # This will apply if data is missing or for a default setup.
-            configuration = replace(configuration, **toml.loads(DEFAULT_TOML))
+            # Should be OK as python strings are all in UTF-8 already?
+            configuration = replace(configuration, **tomllib.loads(DEFAULT_TOML))
 
         return configuration
 
@@ -968,15 +971,9 @@ class Configuration:
         Arguments:
             toml_path {Path} -- Path to the toml file.
         """
-        with toml_path.open("wt") as file_handle:
-            for key, item in asdict(self).items():  # cSpell: disable-line
-                if key != "filters":
-                    toml.dump({key: item}, file_handle)
-                    file_handle.write("\n")
-                else:
-                    # force toml to keep filter structures together
-                    sub_dict = {}
-                    for sub_key, sub_item in item.items():
-                        sub_dict["filters"] = {sub_key: sub_item}
-                        toml.dump(sub_dict, file_handle)
-                        file_handle.write("\n")
+        # Hopefully using sorted with tomli-w allows me keep filter structures
+        # together in the toml? If not, figure out what needs to be done to
+        # emulate the previous version using toml.
+        with toml_path.open("wb") as file_handle:
+            toml = dict(sorted(asdict(self).items()))
+            tomli_w.dump(toml, file_handle)
