@@ -3,7 +3,7 @@
 
 # Consider creating separate classes if these become extensive
 
-# cSpell:ignore HKEY, isdigit
+# cSpell:ignore HKEY, isdigit, remotecache, loginusers
 
 from sys import platform
 from pathlib import Path
@@ -28,7 +28,7 @@ REMOTE_CACHE_NAME = "remotecache.vdf"
 class SteamMetadataError(Exception):
     """Base class for Steam metadata handling errors."""
 
-    def __init__(self, message: str = None) -> None:
+    def __init__(self, message: Optional[str] = None) -> None:
         """Minimal constructor.
 
         Keyword Arguments:
@@ -179,7 +179,7 @@ class SteamAccounts:
     # instance variables
     # Steam data is unlikely to change for the duration of the program, so
     # we could use class variables here. But it'll be a lot effort, as this class
-    # probably only be instaniated once or twice.
+    # probably only be instantiated once or twice.
     # Path to the Steam application.
     _steam_path: Optional[Path]
     _account_info: Dict[str, SteamAccountInfo]
@@ -237,7 +237,7 @@ class SteamAccounts:
         info: Dict[str, SteamAccountInfo] = dict()
 
         if self._steam_path is not None:
-            # create info based on both login vdf file and userdata folder names.
+            # create info based on both login vdf file and user data folder names.
             user_dirs = self._user_data_dirs()
             user_config = self._login_info()
 
@@ -255,7 +255,7 @@ class SteamAccounts:
 
             for account, login_info in user_config.items():
                 if account in user_dirs:
-                    # We have account info and a userdata folder exists
+                    # We have account info and a user data folder exists
                     user_path = user_dirs[account]
                     valid = True
                 else:
@@ -266,11 +266,11 @@ class SteamAccounts:
                 for key in login_info.keys():
                     # Deal with variable case in Steam keys. Joy.
                     loki = key.lower()
-                    if loki == "accountname":
+                    if loki == "accountname":  # cspell: disable-line
                         name = login_info[key]
-                    elif loki == "personaname":
+                    elif loki == "personaname":  # cspell: disable-line
                         persona = login_info[key]
-                    elif loki == "mostrecent":
+                    elif loki == "mostrecent":  # cspell: disable-line
                         if login_info[key] == "1":
                             most_recent = ", most recent Steam login"
                         else:
@@ -309,10 +309,10 @@ class SteamAccounts:
         return info
 
     def _user_data_dirs(self) -> Dict[str, Path]:
-        """Return a dictionary of all userdata directories found in the Steam directory.
+        """Return a dictionary of user data directories found in the Steam directory.
 
         The dictionary keys are local Steam account ids as strings, values are the
-        directory paths. Returns an empty dict if no userdata directories are found.
+        directory paths. Returns an empty dict if no user data directories are found.
 
         """
         ret_val = dict()
@@ -320,7 +320,7 @@ class SteamAccounts:
         users_dir = self._steam_path
         if users_dir is not None:
             # noinspection SpellCheckingInspection
-            users_dir = users_dir.joinpath("userdata")
+            users_dir = users_dir.joinpath("userdata")  # cspell: disable-line
 
             if users_dir.is_dir():
                 for child in users_dir.iterdir():
@@ -340,9 +340,9 @@ class SteamAccounts:
 
         Keyword Arguments:
             only_valid {bool} -- If True, the list will contain only account ids that
-                have userdata folder and account details in the loginusers.vdf file.
+                have user data folder and account details in the loginusers.vdf file.
                 If False, the list will also contain account ids with partial
-                information (either userdata folder or login information is missing).
+                information (either user data folder or login information is missing).
                 (default: {True})
 
         Returns:
@@ -378,9 +378,9 @@ class SteamAccounts:
             test_value {str} -- This may be a 32 bit Steam ID, an 32 bit steam account
                 ID, a Steam account name, or a Steam profile alias.
             only_valid {bool} -- If True, the method will only return the account id
-                for an account with a userdata directory and a loginusers.vdf entry.
+                for an account with a user data directory and a loginusers.vdf entry.
                 If False, it will return an account id for records which have partial
-                data (either a userdata directory or login information is missing).
+                data (either a user data directory or login information is missing).
                 (default: {True})
 
         Raises:

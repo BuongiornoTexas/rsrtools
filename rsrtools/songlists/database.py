@@ -12,7 +12,8 @@ For command line options (database setup, reporting), run
     'python rsrtools.songlists.database.py -h'.
 """
 
-# cSpell:ignore stat
+# cSpell:ignore stat, profilemanager
+# pylint: disable=too-many-lines
 
 import sqlite3
 import argparse
@@ -372,8 +373,7 @@ class SQLTable:
             # cache in case of re-use.
             self._new_table_script = script
 
-        conn.executescript(self._new_table_script)
-        conn.commit()
+        conn.executescript(self._new_table_script)  # cSpell: disable-line
         conn.close()
 
     def write_row(
@@ -393,7 +393,7 @@ class SQLTable:
                 Enum used to define the SQLTable (i.e. the SQLFields defined in the
                 fields_dict argument to __init__), and there must be a key/value pair
                 for *every* field the SQLTable. For example, if a table was defined with
-                the fields ListField.ARTIST, RangeField.PITCH and Listfield.TUNING, then
+                the fields ListField.ARTIST, RangeField.PITCH and ListField.TUNING, then
                 the values dictionary should be of the form:
 
                     {ListField.ARTIST.value: "David Bowie",
@@ -764,7 +764,7 @@ class ArrangementDB:
     _arrangements_sql: SQLTable
     _profile_sql: SQLTable
 
-    def __init__(self, db_path: Path = None) -> None:
+    def __init__(self, db_path: Optional[Path] = None) -> None:
         """Initialise instance path to database, initialise table structure classes.
 
         Keyword Arguments:
@@ -891,7 +891,7 @@ class ArrangementDB:
         """
         self._arrangements_sql.rebuild_table(self.open_db())
         # create file object from path to keep mypy happy
-        # (e-tree seems to grok pathlikes, but annotations don't reflect this)
+        # (e-tree seems to grok path-likes, but annotations don't reflect this)
         with cfsm_xml_file.open("rt") as file_handle:
             tree = eTree.parse(file_handle)
 

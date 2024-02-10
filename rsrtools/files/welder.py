@@ -6,7 +6,8 @@ TODO: It does not yet provide psarc file write routines.
 """
 
 # cSpell:ignore struct, rsrpad, PSAR, Rijndael, mkdir, macos, pycryptodome, pyrocksmith
-# cSpell:ignore odlc, cdlc, xbdq, situ
+# cSpell:ignore odlc, cdlc, xbdq, situ, reconstructability
+# pylint: disable=too-many-lines
 
 import argparse
 import hashlib
@@ -77,7 +78,7 @@ WIN_KEY = bytes.fromhex(
 )
 
 
-@dataclass  # pylint: disable=used-before-assignment
+@dataclass
 class TocEntry:
     """Table of contents dataclass entry."""
 
@@ -373,7 +374,7 @@ class Welder:
         index = 0
         position = 0
         while index < self._n_toc_entries:
-            data = toc[position : position + self._toc_entry_len]
+            data = toc[position: position + self._toc_entry_len]
             # this code is straight from 0x0l. Ungodly weird stuff here.
             self._toc_entries.append(
                 TocEntry(
@@ -400,7 +401,7 @@ class Welder:
         self._block_lengths = list()
 
         while position < toc_len:
-            data = toc[position : position + BLOCK_LEN_BYTES]
+            data = toc[position: position + BLOCK_LEN_BYTES]
             self._block_lengths.append(struct.unpack(">H", data)[0])
             position += BLOCK_LEN_BYTES
 
@@ -482,7 +483,7 @@ class Welder:
         self._fd.seek(entry.offset)
 
         length = 0
-        for block_len in self._block_lengths[entry.first_block_index :]:
+        for block_len in self._block_lengths[entry.first_block_index:]:
             if block_len == 0:
                 block_len = self._default_block_len
 
@@ -566,7 +567,7 @@ class Welder:
         return self._toc_entries[index].path
 
     def verify(self, verify_io: TextIO) -> None:
-        """Verify re-constructability of an archive opened in read mode.
+        """Verify reconstructability of an archive opened in read mode.
 
         Arguments:
             verify_io {TextIO} -- Text stream for the verification reporting.
@@ -797,8 +798,7 @@ class Welder:
         file_stream.close()
 
         arc_data = arc_stream.getvalue()
-        # This is throwing a pylint error, but not sure why. Leaving for now.
-        arc_stream.close
+        arc_stream.close()
 
         return arc_data, block_lengths
 
@@ -896,7 +896,7 @@ class Welder:
                 block_lengths = list()
                 arc_len = 0
                 for this_len in self._block_lengths[
-                    self._toc_entries[check_index].first_block_index :
+                    self._toc_entries[check_index].first_block_index:
                 ]:
                     block_lengths.append(this_len)
                     if this_len == 0:

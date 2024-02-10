@@ -25,7 +25,7 @@ Where test_dir is the name of a directory containing one or more files that can 
 for testing (I wouldn't run this on any files in the Steam directory though ...)
 """
 
-# cSpell:ignore PRFLDB, pycryptodome, rsrpad
+# cSpell:ignore PRFLDB, pycryptodome, rsrpad, savefile, reconstructability
 
 import struct  # cSpell:disable-line
 import zlib
@@ -106,9 +106,12 @@ class RSSaveFile:
     json_tree: RSJsonRoot
 
     def __init__(
-        self, rs_file_path: Path, json_debug_file: str = None, debug: bool = False
+        self,
+        rs_file_path: Path,
+        json_debug_file: Optional[str] = None,
+        debug: bool = False,
     ) -> None:
-        """Read a file, perform reconstructability test, and expose file data as self.json_tree.
+        """Read a file, perform reconstructability test, and expose file data as json.
 
         Arguments:
             rs_file_path {pathlib.Path} -- The name/path of the Rocksmith file to load.
@@ -278,7 +281,7 @@ class RSSaveFile:
         return file_data
 
     def generate_save_file(self) -> bytes:
-        """Return a bytes object containing the save file corresponding the current json tree.
+        """Return a bytes object containing the save file for the current json tree.
 
         Returns:
             bytes -- Binary file data.
@@ -420,7 +423,7 @@ class RSSaveFile:
         if self._json_debug_path is not None:
             # Note: this is the raw json as loaded, not reconstructed.
             # See save_json_file for reconstructed json file
-            with self._json_debug_path.open("xt", encoding='locale') as file_handle:
+            with self._json_debug_path.open("xt", encoding="locale") as file_handle:
                 file_handle.write(payload.decode())
 
         # we use simplejson because it understands decimals and will preserve number

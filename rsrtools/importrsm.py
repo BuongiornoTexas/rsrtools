@@ -9,7 +9,7 @@ rsrtools profile manager facility.
 If the module complexity increases, I may re-implement in class form.
 """
 
-# cSpell:ignore CDLC, faves, isalnum, isdigit, prfldb
+# cSpell:ignore CDLC, faves, isalnum, isdigit, prfldb, profilemanager, userdata
 
 import argparse
 from pathlib import Path
@@ -480,7 +480,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # Share the logger everywhere.
-    global logger  # pylint: disable=global-statement disable=invalid-name
+    global logger  # pylint: disable=global-statement
     logger = SimpleLog(args.silent)
 
     if args.song_list is None:
