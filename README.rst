@@ -23,10 +23,17 @@ News and Breaking Changes
 ==========================
 
 **1.1.0** **WARNING** Please back up your config.toml before upgrading, as this change
-may break it! Update to python 3.12, minor code clean up. Moved from toml to tomllib,
-tomli-w.  I had no issues with Windows 11, but if you are on an older version, you may
-need to convert your config.toml from Windows text to UTF-8 format (I believe it should
-work out of the box though).
+may break it!  I had no issues with Windows 11, but if you are on an older version, you
+may need to convert your config.toml from Windows text to UTF-8 format (I believe it
+should work out of the box though).
+
+Behind the scenes stuff:
+
+* Updated to python 3.12, minor code clean up. 
+
+* Moved from toml to tomllib and tomli-w, much deferred pydantic update.
+  
+* Moved to hatch for packaging, shifted to src layout for packaging. 
 
 **1.0.1** Minor update for changes in steam ``libraryfolder.vdf`` configuration,
 minor bugfixes and linting. For anybody who is looking for a method to merge

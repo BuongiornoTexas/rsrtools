@@ -10,6 +10,7 @@ from typing import Dict, List, Tuple, Union, Optional
 import tomllib
 
 from dataclasses import field, asdict, replace  # cSpell: disable-line
+from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
 
 import tomli_w
@@ -548,12 +549,6 @@ class FilterMode(Enum):
     OR = "OR"
 
 
-class EnumConfig:
-    """Configuration settings for pydantic dataclasses."""
-
-    use_enum_values = True
-
-
 @dataclass
 class Settings:
     """General settings for song list creator.
@@ -797,7 +792,7 @@ class ListSubFilter(SubFilter):
         return sql_text, values
 
 
-@dataclass(config=EnumConfig)  # type: ignore
+@dataclass(config=ConfigDict(use_enum_values=True))
 class Filter:
     """Provide configuration for a named filter.
 
@@ -926,7 +921,9 @@ class Configuration:
     """
 
     # Always create a default instance/list/dictionary.
-    settings: Settings = Settings()
+    # I believe I had a shared mutable previously (which wasn't an issue given I only
+    # ever instanced once). However, hopefully the default factory fixes this.
+    settings: Settings = field(default_factory=Settings)
     # Filters before filter sets to allow future validation of filter sets.
     filters: Dict[str, Filter] = field(default_factory=dict)
     song_list_sets: Dict[str, List[str]] = field(default_factory=dict)
