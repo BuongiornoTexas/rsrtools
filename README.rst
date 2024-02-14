@@ -25,36 +25,73 @@ News and Breaking Changes
 **1.1.0** **WARNING** Please back up your config.toml before upgrading, as this change
 may break it!  I had no issues with Windows 11, but if you are on an older version, you
 may need to convert your config.toml from Windows text to UTF-8 format (I believe it
-should work out of the box though). Older breaking news and CHANGELOG moved to
-separate file as a workaround for github rst rendering problems (early 2024).
+should work out of the box though).
+
+Behind the scenes stuff:
+
+* Updated to python 3.12, minor code clean up. 
+
+* Moved from toml to tomllib and tomli-w, much deferred pydantic update.
+  
+* Moved to hatch for packaging, shifted to src layout for packaging. 
+
+**1.0.1** Minor update for changes in steam ``libraryfolder.vdf`` configuration,
+minor bugfixes and linting. For anybody who is looking for a method to merge
+Rocksmith profiles, I've also put together a rough script as a gist - 
+`profilemerge.py 
+<https://gist.github.com/BuongiornoTexas/c781d28b35ebdfd0ba7f6d906b0cad4a>`_
+Be extremely careful using this script - minimal error check and review. 
+I'd suggest creating a test profile, clone data into it, and then merge data 
+into that.
+
+**1.0.0** First full release. No major changes from 0.3.5.
+
+**0.3.0** Feature complete release (barring a GUI in the longer term future).
+The main feature added in this release is welder/welder.py for packing and unpacking 
+PSARC files, and the integration of the song scanner into the song list module. This
+means rsrtools can now operate in stand alone mode. This also allows improved 
+path (lead/rhythm/bass) filters for song list creation.
+
+**0.2.0**  As of version 
+`2.1.3 <https://github.com/sandiz/rs-manager/releases/tag/v2.1.3>`_,  
+rs-manager integrates rsrtools support out of the box. This means you can install 
+rs-manager and rsrtools, and then export set lists/song list directly from rs-manager 
+into your Rocksmith profile.
+
+**0.2.0** This release provides a command line tool for importing song lists/set lists
+exported from `rs-manager <https://github.com/sandiz/rs-manager>`_. With this
+functionality, you can take advantage of rs-manager's flexible GUI to generate set lists,
+export them to file, and then save them to a Rocksmith profile using rsrtools. Unless
+you have a particular desire to roll your own rsrtools filters, I'd suggest this as 
+a recommended use case. The documentation below provides further details on importrsm. 
 
 Warnings
 ========
 
 As this package is all about editing game saves, here are a couple of warnings.
 
-1. This package is in Beta. I've been using it for more than a year, and
+0. This package is in Beta. I've been using it for more than a year, and
    it has been robust for my application. However, until this warning disappears,
    please assume that you are the second ever user and that you will find bugs.   
    Please report these to me via github issues so I can implement fixes.
 
-2. This package edits Rocksmith profiles. Use at your own risk and with the 
+1. This package edits Rocksmith profiles. Use at your own risk and with the 
    understanding that this package carries the risk of corrupting your save files
    (to date it has worked fine for me - YMMV, and it will definitely stop working if
    Ubisoft make any changes to the Rocksmith save file format). However, the package
    includes many self checks and tries to make backups of profiles before making
    changes, so the risk of profile loss or corruption should be low.
 
-3. This package is (obviously) not endorsed by Ubisoft - if you use this package and run
+2. This package is (obviously) not endorsed by Ubisoft - if you use this package and run
    into problems with your save files, Ubisoft will not be very interested in helping
    you. If this happens, I will try to help, but will be limited by my available time
    and the complexity of your problem. So, in effect repeating the previous warning: use
    this package at your own risk.
 
-4. **Don't run this package at the same time as  Rocksmith is running.** You'll end up 
+3. **Don't run this package at the same time as  Rocksmith is running.** You'll end up 
    crossing the save files and nobody will be happy (mostly you though).
 
-5. This package will only work on Windows and Mac OS X at the moment. I have no idea
+4. This package will only work on Windows and Mac OS X at the moment. I have no idea
    what would be needed for Linux/PS4/XBox song lists.
 
 
@@ -1401,3 +1438,48 @@ TODO
 
 - Add more substantial documentation on profile manager (for Rocksmith file editing),
   database, and song lists (hooks for GUI implementations).
+
+Changelog
+==========
+
+**1.0.0** First full release based on no issues being reported for a significant period.
+Includes a minor update to allow underscore and dash characters in importrsm song list
+names (this addresses a bug identified in
+`rs-manager issue 68 <https://github.com/sandiz/rs-manager/issues/68#issuecomment-604780122>`_).
+
+**0.3.5beta 2019-05-21** Song list filters will now pick up songs that have never
+been played (previously a song needed to have been played at least once for the database
+queries to fire). Fixed spurious detection of new DLC in songlists.
+
+**0.3.0beta 2019-05-21** Welder module for PSARC packing/unpacking. Scanner built into
+songlists.
+
+**0.2.2beta 2019-05-08** Arrangement deletion cli.
+
+**0.2.1beta 2019-05-05** Minor bug fixes, added profile db path option to importrsm.
+
+**0.2.0beta 2019-05-01** 
+
+- Added field reports to song list cli, moved steam.py.
+
+- Fixed a major oversight and added an export profile as json method to profile manager.
+
+- Added a command line importer for song lists/set lists exported from rs-manager.
+
+- Added entry points for profilemanager, songlists and importrsm.
+
+**0.1.2beta 2019-04-26** Mac OS X support added. 
+
+**0.1.1beta 2019-04-26** Minor updates to refer to Steam account id and Steam user id 
+correctly. All Steam support functions moved to steam.py. Some Windows specific Steam
+functions removed and replaced with methods based on Steam vdf files.
+
+**0.1.0beta 2019-04-22** First functional beta release for rsrtools. Windows only.
+
+**0.0.1 2019-03-12** Place holder release to lock package name down in pypi.
+
+Development notes
+=================
+
+20190421 Song list creator and database modules functional, first draft of documentation
+complete. 0.1 release imminent.
