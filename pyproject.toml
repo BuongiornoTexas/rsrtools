@@ -12,7 +12,7 @@ description = "Tools for managing Rocksmith 2014 songlists and save files."
 readme = "README.rst"
 requires-python = ">=3.12"
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: End Users/Desktop",
   "Environment :: Console",
   "License :: OSI Approved :: MIT License",
@@ -41,10 +41,10 @@ dev = [
 ]
 
 [project.scripts]
-songlists = rsrtools.songlists.songlists:main
-profilemanager = rsrtools.files.profilemanager:main
-importrsm = rsrtools.importrsm:main
-welder = rsrtools.files.welder:main
+songlists = "rsrtools.songlists.songlists:main"
+profilemanager = "rsrtools.files.profilemanager:main"
+importrsm = "rsrtools.importrsm:main"
+welder = "rsrtools.files.welder:main"
 
 [project.urls]
 "Homepage" = "https://github.com/BuongiornoTexas/rsrtools"
