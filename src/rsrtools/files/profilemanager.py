@@ -8,7 +8,9 @@ For command line options (database setup, reporting), run:
     'python -m rsrtools.files.profilemanager -h'
 """
 
-# cSpell:ignore shutil, PRFLDB, mkdir, strftime, nargs, fstring
+# cSpell:ignore shutil, PRFLDB, mkdir, strftime, nargs, fstring, remotecache, savefile
+# cSpell: ignore profilemanager, steamcache
+# pylint: disable=too-many-lines
 
 import argparse
 import copy
@@ -68,7 +70,7 @@ JSON_path_type = Sequence[Union[int, str, ProfileKey]]  # pylint: disable=invali
 class RSFileSetError(Exception):
     """Exception for errors in Rocksmith file sets."""
 
-    def __init__(self, message: str = None) -> None:
+    def __init__(self, message: Optional[str] = None) -> None:
         """Minimal constructor for RSFileSetError.
 
         Keyword Arguments:
@@ -85,7 +87,7 @@ class RSFileSetError(Exception):
 class RSProfileError(Exception):
     """Exception for errors in the Rocksmith profile manager and associated classes."""
 
-    def __init__(self, message: str = None) -> None:
+    def __init__(self, message: Optional[str] = None) -> None:
         """Minimal constructor for RSProfileError.
 
         Keyword Arguments:
@@ -143,7 +145,7 @@ class RSSaveWrapper:
 
     Implementation note: I believe all Rocksmith Json objects have either names [str],
     such as 'Songlists' or integer indices into arrays [int], such as the second
-    Songlist (2). Type annotations in this class reflect this assumption.
+    song list (2). Type annotations in this class reflect this assumption.
 
     Save wrapper instances should be marked as dirty when instance data is changed
     (i.e. the caller should mark the instance as dirty when the instance data no longer
@@ -529,7 +531,7 @@ class RSProfileDB(RSSaveWrapper):
         arrangement_ids -- An iterator that yields the unique arrangement ids in the
             Rocksmith profile.
         replace_song_list -- Replace one of the songlists in the profile with a new
-            songlist.
+            song list.
         set_arrangement_play_count -- Set the "Learn a Song" play count of an
             arrangement to a new value.
     """
@@ -652,7 +654,7 @@ class RSProfileDB(RSSaveWrapper):
                 f"\nArgument is of type {type(new_song_list)}."
             )
 
-        if not all(isinstance(songkey, str) for songkey in new_song_list):
+        if not all(isinstance(song_key, str) for song_key in new_song_list):
             raise RSProfileError(
                 "Invalid song list argument. Song lists must be a list of strings."
                 "\nSome non-string types found in list."
@@ -716,7 +718,7 @@ class RSFileSet:
     Public methods:
         Constructor -- Creates and check the consistency of a Rocksmith file set based
             on the files and and sub-directories in a target directory.
-        copy_file_set -- Copy a Rocksmith fileset to a new directory.
+        copy_file_set -- Copy a Rocksmith file set to a new directory.
         delete_files -- Delete all files in the file set.
         consistent -- Read only property. True if the file set has passed basic tests on
             folder structure, existences of Steam and Rocksmith files, and metadata
@@ -728,8 +730,8 @@ class RSFileSet:
         profiles -- Read only property, returns a dictionary of the Rocksmith profiles
             in the the file set (RSProfileDB objects).
         m_time -- Read only property, returns the most recent modification date/time for
-            all of the profiles in the fileset (i.e. checks all profiles and returns the
-            date from the most recently modified of these).
+            all of the profiles in the file set (i.e. checks all profiles and returns
+            the date from the most recently modified of these).
 
     A consistent rocksmith save set consists of the following elements:
         - A remotecache.vdf file used for Steam cloud syncing.
@@ -768,7 +770,7 @@ class RSFileSet:
         The Constructor also checks consistency of the file set and finds time of the
         most recent profile save.
 
-        If there are errors in structure or the fileset is not consistent, errors are
+        If there are errors in structure or the file set is not consistent, errors are
         printed to help user resolve issues.
 
         This method deliberately excludes crd files.
@@ -892,7 +894,7 @@ class RSFileSet:
             new_remote_path {pathlib.Path} -- The destination directory for the
                 Rocksmith save files.
             require_consistent {bool} -- If true, the copy will raise an exception if
-                the fileset is not not consistent. See notes below. A False value for
+                the file set is not not consistent. See notes below. A False value for
                 this parameter may be useful when working with incomplete file sets.
                 (default: True)
 
@@ -955,7 +957,7 @@ class RSFileSet:
             if file.file_path.exists():
                 file.file_path.unlink()
 
-        # and in case someone tries to use this fileset now
+        # and in case someone tries to use this file set now
         self._consistent = False
         self._fs_profiles = dict()
         self._fs_local_profiles = None
@@ -1012,7 +1014,7 @@ class RSFileSet:
 
         Gets:
             str -- Returns the most recent modification date/time for all of the
-            profiles in the fileset (i.e. checks all profiles and returns the date from
+            profiles in the file set (i.e. checks all profiles and returns the date from
             the most recently modified of these).
 
         """
@@ -1092,7 +1094,7 @@ class RSProfileManager:
     """
 
     # instance variables
-    # As we should be working on consistent fileset, none of these three
+    # As we should be working on consistent file set, none of these three
     # should ever be None.
     _steam_metadata: SteamMetadata
     _local_profiles: RSLocalProfiles
@@ -1110,7 +1112,7 @@ class RSProfileManager:
     def __init__(
         self,
         base_dir: Path,
-        steam_account_id: Union[str, int] = None,
+        steam_account_id: Optional[Union[str, int]] = None,
         auto_setup: bool = False,
         flush_working_set: bool = False,
     ) -> None:
@@ -1143,7 +1145,7 @@ class RSProfileManager:
 
         Raises:
             NotADirectoryError -- If base_dir is not a directory.
-            RSFileSetError -- If the selected/specified fileset is not valid.
+            RSFileSetError -- If the selected/specified file set is not valid.
 
         The constructor performs the following actions:
             - Checks the directory structure under base_dir and offers to set up any
@@ -1214,7 +1216,7 @@ class RSProfileManager:
             logging.disable(logging.NOTSET)
 
         if not self._steam_account_id:
-            # default action: user selects working fileset from command line
+            # default action: user selects working file set from command line
             self._steam_account_id, chosen_file_set = self._choose_file_set(
                 steam_file_sets, working_file_set
             )
@@ -1248,14 +1250,14 @@ class RSProfileManager:
         if chosen_file_set.local_profiles is None:
             # Really shouldn't be possible.
             raise RSFileSetError(
-                f"Very unexpected: undefined {LOCAL_PROFILES} for chosen fileset."
+                f"Very unexpected: undefined {LOCAL_PROFILES} for chosen file set."
             )
         self._local_profiles = chosen_file_set.local_profiles
 
         if chosen_file_set.steam_metadata is None:
             # Really shouldn't be possible.
             raise RSFileSetError(
-                "Very unexpected: undefined Steam metadata for chosen fileset."
+                "Very unexpected: undefined Steam metadata for chosen file set."
             )
         self._steam_metadata = chosen_file_set.steam_metadata
 
@@ -1560,7 +1562,7 @@ class RSProfileManager:
         logging.disable(logging.CRITICAL)
         file_set = RSFileSet(self._update_save_path)
         logging.disable(logging.NOTSET)
-        # Note fileset.profiles is a dict - Returns True if it contains members
+        # Note file set.profiles is a dict - Returns True if it contains members
         if (
             file_set.profiles
             or file_set.local_profiles is not None

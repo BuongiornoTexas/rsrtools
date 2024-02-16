@@ -1,11 +1,13 @@
 #! /usr/bin/env python
 """File exceptions for rsrtools."""
 
+from typing import Optional
+
 
 class RsrError(Exception):
     """Super class for rsrtools errors."""
 
-    def __init__(self, message: str = None) -> None:
+    def __init__(self, message: Optional[str] = None) -> None:
         """Minimal constructor for RsrErrors.
 
         Keyword Arguments:

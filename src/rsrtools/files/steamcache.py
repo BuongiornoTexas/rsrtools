@@ -4,7 +4,9 @@
 Refer to class SteamMetadata for further detail/definitions.
 """
 
-# cSpell:ignore platformstosync, PRFLDB
+# cSpell:ignore PRFLDB, remotecache, steamcache
+# I'd prefer to not ignore these, but stupid steam keywords are stupid.
+# cspell: ignore platformstosync, remotetime, syncstate, persiststate
 
 from os import fsdecode
 from pathlib import Path
@@ -161,7 +163,7 @@ class SteamMetadata:
         """
         file_metadata = None
         # This will throw a key error if the metadata dictionary doesn't contain
-        # entries for app_id. Otherwiser returns a dictionary of dicts containing
+        # entries for app_id. Otherwise returns a dictionary of dicts containing
         # metadata for *ALL* of the Steam cloud files associated with the app_id. Need
         # to search this dict to find the sub-dictionary for the target file.
         file_dict = self._steam_metadata[double_quote(app_id)]
@@ -203,7 +205,7 @@ class SteamMetadata:
         return ret_val
 
     def update_metadata_set(
-        self, app_id: str, file_path: Path, data: bytes = None
+        self, app_id: str, file_path: Path, data: Optional[bytes] = None
     ) -> None:
         """Update all writeable metadata for a Steam cloud file.
 
@@ -369,11 +371,13 @@ def self_test() -> None:
     remote_cache = load_vdf(test_path.joinpath(REMOTE_CACHE_NAME), strip_quotes=False)
 
     test_passed = True
-    for app_id in remote_cache:  # pylint: disable=consider-using-dict-items
+    for app_id, app_dict in remote_cache.items():
         print(f"\nTesting steam app: {app_id}.")
-        for cachefile in remote_cache[app_id].keys():
-            print(f"\n  Test results for file: {cachefile}.")
-            filepath = test_path.joinpath(STEAM_REMOTE_DIR + "/" + cachefile.strip('"'))
+        for cache_file in app_dict.keys():
+            print(f"\n  Test results for file: {cache_file}.")
+            filepath = test_path.joinpath(
+                STEAM_REMOTE_DIR + "/" + cache_file.strip('"')
+            )
             if not filepath.exists():
                 print("  File not found.")
 
@@ -390,7 +394,7 @@ def self_test() -> None:
                 for steam_key in SteamMetadataKey:
                     # report on differences/matches between original data and calculated
                     # versions
-                    orig_value = remote_cache[app_id][cachefile][steam_key.value]
+                    orig_value = app_dict[cache_file][steam_key.value]
                     new_value = calculated_metadata[steam_key.value]
                     if orig_value == new_value:
                         outcome = "OK value:"

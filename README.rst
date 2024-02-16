@@ -15,12 +15,25 @@ Acknowledgements
 `rocksmith <https://github.com/0x0L/rocksmith>`_ Rocksmith 
 tools. All of the save file and data file handling routines are based on this code.
 
-**@sandiz** for `rs-manager <https://github.com/sandiz/rs-manager>`_, which is an 
+**@sandiz** for `rs-manager <https://github.com/sandiz/rs-manager>`__, which is an 
 awesome set listing tool. This package also gave me a deeper understanding of the 
 Rocksmith PSARC structure.
 
 News and Breaking Changes
 ==========================
+
+**1.1.0** **WARNING** Please back up your config.toml before upgrading, as this change
+may break it!  I had no issues with Windows 11, but if you are on an older version, you
+may need to convert your config.toml from Windows text to UTF-8 format (I believe it
+should work out of the box though).
+
+Behind the scenes stuff:
+
+* Updated to python 3.12, minor code clean up. 
+
+* Moved from toml to tomllib and tomli-w, much deferred pydantic update.
+  
+* Moved to hatch for packaging, shifted to src layout for packaging. 
 
 **1.0.1** Minor update for changes in steam ``libraryfolder.vdf`` configuration,
 minor bugfixes and linting. For anybody who is looking for a method to merge
@@ -46,7 +59,7 @@ rs-manager and rsrtools, and then export set lists/song list directly from rs-ma
 into your Rocksmith profile.
 
 **0.2.0** This release provides a command line tool for importing song lists/set lists
-exported from `rs-manager <https://github.com/sandiz/rs-manager>`_. With this
+exported from `rs-manager <https://github.com/sandiz/rs-manager>`__. With this
 functionality, you can take advantage of rs-manager's flexible GUI to generate set lists,
 export them to file, and then save them to a Rocksmith profile using rsrtools. Unless
 you have a particular desire to roll your own rsrtools filters, I'd suggest this as 
@@ -57,28 +70,28 @@ Warnings
 
 As this package is all about editing game saves, here are a couple of warnings.
 
-0. This package is in Beta. I've been using it for more than a year, and
+1. This package is in Beta. I've been using it for more than a year, and
    it has been robust for my application. However, until this warning disappears,
    please assume that you are the second ever user and that you will find bugs.   
    Please report these to me via github issues so I can implement fixes.
 
-1. This package edits Rocksmith profiles. Use at your own risk and with the 
+2. This package edits Rocksmith profiles. Use at your own risk and with the 
    understanding that this package carries the risk of corrupting your save files
    (to date it has worked fine for me - YMMV, and it will definitely stop working if
    Ubisoft make any changes to the Rocksmith save file format). However, the package
    includes many self checks and tries to make backups of profiles before making
    changes, so the risk of profile loss or corruption should be low.
 
-2. This package is (obviously) not endorsed by Ubisoft - if you use this package and run
+3. This package is (obviously) not endorsed by Ubisoft - if you use this package and run
    into problems with your save files, Ubisoft will not be very interested in helping
    you. If this happens, I will try to help, but will be limited by my available time
    and the complexity of your problem. So, in effect repeating the previous warning: use
    this package at your own risk.
 
-3. **Don't run this package at the same time as  Rocksmith is running.** You'll end up 
+4. **Don't run this package at the same time as  Rocksmith is running.** You'll end up 
    crossing the save files and nobody will be happy (mostly you though).
 
-4. This package will only work on Windows and Mac OS X at the moment. I have no idea
+5. This package will only work on Windows and Mac OS X at the moment. I have no idea
    what would be needed for Linux/PS4/XBox song lists.
 
 
@@ -90,27 +103,27 @@ If you know what you are doing with python, here are the recommended quick start
 Installation and Basic Set Up
 ------------------------------
 
-0. The package only works on Windows and Mac OS X for now.
+1. The package only works on Windows and Mac OS X for now.
 
-1. Install python 3.7.x (I'm on 3.7.3, and you will need some 3.7 features).
+2. Install python 3.7.x (I'm on 3.7.3, and you will need some 3.7 features).
 
-2. Create a virtual environment (for easy step by step instructions, see 
+3. Create a virtual environment (for easy step by step instructions, see 
    `Installation and Set Up`_). 
 
-3. Install rsrtools into your virtual environment with::
+4. Install rsrtools into your virtual environment with::
 
     pip install rsrtools
 
-4. Create a working folder/directory.
+5. Create a working folder/directory.
 
-5. **READ** the section on setting up a test profile (`Set up a Testing Profile!`_). 
+6. **READ** the section on setting up a test profile (`Set up a Testing Profile!`_). 
    Until you are familiar with the package, this will be your best safeguard against 
    damaging your precious save game(s).
 
-6. **SET UP** a Rocksmith test profile. Open Rocksmith, create a new profile named e.g.
+7. **SET UP** a Rocksmith test profile. Open Rocksmith, create a new profile named e.g.
    'Testing', and run through the profile set up (unavoidable).
 
-7. Optional, but highly recommended: **Clone your save game into the test profile** and
+8. Optional, but highly recommended: **Clone your save game into the test profile** and
    do all of your testing on this test profile until you are comfortable that the
    package is working and doing what you want it to do (`Clone Profile`_). The following
    command provides a short cut for profile cloning::
@@ -532,17 +545,17 @@ Now is a good time to start up Rocksmith and check the Testing profile:
 rs-manager Song List Export
 =============================
 
-This section describes using `rs-manager <https://github.com/sandiz/rs-manager>`_
+This section describes using `rs-manager <https://github.com/sandiz/rs-manager>`__
 to export a set list/song list directly into a Rocksmith profile. I am expecting this
 will be the main use case use for most rsrtools users. 
 
-0. Install both rsrtools and rs-manager.
+1. Install both rsrtools and rs-manager.
 
-1. Start rs-manager.
+2. Start rs-manager.
 
-2. Go to settings and check that the path to importrsm is correct. 
+3. Go to settings and check that the path to importrsm is correct. 
 
-3. Go to Set Lists, pick a set list, hit the export button, and follow the prompts
+4. Go to Set Lists, pick a set list, hit the export button, and follow the prompts
 
 That's it!
 
@@ -550,7 +563,8 @@ Importing Song Lists Created by rs-manager
 ===========================================
 
 This section explains how to use the importrsm command line program to read
-song lists created and exported by `rs-manager <https://github.com/sandiz/rs-manager>`_,
+song lists created and exported by 
+`rs-manager <https://github.com/sandiz/rs-manager>`__,
 and then write these song lists to a Rocksmith profile.
 
 Repeating an important warning (`Warnings`_): **Don't run this package at the same time
@@ -688,7 +702,7 @@ Preliminaries
    All of the text menus and text prompts will ask you to either select a number or 
    select y/n (followed by enter to action).
 
-7. At this menu, you first need to select a Steam account id, so choose 1 to start a
+5. At this menu, you first need to select a Steam account id, so choose 1 to start a
    text menu for selecting from the available Steam account ids. For this tutorial, our 
    selection options look like this::
 
@@ -706,7 +720,7 @@ Preliminaries
    to do this is select an id and then check if the Testing profile can be selected
    (next step). If not, you have the wrong Steam id and need to try another one.
 
-8. After selecting a Steam id, you need to select a user profile for song list creation.
+6. After selecting a Steam id, you need to select a user profile for song list creation.
    Choose 2 to start this process, and then choose a profile ('Testing' for this
    tutorial). After completing this process, the first two information lines of the 
    song list menu should be similar to::
@@ -714,7 +728,7 @@ Preliminaries
             Steam account id:    '12345678', (HalfABee [eric]), most recent Steam login.
             Rocksmith profile:   'Testing'
 
-9. At this point, it's worth saving the changes you have made.
+7. At this point, it's worth saving the changes you have made.
 
    Select 0 to exit the program.
 
@@ -1291,13 +1305,13 @@ maximise your chances of profile edits loading successfully).
 
 With those warnings out of the way, onto the approach. The general steps are:
 
-0. Export a profile in JSON format so that you can work out which fields and data
+1. Export a profile in JSON format so that you can work out which fields and data
    you want to work with in your editor. To this end, rsrtools includes a handy profile 
    export feature described in `Exporting Human Readable Profiles`_.
 
-1. Create a profile manager instance (pm), which will need a working directory.
+2. Create a profile manager instance (pm), which will need a working directory.
 
-2. Read json data from a profile using::
+3. Read json data from a profile using::
 
      pm.get_json_subtree(profile_name, json_path).
    
@@ -1309,7 +1323,7 @@ With those warnings out of the way, onto the approach. The general steps are:
    
       pm.mark_as_dirty(profile_name)
 
-3. If you are working on new data, a copy of data obtained from get_json_subtree, or a 
+4. If you are working on new data, a copy of data obtained from get_json_subtree, or a 
    non-mutable value, replace the instance data in the profile manager with the new
    data by::
    
@@ -1317,11 +1331,11 @@ With those warnings out of the way, onto the approach. The general steps are:
 
    This approach will automatically mark the instance data for profile_name as dirty.
 
-4. Write the files to the update folder (and generate backups along the way)::
+5. Write the files to the update folder (and generate backups along the way)::
 
       pm.write_files()
 
-5. Move the updated files to the Steam folder::
+6. Move the updated files to the Steam folder::
 
       pm.move_update_to_steam(steam_account_id)
  

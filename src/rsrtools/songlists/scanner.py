@@ -3,7 +3,8 @@
 """Provide database scanner for PSARC files."""
 
 # cSpell:ignore steamapps, stat, rpartition, isdigit, CGCGGE, CGCGBE, firekorn
-# cSpell:ignore CACGCE, EADG, etudes
+# cSpell:ignore DADGAD
+# cSpell:ignore CACGCE, EADG, etudes, libraryfolders, levelbreak, chordnamestress
 
 from sys import platform
 
@@ -23,7 +24,7 @@ ROCKSMITH_PATH = "steamapps/common/Rocksmith2014"
 DLC_PATH = "dlc"
 MAC_PSARC = "_m.psarc"
 WIN_PSARC = "_p.psarc"
-RS_COMPATABILITY = "rs1compatibility"
+RS_COMPATIBILITY = "rs1compatibility"
 RS_INTERNAL = "Rocksmith Internal"
 INTERNAL_SONGS = (
     "manifests/songs/rs2tails_combo.json"
@@ -37,7 +38,7 @@ INTERNAL_SONGS = (
 
 track_types = {"_lead": "Lead", "_bass": "Bass", "_rhythm": "Rhythm", "_combo": "Combo"}
 
-# E standard repeated here, as Rocksmith can be interally
+# E standard repeated here, as Rocksmith can be internally
 # inconsistent.
 # Tuning names taken from Rocksmith Song Custom Toolkit (Thanks firekorn)
 # https://github.com/rscustom/rocksmith-custom-song-toolkit/blob/master/ ...
@@ -135,11 +136,11 @@ def rocksmith_path() -> Path:
     return rs_path
 
 
-def newer_songs(last_modifed: float) -> bool:
+def newer_songs(last_modified: float) -> bool:
     """Check Rocksmith dlc against a timestamp and return True if new songs found.
 
     Arguments:
-        last_modifed {float} -- The timestamp to check.
+        last_modified {float} -- The timestamp to check.
 
     Returns:
         bool -- True if at least one song file (psarc) has a timestamp newer than
@@ -152,7 +153,7 @@ def newer_songs(last_modifed: float) -> bool:
         find_files = MAC_PSARC
 
     for scan_path in rocksmith_path().joinpath(DLC_PATH).glob("**/*" + find_files):
-        if scan_path.stat().st_mtime > last_modifed:
+        if scan_path.stat().st_mtime > last_modified:
             return True
 
     return False
@@ -466,7 +467,7 @@ class Scanner:
 
         Arguments:
             last_modified {Optional[float]} -- If specified, the iterator will only
-                return arrangements for psarc files more recent than last_modifed
+                return arrangements for psarc files more recent than last_modified
                 (per Path.stat().st_mtime). (default: None)
 
         Yields:
@@ -513,8 +514,8 @@ class Scanner:
 
         for scan_path in self._rs_path.joinpath(DLC_PATH).glob("**/*" + find_files):
             if not scan_all:
-                if scan_path.name.startswith(RS_COMPATABILITY):
-                    # Only scan RS1 compatability on full scan.
+                if scan_path.name.startswith(RS_COMPATIBILITY):
+                    # Only scan RS1 compatibility on full scan.
                     continue
                 elif scan_path.stat().st_mtime < last_modified:
                     # skip anything older than last modified time.

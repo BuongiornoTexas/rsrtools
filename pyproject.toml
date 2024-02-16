@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rsrtools"
+dynamic = ["version"]
+authors = [
+  {name="BuongiornoTexas"},
+]
+description = "Tools for managing Rocksmith 2014 songlists and save files."
+readme = "README.rst"
+requires-python = ">=3.12"
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: End Users/Desktop",
+  "Environment :: Console",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: Microsoft :: Windows :: Windows 10",
+  "Operating System :: Microsoft :: Windows :: Windows 11",
+  "Operating System :: MacOS :: MacOS X",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Games/Entertainment",
+]
+license = "MIT"
+keywords = [
+  "Rocksmith",
+  "Songlists",
+]
+dependencies = [
+  "pycryptodome >= 3.20.0",
+  "simplejson >= 3.19.2",
+  "tomli-w >= 1.0.0",
+  "pydantic >= 2.6.1",
+]
+
+[project.optional-dependencies] 
+dev = [
+  "types-simplejson",
+]
+
+[project.scripts]
+songlists = "rsrtools.songlists.songlists:main"
+profilemanager = "rsrtools.files.profilemanager:main"
+importrsm = "rsrtools.importrsm:main"
+welder = "rsrtools.files.welder:main"
+
+[project.urls]
+"Homepage" = "https://github.com/BuongiornoTexas/rsrtools"
+"Bug Tracker" = "https://github.com/BuongiornoTexas/rsrtools/issues"
+
+[tool.hatch.version]
+path = "src/rsrtools/__init__.py"
+
+[tool.hatch.envs.default]
+platforms = ["windows", "macos"]
