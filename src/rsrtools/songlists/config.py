@@ -12,12 +12,15 @@ class SQLField(Enum):
     """Provide for abuse of the Enum class to set standard field types."""
 
     @classmethod
-    def getsubclass(cls, value: str) -> "SQLField":
+    def get_sub_class(cls, value: str) -> "SQLField":
         """Create a subclass Enum value from a string value.
 
         This assumes that a) all SQLField subclass constants are strings and b) there
         are no repeated strings between the subclasses.
         """
+        # Jan 2024 - I don't think this method is used at all? Safe to delete?
+        # for now, have made the method name consistent with other methods.
+        # Previous version had no underscores.
         ret_val: Optional[SQLField] = None
         for field_class in cls.__subclasses__():
             try:

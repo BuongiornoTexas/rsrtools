@@ -86,7 +86,7 @@ def choose(
             print()
 
         for i, (key, value) in enumerate(opt_tuple_list):
-            print(f"{i +1:3d}) {key}")
+            print(f"{i + 1: 3d}) {key}")
         if no_action is not None:
             print("  0) " + no_action)
         if help_text is not None:

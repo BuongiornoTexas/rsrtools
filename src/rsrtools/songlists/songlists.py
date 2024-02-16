@@ -6,7 +6,7 @@ For command line options (database setup, reporting), run:
     'python -m rsrtools.songlists.songlists -h'
 """
 
-# cSpell:ignore unsubscriptable
+# cSpell:ignore unsubscriptable, profilemanager
 
 import argparse
 import sys
@@ -496,13 +496,11 @@ class SongListCreator:
         if list_target is ProfileKey.FAVORITES_LIST:
             # Running favorites or testing a filter, so need to select a single filter
             # from the dictionary of filters
-            # pylint doesn't grok dataclasses propertly yet.
-            option_list = tuple(self._filter_dict.keys())  # pylint: disable=no-member
+            option_list = tuple(self._filter_dict.keys())
         elif list_target is ProfileKey.SONG_LISTS:
             # Running song lists, so need to select from available song list sets
-            # pylint doesn't grok dataclasses propertly yet.
             option_list = tuple(
-                self._song_list_sets.keys()  # pylint: disable=no-member
+                self._song_list_sets.keys()
             )
         else:
             raise RSFilterError(
@@ -538,7 +536,6 @@ class SongListCreator:
             # Get the selected song list set from the song_list_sets dict. No need for
             # extended else clause, as we have checked previously for invalid
             # list_target
-            # pylint doesn't grok dataclasses propertly yet.
             song_list_set = self._song_list_sets[
                 key
             ]
@@ -710,7 +707,7 @@ class SongListCreator:
 
         If debug target is not None, song lists are not saved to the instance profile.
         Instead:
-            - If debug_target is a stream, extended song lists are writtend to the
+            - If debug_target is a stream, extended song lists are written to the
               stream.
             - If debug_target is a file path, the file is opened and the extended
               song lists are written to this file.
